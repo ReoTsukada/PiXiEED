@@ -15,7 +15,7 @@ import {
 import { buildJigsawSelectionEdges } from './jigsaw-selection.mjs';
 import { supabaseConfig } from '../../data/site-config.js?rev=20261001-free-tools-1';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
-import { mountPxdTools } from './pxd-ui.mjs?rev=20261118-draw-display-ad-1';
+import { mountPxdTools } from './pxd-ui.mjs?rev=20261118-draw-button-label-1';
 import { putPxdSharedImage } from './pxd-project.mjs?rev=20261116-normal-release-2';
 import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20261116-normal-release-2';
 import { normalizeJigsawFile } from './jigsaw-file.mjs?rev=20260929-claude-integration-1';

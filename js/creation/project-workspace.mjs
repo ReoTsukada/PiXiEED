@@ -3,7 +3,7 @@ import { routeEditorFile } from './output-router.mjs?rev=20261111-output-offerwa
 import { getToolStartRoute, isFreshToolStartRequest } from '../tool-start-routes.mjs?rev=20261110-output-result-1';
 import { createPxdProject, decodePxd, encodePxd } from './pxd-codec.mjs';
 import { createToolProjectStore, cloneAsToolProject } from './tool-project-store.mjs?rev=20261116-normal-release-2';
-import { importToolProject } from './tool-project-import.mjs?rev=20261116-normal-release-2';
+import { importToolProject } from './tool-project-import.mjs?rev=20261118-draw-button-label-1';
 import { createProjectSession } from './project-session.mjs?rev=20261116-normal-release-2';
 import { forkProject, sanitizeProjectTitle, summarizeProject } from './project-catalog.mjs?rev=20261116-normal-release-2';
 import { pxdToolUrl, readPxdImage } from './pxd-project.mjs?rev=20261116-normal-release-2';
@@ -23,11 +23,33 @@ const icons = {
   jigsaw: '<path d="M4 4h6a3 3 0 1 0 4 0h6v6a3 3 0 1 1 0 4v6h-6a3 3 0 1 0-4 0H4v-6a3 3 0 1 1 0-4z"/>',
   spot_difference: '<path d="M3 4h7v16H3zM14 4h7v16h-7zM5 9h3M16 14h3"/>',
   hidden_object: '<circle cx="10" cy="10" r="6"/><path d="m15 15 6 6M8 10h4M10 8v4"/>',
-  close: '<path d="m6 6 12 12M6 18 18 6"/>'
+  close: '<path d="m6 6 12 12M6 18 18 6"/>',
+  add: '<path d="M12 5v14M5 12h14"/>',
+  copy: '<rect x="8" y="7" width="12" height="14" rx="2"/><path d="M16 7V4a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h3"/>',
+  save: '<path d="M5 3h12l4 4v14H3V3zM7 3v6h10V3M7 21v-8h10v8"/>',
+  download: '<path d="M12 3v12m-5-5 5 5 5-5M5 17v4h14v-4"/>',
+  retry: '<path d="M4 7v5h5M5.5 11A7 7 0 1 1 6 16"/>',
+  select: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="m8 12 3 3 5-6"/>',
+  trash: '<path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7"/>'
 };
+const ACTION_ICONS = Object.freeze({
+  'project-close': 'close', 'project-rename': 'save', 'project-continue': 'draw', 'project-new': 'add',
+  'project-duplicate': 'copy', 'pxd-save': 'save', 'pxd-export': 'download', 'pxd-export-original': 'download',
+  'pxd-open': 'folder', 'project-import-retry': 'retry', 'project-import-copy': 'copy', 'project-import-clear': 'close',
+  'project-tab-current': 'draw', 'project-tab-library': 'folder', 'project-tab-import': 'folder',
+  'project-select': 'select', 'project-select-all': 'select', 'project-select-cancel': 'close',
+  'project-delete-selected': 'trash', 'project-list-retry': 'retry', 'project-empty-new': 'add',
+  'project-delete-dismiss': 'close', 'project-delete-cancel': 'close', 'project-delete-confirm': 'trash',
+  'project-card-actions-open': 'folder', 'project-card-actions-copy': 'copy', 'project-card-actions-delete': 'trash',
+  'project-card-actions-close': 'close', 'project-card-actions-dismiss': 'close'
+});
 function icon(name) { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name]}</svg>`; }
 function node(tag, className, text) { const el = document.createElement(tag); if (className) el.className = className; if (text) el.textContent = text; return el; }
-function button(label, id, action) { const el = node('button', '', label); el.type = 'button'; el.id = id; el.addEventListener('click', action); return el; }
+function setButtonLabel(button, value) {
+  const label = button.querySelector('.project-action-label');
+  const text = label ? String(value).replace(/^＋\s*/, '') : value;
+  if ((label || button).textContent !== text) (label || button).textContent = text;
+}
 async function sendPxdBackup(bytes, name) {
   // Stage the exact backup; PXD is never decoded by the image converter.
   await routeEditorFile(new Blob([bytes], { type: 'application/octet-stream' }), name);
@@ -40,6 +62,19 @@ export function isInitialProjectEntryFresh({ initialProject = null, pointer = nu
 
 /** Each tool owns its projects. Imports are independent copies, never linked editors. */
 export function mountProjectWorkspace({ tool, getProject, openProject, setStatus = () => {}, getPublicSources = () => [], getEditorState = () => ({}), getPreviewImage = () => null, restoreEditorState = () => {}, onNavigate = null, hasContent = () => true, initialProject = null, initialPointer = null, initialRestoreError = '', root = null, idPrefix = '', routePointer = true, isActive = () => true, rememberKey = null, rememberShared = true, allowImplicitImport = true, initialEntryRequestFresh = null }) {
+  function button(label, id, action) {
+    const el = node('button', '', label); el.type = 'button'; el.id = id; el.addEventListener('click', action);
+    const name = tool === 'draw' && ACTION_ICONS[id];
+    if (name) {
+      el.dataset.projectActionIcon = 'true';
+      el.innerHTML = icon(name);
+      el.firstElementChild.classList.add('project-action-icon');
+      const caption = ({ 'project-tab-library': '作品一覧', 'project-tab-import': '取り込み' })[id] || (label === '×' || !label ? '閉じる' : label.replace(/^＋\s*/, ''));
+      el.append(node('span', 'project-action-label draw-button-label', caption));
+      if (id === 'project-tab-library' || id === 'project-tab-import') el.title = label;
+    }
+    return el;
+  }
   const store = createToolProjectStore(tool); let main = root || document.querySelector('#main') || document.querySelector('main');
   const lifecycle = new AbortController();
   main.inert = true; main.setAttribute('aria-busy', 'true');
@@ -64,7 +99,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   function closeManagerAd() { managerAd?.dispose(); managerAd = null; cancelAnimationFrame(managerAdFrame); managerAdFrame = 0; managerAdPrepared = false; }
 
   let transientNavigation = false;
-  const projectWorkspaceCssHref = '/css/project-workspace.css?rev=20261112-creation-guidance-1';
+  const projectWorkspaceCssHref = '/css/project-workspace.css?rev=20261118-draw-button-label-1';
   let css = [...document.querySelectorAll('link[rel="stylesheet"]')].find(link => link.getAttribute('href') === projectWorkspaceCssHref);
   const ownsCss = !css;
   if (ownsCss) { css = node('link'); css.rel = 'stylesheet'; css.href = projectWorkspaceCssHref; document.head.append(css); }
@@ -84,7 +119,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   mountToolHeaderControls(document, { projectBar: bar });
   const dialog = node('dialog', 'project-sheet'); dialog.id = 'pxd-panel'; dialog.setAttribute('aria-labelledby', 'project-sheet-title');
   const heading = node('div', 'project-sheet__heading'); const title = node('h2', '', '作品を管理'); title.id = 'project-sheet-title';
-  const close = button('', 'project-close', () => dialog.close()); close.innerHTML = icon('close'); close.setAttribute('aria-label', '作品一覧を閉じる'); heading.append(title, close);
+  const close = button('', 'project-close', () => dialog.close()); if (tool !== 'draw') close.innerHTML = icon('close'); close.setAttribute('aria-label', '作品一覧を閉じる'); heading.append(title, close);
   const currentRow = node('div', 'project-sheet__current'); const titleLabel = node('label', '', '作品名'); titleLabel.htmlFor = 'project-title';
   const titleInput = node('input'); titleInput.id = 'project-title'; titleInput.maxLength = 60; titleInput.autocomplete = 'off';
   const rename = button('名前を保存', 'project-rename', () => { const name = titleInput.value; void transact(async () => { session.rename(name); await save(); await refreshList(); }, { close: false }); });
@@ -246,7 +281,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     return { width: source.width, height: source.height };
   }
   const identityName = identity.querySelector('strong'); const identityMeta = identity.querySelector('small');
-  const toolbar = node('div', 'project-sheet__toolbar'); newButton.textContent = '＋ 新規作成'; toolbar.append(tabs, newButton);
+  const toolbar = node('div', 'project-sheet__toolbar'); setButtonLabel(newButton, '＋ 新規作成'); toolbar.append(tabs, newButton);
   const search = node('input', 'project-search'); search.type = 'search'; search.id = 'project-search'; search.placeholder = '作品名で探す'; search.setAttribute('aria-label', '保存した作品を作品名で探す');
   const count = node('p', 'project-library-count'); count.setAttribute('role', 'status');
   const noMatches = node('p', 'project-list__empty', 'この名前の作品は見つかりません。'); noMatches.hidden = true;
@@ -269,9 +304,9 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
       if (selecting || search.value) retireManagerAd('selection-or-search');
       selectionToolbar.hidden = total === 0; selectionActions.hidden = !selecting;
       selectButton.hidden = selecting; selectAll.hidden = cancelSelection.hidden = !selecting;
-      selectAll.textContent = all ? 'すべて解除' : search.value ? '検索結果を選択' : 'すべて選択';
+      setButtonLabel(selectAll, all ? 'すべて解除' : search.value ? '検索結果を選択' : 'すべて選択');
       selectionCount.textContent = selecting ? `${selected}件選択` : `${total}作品`;
-      deleteSelected.textContent = selected ? `${selected}件を削除` : '削除する作品を選択'; deleteSelected.disabled = !selected || locked;
+      setButtonLabel(deleteSelected, selected ? `${selected}件を削除` : '削除する作品を選択'); deleteSelected.disabled = !selected || locked;
       noMatches.hidden = total === 0 || visible > 0;
       count.textContent = total ? `${search.value ? `${visible} / ${total}作品 · ` : ''}最近保存した順` : '';
       libraryPane.dataset.empty = String(total === 0); search.hidden = count.hidden = help.hidden = total === 0;
@@ -437,7 +472,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     for (const el of dialog.querySelectorAll('button')) el.disabled = locked;
     for (const el of [resumeButton, rename, duplicate, saveButton, exportButton]) el.disabled = locked || Boolean(initialRestoreError);
     const backup = findPxdOriginalBackup(project);
-    original.hidden = !backup; if (backup) original.textContent = backup.label;
+    original.hidden = !backup; if (backup) setButtonLabel(original, backup.label);
     if (!titleInput.matches(':focus')) titleInput.value = name;
     const canTransfer = Boolean(!getPublicSources().length && hasContent());
     transferSection.hidden = !canTransfer;
@@ -527,7 +562,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
       importPreviewTitle.textContent = item.summary.name || '無題の作品';
       const size = item.summary.width ? `${item.summary.width} × ${item.summary.height}px` : '画像のプレビューはありません';
       importPreviewMeta.textContent = `${importLabel(item)} · ${size}${item.filename ? ` · ${item.filename}` : ''}。元の作品は残ります。`;
-      clearImportButton.textContent = item === stagedImport ? '候補から外す' : '選択を解除';
+      setButtonLabel(clearImportButton, item === stagedImport ? '候補から外す' : '選択を解除');
     }
     importGallery.refresh();
   }
@@ -565,7 +600,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     const controls = node('div', 'project-card-actions__controls');
     const close = () => { sheet.close(); sheet.remove(); card.focus(); };
     const open = button('開く', 'project-card-actions-open', () => { close(); openCard(); });
-    open.innerHTML = `${icon('folder')}<span>続きを開く</span>`;
+    if (tool === 'draw') setButtonLabel(open, '続きを開く'); else open.innerHTML = `${icon('folder')}<span>続きを開く</span>`;
     const copy = button('複製', 'project-card-actions-copy', () => {
       close(); void transact(async () => {
         if (!initialRestoreError && (session.persisted || editedSinceOpen)) await save();
@@ -575,7 +610,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
       });
     });
     const remove = button('削除', 'project-card-actions-delete', () => { close(); void deleteProjects([item]); });
-    remove.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7"/></svg><span>作品を削除</span>';
+    if (tool === 'draw') setButtonLabel(remove, '作品を削除'); else remove.innerHTML = `${icon('trash')}<span>作品を削除</span>`;
     controls.append(open, copy, remove, button('閉じる', 'project-card-actions-close', close));
     const header = node('div', 'project-delete-dialog__header');
     const dismiss = button('×', 'project-card-actions-dismiss', close);

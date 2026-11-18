@@ -395,3 +395,39 @@ body.creation-suite .creation-project-settings__other-shapes summary { cursor:po
 body.creation-suite .creation-project-settings__other-shapes[open] summary { margin-bottom:3px; }
 
 @media (max-width:379px) { body.creation-suite .creation-project-settings__panel[data-large-canvas=true] .creation-project-settings__comparison { grid-template-rows:auto 96px auto; } }
+
+/* Names fit inside the existing controls; their rails and canvas keep the same size. */
+body[data-creation-mode="draw"] :is(.px-site-header,.app-tabs) .draw-button-label,
+body[data-creation-mode="draw"] :is(.draw-settings-panel > button,#draw-mirror-center,[data-draw-color-add]) > .draw-button-label { font:700 10px/12px system-ui,-apple-system,sans-serif; letter-spacing:0; white-space:nowrap; }
+body[data-creation-mode="draw"] .px-site-header :is(#draw-clear,#draw-to-globe) {
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; padding:2px !important;
+}
+body[data-creation-mode="draw"] .px-site-header :is(#draw-clear,#draw-to-globe) > svg { width:20px; height:20px; flex:none; }
+body[data-creation-mode="draw"] .px-site-header :is(#draw-clear,#draw-to-globe) > .draw-button-label { display:block; }
+body[data-creation-mode="draw"] .draw-settings-panel > button:has(.draw-button-label),
+body[data-creation-mode="draw"] #draw-mirror-center {
+  display:flex !important; flex-direction:column; justify-content:center; align-items:center; gap:1px; padding:2px !important;
+}
+body[data-creation-mode="draw"] .draw-settings-panel > button:has(.draw-button-label) > svg { width:20px; height:20px; }
+body[data-creation-mode="draw"] .draw-inline-icon { display:inline-block; width:18px; height:18px; vertical-align:middle; margin-inline-end:6px; filter:brightness(0) invert(1); }
+body[data-creation-mode="draw"] #draw-animation-play[data-nav-primary] { display:flex; flex-direction:column; justify-content:center; align-items:center; gap:1px; }
+body[data-creation-mode="draw"] #draw-animation-play > .draw-button-label { display:block; color:inherit; }
+body[data-creation-mode="draw"] [data-draw-color-add] { display:flex !important; flex-direction:column; justify-content:center; align-items:center; gap:0; }
+body[data-creation-mode="draw"] [data-draw-color-add] .draw-add-color-icon { display:block; font:24px/24px system-ui,sans-serif; }
+
+/* Shared settings keep their original dimensions and labels in other modes. */
+.creation-project-settings__button-icon { display:none; }
+body.creation-suite[data-creation-mode="draw"] .creation-project-settings button:not([hidden]):has(> .creation-project-settings__button-icon) {
+  display:inline-flex; align-items:center; justify-content:center; gap:5px;
+}
+body.creation-suite[data-creation-mode="draw"] .creation-project-settings__button-icon {
+  display:block; width:20px; height:20px; flex:0 0 20px; filter:brightness(0) invert(1);
+}
+body.creation-suite[data-creation-mode="draw"] .creation-project-settings .draw-button-label { display:block; font:inherit; white-space:normal; }
+body.creation-suite[data-creation-mode="draw"] .creation-project-settings :is([aria-selected="true"], [data-project-action="apply"]) > .creation-project-settings__button-icon { filter:none; }
+body.creation-suite[data-creation-mode="draw"] .creation-project-settings__tabs button:has(> .creation-project-settings__button-icon) {
+  display:grid; grid-template-rows:20px 12px; place-items:center; place-content:center; gap:1px; height:44px; padding-block:3px;
+}
+body.creation-suite[data-creation-mode="draw"] .creation-project-settings__tabs .draw-button-label { font-size:10px; line-height:12px; white-space:nowrap; }
+
+body[data-creation-mode="draw"] #draw-palette [data-draw-color-add] { color:#edf2f3 !important; background:#28333d !important; }

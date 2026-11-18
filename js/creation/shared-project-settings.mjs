@@ -17,6 +17,12 @@ function el(tag, attrs = {}, text = '') {
   return node;
 }
 
+function labelAction(button, name) {
+  const label = el('span', { class: 'draw-button-label' }, button.textContent);
+  const image = el('img', { class: 'creation-project-settings__button-icon', src: `/assets/icons/pixieed/${name}.svg`, alt: '', 'aria-hidden': 'true', width: '20', height: '20' });
+  button.replaceChildren(image, label);
+}
+
 function asImage(image) {
   if (!image || !Number.isInteger(image.width) || !Number.isInteger(image.height) || !(image.rgba instanceof Uint8Array || image.rgba instanceof Uint8ClampedArray)) return null;
   if (image.rgba.length !== image.width * image.height * 4) return null;
@@ -40,17 +46,20 @@ export function mountSharedProjectSettings({ draw, scope, getMode = () => 'draw'
 
   const root = el('section', { id: 'creation-project-settings', class: 'creation-project-settings', 'data-mode-owner': 'shared', 'aria-label': 'キャンバス設定' });
   const launcher = el('button', { id: 'creation-project-settings-open', type: 'button', class: 'creation-control-button', 'aria-expanded': 'false', 'aria-controls': 'creation-project-settings-panel' }, 'キャンバス');
+  labelAction(launcher, 'selection');
   const scrim = el('div', { class: 'creation-project-settings__scrim', 'aria-hidden': 'true', hidden: '' });
   const panel = el('div', { id: 'creation-project-settings-panel', class: 'creation-project-settings__panel', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'creation-project-settings-title', tabindex: '-1', hidden: '' });
   const header = el('header', { class: 'creation-project-settings__header' });
   const title = el('strong', { id: 'creation-project-settings-title' }, 'キャンバス設定');
   const close = el('button', { type: 'button', class: 'creation-project-settings__close', 'aria-label': '設定を閉じる' }, '戻る');
+  labelAction(close, 'back');
   header.append(title, close);
 
   const tabs = el('div', { class: 'creation-project-settings__tabs', role: 'tablist', 'aria-label': '変更する内容' });
   const tabButtons = new Map();
   for (const [kind, label] of Object.entries(TAB_LABELS)) {
     const button = el('button', { id: `creation-project-tab-${kind}`, type: 'button', role: 'tab', 'aria-selected': String(kind === 'area'), 'aria-controls': `creation-project-panel-${kind}`, tabindex: kind === 'area' ? '0' : '-1' }, label);
+    labelAction(button, { area: 'selection', scale: 'selection-transform', palette: 'color-adjust' }[kind]);
     tabButtons.set(kind, button); tabs.append(button);
   }
   const form = el('form', { id: 'creation-project-settings-form', class: 'creation-project-settings__form', novalidate: '' });
@@ -165,6 +174,7 @@ export function mountSharedProjectSettings({ draw, scope, getMode = () => 'draw'
   const footer = el('footer', { class: 'creation-project-settings__footer' });
   const cancelButton = el('button', { type: 'button', 'data-project-action': 'cancel' }, '取消');
   const applyButton = el('button', { type: 'button', 'data-project-action': 'apply', disabled: '' }, '適用');
+  labelAction(cancelButton, 'close'); labelAction(applyButton, 'confirm');
   footer.append(cancelButton, applyButton);
   panel.append(header, tabs, form, footer);
   root.append(launcher, scrim, panel);

@@ -139,7 +139,7 @@ test('direct runtime revalidates a versioned editor template without losing cred
     fetch(url, options) { request = { url, options }; throw stop; }
   });
   await assert.rejects(pending, error => error === stop);
-  assert.equal(request.url, '/draw/editor.html?rev=20261116-normal-release-2', 'the previous unversioned HTML cache cannot supply a stale stylesheet list');
+  assert.equal(request.url, '/draw/editor.html?rev=20261118-draw-button-label-1', 'the previous unversioned HTML cache cannot supply a stale stylesheet list');
   assert.equal(request.options.cache, 'no-cache', 'even the versioned template is revalidated');
   assert.equal(request.options.credentials, 'same-origin');
   assert.equal(request.options.signal, controller.signal, 'closing the editor still aborts its pending template request');

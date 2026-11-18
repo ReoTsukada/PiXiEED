@@ -55,7 +55,7 @@ export function installDirectToolShell({ section, mode, search }) {
   const message = document.createElement('span'); message.className = 'tool-direct__status'; message.setAttribute('role', 'status');
   const retry = document.createElement('button'); retry.type = 'button'; retry.textContent = '再試行'; retry.hidden = true;
   const recovery = document.createElement('button'); recovery.type = 'button'; recovery.textContent = '作品を選ぶ'; recovery.hidden = true;
-  const explanation = document.createElement('button'); explanation.type = 'button'; explanation.textContent = '?'; explanation.setAttribute('aria-label', '説明を見る'); explanation.title = '説明を見る'; explanation.dataset.shellExplanation = '';
+  const explanation = document.createElement('button'); explanation.type = 'button'; explanation.innerHTML = '<span class="tool-direct__help-icon" aria-hidden="true">?</span><span class="draw-button-label" aria-hidden="true">説明</span>'; explanation.setAttribute('aria-label', '説明を見る'); explanation.title = '説明を見る'; explanation.dataset.shellExplanation = '';
   explanation.className = 'tool-direct__help';
   const chromeMoves = [];
   bar.append(label, message, retry, recovery, explanation);
@@ -129,7 +129,7 @@ export function installDirectToolShell({ section, mode, search }) {
       const href = new URL(source.getAttribute('href'), location.origin);
       if (href.origin === location.origin) addStartupHint('modulepreload', href.href);
     }
-    const modeStylesheet = new URL('/css/creation-modes.css?rev=20261116-normal-release-2', location.origin);
+    const modeStylesheet = new URL('/css/creation-modes.css?rev=20261118-draw-button-label-1', location.origin);
     if (!existingStylesheets.has(modeStylesheet.href)) addStartupHint('preload', modeStylesheet.href, 'style');
   }
   function clearStartupHints() {
@@ -347,7 +347,7 @@ export function installDirectToolShell({ section, mode, search }) {
   }
   async function loadStartPicker() {
     if (picker) return picker;
-    if (!pickerLoading) pickerLoading = import('./creation/project-start-picker.mjs?rev=20261118-draw-display-ad-1')
+    if (!pickerLoading) pickerLoading = import('./creation/project-start-picker.mjs?rev=20261118-draw-button-label-1')
       .then(({ mountProjectStartPicker }) => {
         checkAlive();
         picker = mountProjectStartPicker({ signal: lifecycle.signal,
@@ -376,7 +376,7 @@ export function installDirectToolShell({ section, mode, search }) {
     if (mounting) return mounting;
     mounting = (async () => {
       setLoadingStage('編集画面を取得しています…');
-      const response = await fetch('/draw/editor.html?rev=20261116-normal-release-2', { cache: 'no-cache', credentials: 'same-origin', signal: lifecycle.signal });
+      const response = await fetch('/draw/editor.html?rev=20261118-draw-button-label-1', { cache: 'no-cache', credentials: 'same-origin', signal: lifecycle.signal });
       if (!response.ok) throw new Error('編集画面を読み込めませんでした。');
       const template = new DOMParser().parseFromString(await response.text(), 'text/html');
       checkAlive();
@@ -386,7 +386,7 @@ export function installDirectToolShell({ section, mode, search }) {
       prepareHost(template);
       // Start evaluating the already-required graph while the editor styles load.
       // The handled result is consumed only after CSS and restore-state checks.
-      const runtimeImport = (async () => await import('./creation/creation-runtime.mjs?rev=20261118-draw-display-ad-1'))()
+      const runtimeImport = (async () => await import('./creation/creation-runtime.mjs?rev=20261118-draw-button-label-1'))()
         .then(module => ({ module }), error => { reloadRequired = true; return { error }; });
       const cssLoads = [];
       const existing = new Set([...document.querySelectorAll('link[rel="stylesheet"]')].map(n => n.href));

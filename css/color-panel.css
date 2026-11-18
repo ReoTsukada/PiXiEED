@@ -41,3 +41,30 @@
 @media (prefers-reduced-motion: reduce) { .creation-color-panel.draw-color-editor { transition: none; } }
 
 @media (max-width: 380px) { .creation-color-panel .dce-quick { grid-template-columns: repeat(4, minmax(44px, 1fr)); } }
+
+.creation-color-panel .dce-button-icon { display: none; }
+body[data-creation-mode="draw"] #draw-color-editor .dce-button-icon {
+  display: block;
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  filter: brightness(0) invert(1);
+}
+body[data-creation-mode="draw"] #draw-color-editor .draw-button-label { display: block; font: inherit; }
+body[data-creation-mode="draw"] #draw-color-editor :is(.dce-view-tabs button, .dce-close):has(> .dce-button-icon) {
+  display: grid;
+  grid-template-rows: 20px 12px;
+  place-items: center;
+  place-content: center;
+  gap: 1px;
+  height: 44px;
+  padding-block: 3px;
+}
+body[data-creation-mode="draw"] #draw-color-editor :is(.dce-view-tabs button, .dce-close) > .draw-button-label {
+  font: 600 10px/12px system-ui, sans-serif;
+}
+body[data-creation-mode="draw"] #draw-color-editor .dce-view-tabs [aria-pressed="true"] > .dce-button-icon { filter: none; }
+body[data-creation-mode="draw"] #draw-color-editor #dce-reset:has(> .dce-button-icon) {
+  display: grid; grid-template-rows: 20px 12px; place-items: center; place-content: center; gap: 1px; height: 44px; padding-block: 3px;
+}
+body[data-creation-mode="draw"] #draw-color-editor #dce-reset > .draw-button-label { font: 600 10px/12px system-ui, sans-serif; }

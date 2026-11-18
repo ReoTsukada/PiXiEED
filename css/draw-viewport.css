@@ -226,3 +226,16 @@ body[data-page="draw"] .draw-input-action-strip .draw-selection-controls :is(but
 
 .draw-input-action-strip { flex-basis: 52px; }
 .draw-input-action-strip .draw-selection-controls { height: 52px; padding: 3px 1px; }
+
+/* Shared captioned controls used by dynamically mounted Draw sheets. */
+body[data-page="draw"] .draw-shortcuts-dialog [data-draw-button-content] { display:grid; grid-template-rows:18px 11px; align-content:center; justify-items:center; gap:1px; min-height:44px; }
+body[data-page="draw"] .draw-shortcuts-dialog .draw-button-icon { width:16px; height:16px; filter:brightness(0) invert(1); pointer-events:none; }
+body[data-page="draw"] .draw-shortcuts-dialog .draw-button-label { display:block; max-width:100%; overflow:hidden; color:inherit; font:600 10px/11px system-ui,sans-serif; white-space:nowrap; pointer-events:none; }
+body[data-page="draw"] .draw-shortcuts-dialog__header button[data-draw-button-content] { display:grid; grid-template-rows:18px 11px; align-content:center; justify-items:center; gap:1px; }
+body[data-page="draw"] .draw-shortcuts-dialog > button[data-draw-button-content] { display:flex; flex-direction:row; align-items:center; justify-content:center; gap:6px; }
+body[data-page="draw"] .draw-panel-header .draw-panel-close[data-draw-button-content] { display:grid !important; grid-template-rows:18px 11px; align-content:center; justify-items:center; gap:1px; font-size:10px !important; line-height:11px !important; }
+body[data-page="draw"] .draw-panel-close[data-draw-button-content] > .draw-button-icon { width:16px; height:16px; filter:brightness(0) invert(1); }
+body[data-page="draw"] .draw-panel-close[data-draw-button-content] > .draw-button-label { display:block; font:600 10px/11px system-ui,sans-serif; }
+body[data-page="draw"] .draw-music-panel .draw-music-pages :is(#draw-music-page-before,#draw-music-page-after)[data-draw-button-content] { display:grid !important; grid-template-rows:18px 11px; align-content:center; justify-items:center; gap:1px; }
+body[data-page="draw"] .draw-music-panel .draw-music-pages :is(#draw-music-page-before,#draw-music-page-after) .draw-button-icon { width:16px; height:16px; filter:brightness(0) invert(1); }
+body[data-page="draw"] .draw-music-panel .draw-music-pages :is(#draw-music-page-before,#draw-music-page-after) .draw-button-label { font:600 10px/11px system-ui,sans-serif; }

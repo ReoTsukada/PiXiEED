@@ -28,14 +28,21 @@ test('delivery plan preserves runtime identities and bounds minification to star
   // The adapter is bundled; color adjustment stays external as the canonical module also used by its lazy panel.
   // Desktop ads add two modules/three edges; mobile anchor adds one controller/two edges.
   // The shared SDK loader reuses the same Draw config across the external boundary.
-  assert.equal(plan.runtimeGraph.modules.size, 126);
-  assert.equal(plan.runtimeGraph.edges.length, 251);
+  // Draw captions share one external helper with four startup imports; lazy panels reuse it.
+  assert.equal(plan.runtimeGraph.modules.size, 127);
+  assert.equal(plan.runtimeGraph.edges.length, 255);
   assert.equal(plan.dynamicRoots.length, 26);
-  assert.equal(plan.dynamicGraph.modules.size, 123);
-  assert(plan.dynamicRoots.some(item => item.url === '/js/creation/draw-live-session-panel.mjs?rev=20261117-chat-connect-1'), 'Live-session UI is loaded only on demand.');
-  assert.equal(plan.externalUrls.size, 71);
+  assert.equal(plan.dynamicGraph.modules.size, 124);
+  assert(plan.dynamicRoots.some(item => item.url === '/js/creation/draw-live-session-panel.mjs?rev=20261118-draw-button-label-1'), 'Live-session UI is loaded only on demand.');
+  assert.equal(plan.externalUrls.size, 72);
   assert.equal(plan.internalizedUrls.length, 55);
   const files = [...plan.runtimeGraph.modules.values()].map(module => module.file);
+  const buttonContentUrl = '/js/creation/draw-button-content.mjs?rev=20261118-draw-button-label-1';
+  assert.deepEqual([...plan.runtimeGraph.modules.values()].filter(module => module.file === 'js/creation/draw-button-content.mjs').map(module => module.url), [buttonContentUrl]);
+  assert.equal(plan.runtimeGraph.edges.filter(edge => edge.to === buttonContentUrl).length, 4);
+  assert.equal(plan.runtimeGraph.edges.filter(edge => edge.from === buttonContentUrl).length, 0, 'Caption rendering does not pull other runtime modules into startup.');
+  assert(plan.externalUrls.has(buttonContentUrl), 'Startup and lazy panels reuse one caption helper identity.');
+  assert(plan.dynamicGraph.modules.has(buttonContentUrl));
   assert(files.includes('js/ads/draw-display-ad.mjs'));
   assert(files.includes('js/ads/draw-mobile-anchor.mjs'));
   assert(files.includes('data/draw-display-ad-config.mjs'));
@@ -48,7 +55,7 @@ test('delivery plan preserves runtime identities and bounds minification to star
   assert(plan.externalUrls.has(drawColorAdjustmentsUrl), 'Color adjustment remains one canonical external module shared with its lazy panel.');
   assert(plan.internalizedUrls.includes('/js/creation/draw-agent-operations.mjs?rev=20261117-chat-connect-1'), 'Only the small allowlisted adapter is bundled into startup.');
   assert(!files.some(file => /js\/mcp\/(?:pixel-art-(?:guide|cases|case-index|techniques|settings|expression|review)|guide-page|examples-page|settings-page)\.mjs$/.test(file)), 'Optional guide, case, and settings modules stay outside Draw startup.');
-  assert(plan.pickerGraph.modules.has('/js/creation/project-start-picker.mjs?rev=20261118-draw-display-ad-1'));
+  assert(plan.pickerGraph.modules.has('/js/creation/project-start-picker.mjs?rev=20261118-draw-button-label-1'));
   assert(![...plan.pickerGraph.modules.values()].some(module => /(?:creation-runtime|draw-page|creation-modes|draw-music)\.mjs$/.test(module.file)), 'Choosing a work must not import editor or mode runtimes');
   assert(plan.physicalFiles.has('js/creation/project-start-picker.mjs'));
   assert(plan.pickerGraph.modules.has('/js/ads/project-gallery-ad.mjs?rev=20261118-draw-display-ad-1'));
@@ -159,7 +166,7 @@ test('optimized owned build carries one fingerprinted bundle and no private sour
     assert.equal(report.revision, expectedRevision);
     assert.equal(report.addedFiles, 1);
     assert.equal(report.bundlePath, 'js/creation/creation-runtime.bundle.mjs');
-    assert.equal(report.externalCount, 71);
+    assert.equal(report.externalCount, 72);
     assert.equal(report.internalizedCount, 55);
     assert(report.startupStandaloneMinifiedCount >= 129);
     assert.match(report.revision, /^20261020-staged-startup-1-[a-f0-9]{12}$/);
@@ -170,7 +177,7 @@ test('optimized owned build carries one fingerprinted bundle and no private sour
     assert(!bundle.includes(tempBase), 'Compiler leaked its private temporary path into public output.');
     const direct = await readFile(path.join(buildRoot, 'js/tool-direct.mjs'), 'utf8');
     assert(direct.includes(`./creation/creation-runtime.bundle.mjs?rev=${report.revision}`));
-    assert(direct.includes('/draw/editor.html?rev=20261116-normal-release-2'), 'Minification must preserve the editor HTML cache version.');
+    assert(direct.includes('/draw/editor.html?rev=20261118-draw-button-label-1'), 'Minification must preserve the editor HTML cache version.');
     assert.match(direct, /cache:["']no-cache["']/, 'The optimized loader must still revalidate editor HTML.');
     const builtShell = await readFile(shellPath, 'utf8');
     assert(builtShell.includes(`./tool-direct.mjs?rev=${report.revision}`), 'The caller must invalidate the changed template loader.');

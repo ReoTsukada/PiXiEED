@@ -332,9 +332,7 @@ body.draw-desktop-active .draw-desktop-button__icon,
 body.draw-desktop-active .draw-desktop-history svg { width: 24px; height: 24px; }
 body.draw-desktop-active .draw-desktop-button__icon { flex-basis: 24px; }
 body.draw-desktop-active .draw-desktop-button__icon svg { width: 24px; height: 24px; }
-body.draw-desktop-active .draw-desktop-button__label,
-body.draw-desktop-active .draw-desktop-button__key,
-body.draw-desktop-active .draw-desktop-cell-launcher > span { display: none !important; }
+body.draw-desktop-active .draw-desktop-button__key { display: none !important; }
 body.draw-desktop-active .draw-desktop-history { grid-auto-rows: 44px; margin-bottom: 7px; }
 body.draw-desktop-active .draw-desktop-history > button { padding: 0; }
 body.draw-desktop-active .draw-desktop-features .draw-feature-actions > button,
@@ -544,3 +542,88 @@ body.draw-desktop-active .draw-desktop-dock[data-minimal="true"] .draw-desktop-l
   color: #fff;
   font: 700 9px/1 system-ui, sans-serif;
 }
+
+/* Captions use the existing tiles: no new toolbar row or canvas inset. Shared
+   animation controls retain their ordinary appearance outside Draw mode. */
+body.draw-desktop-active[data-creation-mode="draw"] .draw-desktop-shell .draw-button-label {
+  display: block !important;
+  flex: none;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  font: 500 10px/12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  letter-spacing: 0;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+body.draw-desktop-active[data-creation-mode="draw"] .draw-desktop-button,
+body.draw-desktop-active[data-creation-mode="draw"] .draw-desktop-history > button:has(> .draw-button-label),
+body.draw-desktop-active[data-creation-mode="draw"] .draw-desktop-features .draw-feature-actions > button:has(> .draw-button-label),
+body.draw-desktop-active[data-creation-mode="draw"] .draw-desktop-shell #draw-selection-controls .draw-selection-controls__row > button:has(> .draw-button-label),
+body.draw-desktop-active[data-creation-mode="draw"] .draw-desktop-shell .draw-selection-numbers > summary:has(> .draw-button-label),
+body.draw-desktop-active[data-creation-mode="draw"] .draw-desktop-frame-host .animation-controls__desktop-frame-actions button[data-draw-button-label="true"],
+body.draw-desktop-active[data-creation-mode="draw"] .draw-desktop-dock[data-compact="true"] .draw-desktop-layer-host button[data-draw-button-label="true"] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 20px 12px;
+  place-items: center;
+  place-content: center;
+  gap: 1px;
+}
+body.draw-desktop-active[data-creation-mode="draw"] .draw-desktop-button__icon {
+  width: 20px;
+  height: 20px;
+  flex-basis: 20px;
+  font-size: 16px;
+  line-height: 20px;
+}
+body.draw-desktop-active[data-creation-mode="draw"] .draw-desktop-button { padding-inline: 1px; }
+body.draw-desktop-active[data-creation-mode="draw"] .draw-desktop-button__icon svg,
+body.draw-desktop-active[data-creation-mode="draw"] .draw-desktop-history > button:has(> .draw-button-label) > svg,
+body.draw-desktop-active[data-creation-mode="draw"] .draw-desktop-shell .draw-selection-numbers > summary:has(> .draw-button-label)::before {
+  width: 20px;
+  height: 20px;
+}
+/* The normal layer list keeps its 28px columns. A slightly taller action
+   leaves room for readable icons and captions inside the scrolling lane. */
+body.draw-desktop-active[data-creation-mode="draw"] .draw-desktop-dock:not([data-compact="true"]) .draw-desktop-layer-host :is(.animation-controls__layer > button, .animation-controls__wide-button)[data-draw-button-label="true"] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 16px 10px;
+  place-items: center;
+  place-content: center;
+  gap: 0;
+  height: 34px !important;
+  min-height: 34px !important;
+  max-height: 34px !important;
+  padding: 2px;
+}
+body.draw-desktop-active[data-creation-mode="draw"] .draw-desktop-dock:not([data-compact="true"]) .draw-desktop-layer-host :is(.animation-controls__layer > button, .animation-controls__wide-button)[data-draw-button-label="true"] > svg {
+  width: 16px;
+  height: 16px;
+}
+body.draw-desktop-active[data-creation-mode="draw"] .draw-desktop-dock:not([data-compact="true"]) .draw-desktop-layer-host :is(.animation-controls__layer > button, .animation-controls__wide-button)[data-draw-button-label="true"] > .draw-button-label {
+  line-height: 10px;
+}
+/* Keep the 24px frame heading height while making the reset action readable. */
+body.draw-desktop-active[data-creation-mode="draw"] .draw-desktop-frame-heading [data-layout-reset] {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  padding-inline: 6px;
+}
+
+/* The normal-map entry is a full-width explanation, unlike square layer actions. */
+body.draw-desktop-active[data-creation-mode="draw"] .draw-desktop-layer-host .animation-controls__wide-button:has(> .animation-controls__wide-label) {
+  display:flex; flex-direction:row; justify-content:center; align-items:center; gap:6px;
+  width:100% !important; min-width:0 !important; max-width:none !important;
+  height:auto !important; min-height:44px !important; max-height:none !important; padding:6px;
+}
+body.draw-desktop-active[data-creation-mode="draw"] .draw-desktop-layer-host .animation-controls__wide-label { font:600 11px/1.4 system-ui,sans-serif; white-space:normal; }
+body.draw-desktop-active[data-creation-mode="draw"] .draw-desktop-layer-host .animation-controls__wide-button:has(> .animation-controls__wide-label) > svg { flex:0 0 20px; width:20px; height:20px; }

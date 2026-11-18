@@ -1,3 +1,4 @@
+import { createDrawButtonContent } from './draw-button-content.mjs?rev=20261118-draw-button-label-1';
 import {
   createNormalMap,
   convertPaintedNormalMap,
@@ -31,8 +32,9 @@ export function mountDrawNormalMapPanel({ scope, host, getSource, getPaintedNorm
   const urls = win.URL || globalThis.URL;
   const opener = doc.createElement('button');
   opener.type = 'button'; opener.className = 'draw-normal-map-open';
+  createDrawButtonContent(opener, { icon: 'adjustments', label: '凹凸', doc });
   opener.setAttribute('aria-label', 'ノーマルマップを作成'); opener.setAttribute('aria-haspopup', 'dialog');
-  opener.setAttribute('aria-expanded', 'false'); opener.title = 'ノーマルマップを作成'; opener.textContent = '凹凸';
+  opener.setAttribute('aria-expanded', 'false'); opener.title = 'ノーマルマップを作成';
   const dialog = doc.createElement('dialog');
   dialog.className = 'draw-normal-map'; dialog.setAttribute('aria-labelledby', 'draw-normal-map-title');
   dialog.innerHTML = `
@@ -88,6 +90,13 @@ export function mountDrawNormalMapPanel({ scope, host, getSource, getPaintedNorm
     </footer>`;
   (doc.body || host).append(dialog);
   const $ = selector => dialog.querySelector(selector);
+  createDrawButtonContent($('[data-close]'), { icon: 'close', label: '閉じる', doc });
+  createDrawButtonContent($('[data-edit-normal]'), { icon: 'draw', label: '専用レイヤーで描く', doc });
+  createDrawButtonContent($('[data-save]'), { icon: 'artwork', label: 'ノーマルマップPNG', doc });
+  createDrawButtonContent($('[data-save-lit]'), { icon: 'sun', label: '照明済みPNG', doc });
+  createDrawButtonContent($('[data-refresh]'), { icon: 'reset', label: '現在の絵を読み直す', doc });
+  createDrawButtonContent($('[data-cancel]'), { icon: 'close', label: 'キャンセル', doc });
+  createDrawButtonContent($('[data-apply]'), { icon: 'confirm', label: '適用してDrawへ', doc });
   const sourceCanvas = $('[data-source]'), normalCanvas = $('[data-normal]'), litCanvas = $('[data-lit]');
   const refreshStatus = $('[data-refresh-status]'), error = $('[data-error]'), save = $('[data-save]'), saveLit = $('[data-save-lit]'), apply = $('[data-apply]'), download = $('[data-download]');
   let settings = normalizeNormalMapSettings(null), settingsRestored = false;

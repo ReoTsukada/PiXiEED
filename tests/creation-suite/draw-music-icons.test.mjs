@@ -22,6 +22,13 @@ test('music page and preview/output actions pair decorative SVGs with readable l
   assert.match(music, /class="draw-music-action-icon" viewBox="0 0 24 24" aria-hidden="true"/);
 });
 
+test('music page navigation adds the shared icon and visible caption', () => {
+  assert.match(music, /createDrawButtonContent\(settings\.querySelector\('#draw-music-page-before'\), \{ icon: 'back', label: '前へ'/);
+  assert.match(music, /createDrawButtonContent\(settings\.querySelector\('#draw-music-page-after'\), \{ icon: 'forward', label: '次へ'/);
+  const viewport = read('css/draw-viewport.css');
+  assert.match(viewport, /#draw-music-page-before,#draw-music-page-after\)\[data-draw-button-content\] \{ display:grid !important; grid-template-rows:18px 11px/);
+});
+
 test('music action icon sizing leaves the existing button hit areas intact', () => {
   assert.match(css, /\.draw-music-panel :is\(#draw-music-page-add,[\s\S]*?#draw-music-video\)\s*\{\s*display:inline-flex; align-items:center; justify-content:center; gap:6px;/);
   assert.match(css, /\.draw-music-action-icon\s*\{[^}]*flex:0 0 18px; width:18px; height:18px;/);

@@ -857,3 +857,93 @@ test('compact workspace stays below the visible header when direct-work hides th
     ui.dispose();
   }
 });
+
+
+test('Draw opt-in captions survive playback and layer icon changes without duplicate text', () => {
+  const doc = new FakeDocument(), host = doc.createElement('div'), scope = fakeScope();
+  const state = { frames: [{ id: 'f1', durationMs: 100 }, { id: 'f2', durationMs: 100 }],
+    layers: [{ id: 'l1', name: '線', visible: true, locked: false }], frameId: 'f1', layerId: 'l1',
+    playing: false, onion: false, readOnly: false, audioMode: false };
+  const ui = mountAnimationControls({ host, scope, buttonLabels: true, getCelHasContent: () => false, getState: () => state, onAction() {} });
+  const root = host.children[0];
+  const controlFor = action => root.querySelector(`[data-action="${action}"]`) || doc.body.querySelector(`[data-action="${action}"]`);
+  const caption = control => control.children.find(child => child.classList.contains('draw-button-label'));
+  for (const [action, text] of [['previous-frame', '前へ'], ['next-frame', '次へ'], ['add-frame', '複製'],
+    ['toggle-duration', '速さ'], ['toggle-layers', 'レイヤー'], ['play', '再生'], ['export-gif', 'GIF']]) {
+    const control = controlFor(action);
+    assert.equal(control.children[0].tagName, 'SVG'); assert.equal(caption(control).textContent, text);
+    assert.equal(caption(control).getAttribute('aria-hidden'), 'true');
+  }
+  const play = controlFor('play'), playCaption = caption(play);
+  state.playing = true; ui.refresh();
+  assert.equal(caption(play), playCaption); assert.equal(playCaption.textContent, '停止');
+  assert.equal(play.getAttribute('aria-label'), '再生を止める');
+  state.playing = false; ui.refresh(); assert.equal(playCaption.textContent, '再生');
+  controlFor('toggle-layers').fire('click');
+  const eye = doc.body.querySelector('[data-action="visibility"]'), lock = doc.body.querySelector('[data-action="lock"]');
+  assert.ok(eye); assert.ok(lock); const eyeCaption = caption(eye), lockCaption = caption(lock);
+  assert.equal(eyeCaption.textContent, '隠す'); assert.equal(lockCaption.textContent, '固定');
+  state.layers = [{ ...state.layers[0], visible: false, locked: true }]; ui.refresh();
+  assert.equal(caption(eye), eyeCaption); assert.equal(eyeCaption.textContent, '表示');
+  assert.equal(caption(lock), lockCaption); assert.equal(lockCaption.textContent, '解除');
+  assert.equal(eye.children.filter(child => child.classList.contains('draw-button-label')).length, 1);
+  assert.equal(lock.children.filter(child => child.classList.contains('draw-button-label')).length, 1);
+  const layerHost = doc.createElement('aside'), frameHost = doc.createElement('footer');
+  ui.setDesktopLayout({ active: true, layerHost, frameHost }); ui.setDesktopMinimal(true);
+  layerHost.querySelector('[data-action="selected-layer-settings"]').fire('click');
+  for (const [command, text] of [['visibility', '表示する'], ['lock', 'ロック解除']]) {
+    const control = doc.body.querySelector(`[data-frame-menu-action="${command}"]`);
+    const labels = control.children.filter(child => child.classList.contains('animation-controls__context-label'));
+    assert.equal(control.children[0].tagName, 'SVG'); assert.equal(labels.length, 1); assert.equal(labels[0].textContent, text);
+  }
+  ui.dispose();
+});
+
+test('Draw workspace launcher retains its frame/layer badge alongside the icon and caption', () => {
+  const doc = new FakeDocument(), host = doc.createElement('div'), scope = fakeScope();
+  const state = { frames: [{ id: 'f1', durationMs: 100 }], layers: [{ id: 'l1', name: '線', visible: true, locked: false }],
+    frameId: 'f1', layerId: 'l1', playing: false, onion: false, readOnly: false, audioMode: false };
+  const ui = mountAnimationControls({ host, scope, buttonLabels: true, getCelHasContent: () => false, getState: () => state, onAction() {} });
+  const launcher = host.children[0].querySelector('[data-action="toggle-frames"]');
+  assert.equal(launcher.children[0].tagName, 'SVG');
+  assert.equal(launcher.children.filter(child => child.classList.contains('draw-button-label')).length, 1);
+  const badge = launcher.children.find(child => child.classList.contains('animation-controls__workspace-badge'));
+  assert.equal(badge.textContent, 'L1/F1');
+  ui.refresh(); assert.equal(launcher.children.find(child => child.classList.contains('animation-controls__workspace-badge')), badge);
+  ui.dispose();
+});
+
+test('Draw normal-map entries retain their full instruction next to a decorative icon', () => {
+  const doc = new FakeDocument(), host = doc.createElement('div'), scope = fakeScope();
+  const state = { frames: [{ id: 'f1', durationMs: 100 }], layers: [{ id: 'l1', name: '線', visible: true, locked: false }],
+    frameId: 'f1', layerId: 'l1', playing: false, onion: false, readOnly: false, audioMode: false, normalMapAvailable: true };
+  const actions = [];
+  const ui = mountAnimationControls({ host, scope, buttonLabels: true, getCelHasContent: () => false, getState: () => state, onAction: action => actions.push(action) });
+  const controls = [...host.querySelectorAll('[data-action="normal-map"]'), ...doc.body.querySelectorAll('[data-action="normal-map"]')];
+  assert.equal(controls.length, 2, 'both layer and compact workspace entries have the same contents');
+  for (const control of controls) {
+    const [icon, label] = control.children;
+    assert.equal(icon.tagName, 'SVG'); assert.equal(icon.getAttribute('aria-hidden'), 'true');
+    assert.equal(label.textContent, 'ノーマルマップを作成・編集');
+    assert.equal(label.classList.contains('animation-controls__wide-label'), true);
+    assert.equal(control.getAttribute('aria-label'), label.textContent);
+    assert.equal(control.dataset.drawButtonLabel, undefined, 'full-width instructions do not use the compact vertical caption layout');
+  }
+  controls[0].fire('click');
+  assert.equal(actions[0].type, 'normal-map');
+  ui.refresh();
+  assert.equal(controls[0].children.length, 2);
+  ui.dispose();
+});
+
+test('shared Audio controls keep their existing icon-only content unless explicitly opted in', () => {
+  const doc = new FakeDocument(), host = doc.createElement('div'), scope = fakeScope();
+  const state = { frames: [{ id: 'f1', durationMs: 100 }], layers: [{ id: 'l1', name: 'Music', visible: true, locked: false }],
+    frameId: 'f1', layerId: 'l1', playing: false, onion: false, readOnly: false, audioMode: true };
+  const ui = mountAnimationControls({ host, scope, frameOnly: true, getState: () => state, onAction() {} });
+  for (const control of host.children[0].querySelectorAll('button')) {
+    assert.equal(control.dataset.drawButtonLabel, undefined);
+    assert.equal(control.children.some(child => child.classList.contains('draw-button-label')), false);
+  }
+  ui.dispose();
+});

@@ -1,23 +1,24 @@
 import { createModeScope } from './mode-scope.mjs?rev=20261001-independent-editors-1';
+import { createDrawButtonContent, setDrawButtonLabel } from './draw-button-content.mjs?rev=20261118-draw-button-label-1';
 
 const defaultLoaders = Object.freeze({
   color: (attempt) => attempt === 0
-    ? import('./draw-color-adjustment-panel.mjs?rev=20261116-normal-release-2')
-    : importModule(`/js/creation/draw-color-adjustment-panel.mjs?rev=20261116-normal-release-2&attempt=${attempt}`),
+    ? import('./draw-color-adjustment-panel.mjs?rev=20261118-draw-button-label-1')
+    : importModule(`/js/creation/draw-color-adjustment-panel.mjs?rev=20261118-draw-button-label-1&attempt=${attempt}`),
   normal: (attempt) => attempt === 0
-    ? import('./draw-normal-map-panel.mjs?rev=20261117-normal-apply-1')
-    : importModule(`/js/creation/draw-normal-map-panel.mjs?rev=20261117-normal-apply-1&attempt=${attempt}`),
+    ? import('./draw-normal-map-panel.mjs?rev=20261118-draw-button-label-1')
+    : importModule(`/js/creation/draw-normal-map-panel.mjs?rev=20261118-draw-button-label-1&attempt=${attempt}`),
   text: (attempt) => attempt === 0
-    ? import('./draw-text-panel.mjs?rev=20261116-normal-release-2')
-    : importModule(`/js/creation/draw-text-panel.mjs?rev=20261116-normal-release-2&attempt=${attempt}`)
+    ? import('./draw-text-panel.mjs?rev=20261118-draw-button-label-1')
+    : importModule(`/js/creation/draw-text-panel.mjs?rev=20261118-draw-button-label-1&attempt=${attempt}`)
 });
 
 const importModule = (specifier) => import(specifier);
 
 const labels = Object.freeze({
-  normal: { button: '凹凸', aria: 'ノーマルマップを作成', loading: 'ノーマルマップを読み込み中です。', error: '読み込みに失敗しました。もう一度押して再試行してください。', ready: '準備できました。もう一度押すと開きます。' },
-  color: { button: '色調', loading: '色調パネルを読み込み中です。', error: '読み込みに失敗しました。もう一度押して再試行してください。', ready: '準備できました。もう一度押すと開きます。' },
-  text: { button: '文字', loading: '文字パネルを読み込み中です。', error: '読み込みに失敗しました。もう一度押して再試行してください。', ready: '準備できました。もう一度押すと開きます。' }
+  normal: { button: '凹凸', icon: 'adjustments', aria: 'ノーマルマップを作成', loading: 'ノーマルマップを読み込み中です。', error: '読み込みに失敗しました。もう一度押して再試行してください。', ready: '準備できました。もう一度押すと開きます。' },
+  color: { button: '色調', icon: 'color-adjust', loading: '色調パネルを読み込み中です。', error: '読み込みに失敗しました。もう一度押して再試行してください。', ready: '準備できました。もう一度押すと開きます。' },
+  text: { button: '文字', icon: 'text', loading: '文字パネルを読み込み中です。', error: '読み込みに失敗しました。もう一度押して再試行してください。', ready: '準備できました。もう一度押すと開きます。' }
 });
 
 /** Create stable toolbar buttons that mount their feature panel only after activation. */
@@ -38,16 +39,16 @@ function mountLazyPanel({ kind, scope, host, callbacks, isActive, loader, doc })
   const opener = doc.createElement('button');
   opener.type = 'button';
   opener.className = kind === 'normal' ? 'draw-normal-map-open' : kind === 'color' ? 'draw-color-adjustment-open' : 'draw-text-opener';
+  let buttonContent = createDrawButtonContent(opener, { icon: spec.icon, label: spec.button, doc });
   opener.setAttribute('aria-label', ariaLabel);
   opener.setAttribute('aria-haspopup', 'dialog');
   opener.setAttribute('aria-expanded', 'false');
   opener.title = ariaLabel;
-  const labelNode = doc.createTextNode(spec.button);
   const status = doc.createElement('span');
   status.className = 'visually-hidden';
   status.setAttribute('role', 'status');
   status.setAttribute('aria-live', 'polite');
-  opener.append(labelNode, status);
+  opener.append(status);
 
   const toolbar = kind !== 'text'
     ? host.querySelector?.('.draw-fixed-left, .draw-fixed-toolbar') || host
@@ -80,6 +81,7 @@ function mountLazyPanel({ kind, scope, host, callbacks, isActive, loader, doc })
       const realOpener = realPanel?.opener || (kind === 'text' ? [...host.querySelectorAll('.draw-text-opener')].find(node => node !== opener) : null);
       const panel = realPanel?.panel || host.querySelector(kind === 'text' ? '.draw-text-panel' : '.draw-color-adjustment');
       if (!realOpener || typeof realPanel?.open !== 'function') throw new TypeError(`Loaded ${kind} panel returned an invalid controller`);
+      buttonContent = createDrawButtonContent(realOpener, { icon: spec.icon, label: spec.button, doc });
       realOpener.append(status);
       realOpener.title = realOpener.getAttribute('aria-label') || spec.button;
       opener.replaceWith(realOpener);
@@ -107,7 +109,7 @@ function mountLazyPanel({ kind, scope, host, callbacks, isActive, loader, doc })
         return true;
       } catch {
         setStatus(spec.error);
-        labelNode.textContent = '再試行';
+        setDrawButtonLabel(buttonContent.label, '再試行');
         opener.title = spec.error;
         opener.setAttribute('aria-label', `${ariaLabel}（再試行）`);
         return false;
@@ -116,7 +118,7 @@ function mountLazyPanel({ kind, scope, host, callbacks, isActive, loader, doc })
 
     opener.disabled = true;
     opener.setAttribute('aria-busy', 'true');
-    labelNode.textContent = '読込';
+    setDrawButtonLabel(buttonContent.label, '読込');
     opener.title = spec.loading;
     setStatus(spec.loading);
     const token = ++activationSequence;
@@ -126,7 +128,7 @@ function mountLazyPanel({ kind, scope, host, callbacks, isActive, loader, doc })
         if (disposed || scope.disposed) return false;
         opener.disabled = false;
         opener.removeAttribute('aria-busy');
-        labelNode.textContent = spec.button;
+        setDrawButtonLabel(buttonContent.label, spec.button);
         opener.title = opener.getAttribute('aria-label') || spec.button;
         if (!available() || doc.hidden) { setStatus(spec.ready); return false; }
         // Toolbar and layer-panel entries can activate the same lazy panel.
@@ -145,7 +147,7 @@ function mountLazyPanel({ kind, scope, host, callbacks, isActive, loader, doc })
           opener.removeAttribute('aria-busy');
           if (!loadedModule) retryAttempt += 1;
           setStatus(spec.error);
-          labelNode.textContent = '再試行';
+          setDrawButtonLabel(buttonContent.label, '再試行');
           opener.title = spec.error;
           opener.setAttribute('aria-label', `${ariaLabel}（再試行）`);
         }

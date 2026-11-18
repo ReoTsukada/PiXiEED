@@ -1,4 +1,6 @@
 const SIZED_TOOLS = new Set(['pen', 'eraser', 'line', 'rectangle', 'rectangle-fill', 'ellipse', 'ellipse-fill', 'spray']);
+import { createDrawButtonContent, setDrawButtonLabel } from './draw-button-content.mjs?rev=20261118-draw-button-label-1';
+
 export function brushSettingForTool(binding = {}) {
   const spray = binding.tool === 'spray';
   return { supported: SIZED_TOOLS.has(binding.tool), value: spray ? binding.spraySize ?? 5 : binding.brushSize ?? 1,
@@ -10,6 +12,7 @@ export function brushSettingForTool(binding = {}) {
 export function mountDrawBrushSettings({ scope, host, getState, onChange, beforeOpen }) {
   const doc = host.ownerDocument;
   const opener = doc.createElement('button'); opener.type = 'button'; opener.id = 'draw-brush-size-open'; opener.className = 'draw-brush-size-open';
+  const openerContent = createDrawButtonContent(opener, { icon: 'adjustments', label: '太さ', doc });
   opener.setAttribute('aria-haspopup', 'dialog'); opener.setAttribute('aria-controls', 'draw-brush-settings-panel'); opener.setAttribute('aria-expanded', 'false');
   const inlineControl = doc.createElement('div'); inlineControl.className = 'draw-brush-size-inline'; inlineControl.setAttribute('role', 'group'); inlineControl.setAttribute('aria-label', '線の太さ');
   const inlineRange = doc.createElement('input'); inlineRange.type = 'range'; inlineRange.className = 'draw-brush-size-inline__range'; inlineRange.setAttribute('aria-label', '現在の線の太さ');
@@ -21,6 +24,9 @@ export function mountDrawBrushSettings({ scope, host, getState, onChange, before
     <p data-brush-tool></p><label for="draw-brush-size-value" data-brush-label></label>
     <div class="draw-brush-settings__value"><input id="draw-brush-size-value" type="number" inputmode="numeric"><span>px</span></div>
     <input id="draw-brush-size-range" type="range" aria-label="サイズを変更"><p data-brush-help></p><p data-brush-status role="status" aria-live="polite"></p>`;
+  createDrawButtonContent(dialog.querySelector('[data-brush-close]'), { icon: 'close', label: '閉じる', doc });
+  createDrawButtonContent(dialog.querySelector('[data-brush-side="left"]'), { icon: 'back', label: '左', doc });
+  createDrawButtonContent(dialog.querySelector('[data-brush-side="right"]'), { icon: 'forward', label: '右', doc });
   doc.body.append(dialog);
   let side = 'left';
   const number = dialog.querySelector('#draw-brush-size-value'), range = dialog.querySelector('#draw-brush-size-range');
@@ -29,8 +35,7 @@ export function mountDrawBrushSettings({ scope, host, getState, onChange, before
     const state = getState(), current = state.bindings[state.side || 'left'], setting = brushSettingForTool(current);
     // Pointer-down cancellation also syncs these controls. Replacing the label
     // during that gesture can cancel the browser's native button click.
-    const text = `サイズ ${setting.supported ? `${setting.value}px` : '—'}`;
-    if (opener.textContent !== text) opener.textContent = text;
+    setDrawButtonLabel(openerContent.label, '太さ');
     opener.setAttribute('aria-label', `サイズ設定。${state.side === 'right' ? '右' : '左'}ボタン${setting.supported ? ` ${setting.value}px` : 'の道具はサイズ対象外'}`);
     opener.disabled = Boolean(state.blockedReason);
     for (const input of [inlineRange]) { input.min = String(setting.min); input.max = String(setting.max); input.step = String(setting.step); input.disabled = !setting.supported || Boolean(state.blockedReason); input.value = String(setting.value); }

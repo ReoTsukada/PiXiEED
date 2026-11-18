@@ -1,4 +1,5 @@
 import { ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261116-normal-release-2';
+const ACTION_CAPTIONS = Object.freeze({ confirm: '確定', cancel: '取消', paste: '貼付', back: '選択', copy: 'コピー', cut: 'カット' });
 /** Selection transactions take priority over the currently used input's settings. */
 export function drawSelectionActionSlots(state, mode = 'select', binding = {}, side = 'left') {
   const action = (key, label, enabled) => ({ key, label, enabled: Boolean(enabled), kind: 'action' });
@@ -18,13 +19,14 @@ export function drawSelectionActionSlots(state, mode = 'select', binding = {}, s
 export function mountDrawSelectionPanel({ scope, host, getState, onAction, beforeOpen, auxiliaryHost, getToolOptions = () => ({}), onToolOption = () => false }) {
   const doc = host.ownerDocument, root = doc.createElement('section');
   root.id = 'draw-selection-controls'; root.className = 'draw-selection-controls'; root.setAttribute('aria-label', '選択と貼り付け');
-  root.innerHTML = `<div class="draw-selection-controls__row"><button type="button" data-selection-slot="0" hidden></button><button type="button" data-selection-slot="1" hidden></button></div><button type="button" class="draw-selection-controls__deselect" data-selection-action="deselect" hidden>選択解除</button><p data-selection-status aria-live="polite"></p>`;
+  root.innerHTML = `<div class="draw-selection-controls__row"><button type="button" data-selection-slot="0" hidden></button><button type="button" data-selection-slot="1" hidden></button></div><button type="button" class="draw-selection-controls__deselect" data-selection-action="deselect" aria-label="選択解除" title="選択解除" hidden><span class="draw-button-label" aria-hidden="true">解除</span></button><p data-selection-status aria-live="polite"></p>`;
   const controls = host.querySelector('.draw-controls'), right = controls.querySelector('.draw-fixed-right'); right.prepend(root);
   const fields = doc.createElement('details'); fields.id = 'draw-selection-numbers'; fields.className = 'draw-selection-numbers';
-  fields.innerHTML = `<summary aria-label="数値で変形" title="数値で変形">数値で変形</summary><label class="draw-selection-panel__ratio"><input id="draw-selection-ratio" type="checkbox" checked>幅・高さの比率を固定</label><div class="draw-selection-numbers__grid"><label>幅<input id="draw-selection-width" type="number" min="1" max="${ANIMATION_MAX_DIMENSION}" step="1"></label><label>高さ<input id="draw-selection-height" type="number" min="1" max="${ANIMATION_MAX_DIMENSION}" step="1"></label><label>角度 °<input id="draw-selection-angle" type="number" min="-3600" max="3600" step="any" data-selection-field="angle"></label><label>位置 X<input id="draw-selection-x" type="number" min="-1024" max="1024" step="any" data-selection-field="position" data-axis="x"></label><label>位置 Y<input id="draw-selection-y" type="number" min="-1024" max="1024" step="any" data-selection-field="position" data-axis="y"></label><label>中心 X<input id="draw-selection-pivot-x" type="number" min="-1024" max="1024" step="any" data-selection-field="pivot" data-axis="x"></label><label>中心 Y<input id="draw-selection-pivot-y" type="number" min="-1024" max="1024" step="any" data-selection-field="pivot" data-axis="y"></label></div><p>四隅は中心を基準に拡縮＋回転。幅・高さの個別変更は数値で。カット後の貼付取消ではカットは戻りません。</p>`;
+  fields.innerHTML = `<summary aria-label="数値で変形" title="数値で変形"><span class="draw-button-label" aria-hidden="true">変形</span></summary><label class="draw-selection-panel__ratio"><input id="draw-selection-ratio" type="checkbox" checked>幅・高さの比率を固定</label><div class="draw-selection-numbers__grid"><label>幅<input id="draw-selection-width" type="number" min="1" max="${ANIMATION_MAX_DIMENSION}" step="1"></label><label>高さ<input id="draw-selection-height" type="number" min="1" max="${ANIMATION_MAX_DIMENSION}" step="1"></label><label>角度 °<input id="draw-selection-angle" type="number" min="-3600" max="3600" step="any" data-selection-field="angle"></label><label>位置 X<input id="draw-selection-x" type="number" min="-1024" max="1024" step="any" data-selection-field="position" data-axis="x"></label><label>位置 Y<input id="draw-selection-y" type="number" min="-1024" max="1024" step="any" data-selection-field="position" data-axis="y"></label><label>中心 X<input id="draw-selection-pivot-x" type="number" min="-1024" max="1024" step="any" data-selection-field="pivot" data-axis="x"></label><label>中心 Y<input id="draw-selection-pivot-y" type="number" min="-1024" max="1024" step="any" data-selection-field="pivot" data-axis="y"></label></div><p>四隅は中心を基準に拡縮＋回転。幅・高さの個別変更は数値で。カット後の貼付取消ではカットは戻りません。</p>`;
   auxiliaryHost.append(fields);
   let mode = 'select', wasPending = false;
   const buttons = [...root.querySelectorAll('[data-selection-slot]')], held = new Map();
+  const captions = buttons.map(button => { const caption = doc.createElement('span'); caption.setAttribute('aria-hidden', 'true'); button.append(caption); return caption; });
   function sync() {
     const activeBefore = doc.activeElement;
     const s = getState();
@@ -41,9 +43,11 @@ export function mountDrawSelectionPanel({ scope, host, getState, onAction, befor
       if (kind === 'option') button.setAttribute('aria-pressed', String(value)); else button.removeAttribute('aria-pressed');
       button.setAttribute('aria-label', kind === 'empty' ? 'この道具の追加設定はありません' : label);
       button.title = action === 'contiguous' ? (value ? '隣接する同じ色だけを塗る' : '離れた同じ色もすべて塗る') : kind === 'option' ? '図形の塗りを切り替える' : label;
-      // Preserve the pressed text node: WebKit can drop a native mouse click
-      // when pointerdown synchronization replaces that node with the same label.
-      if (button.textContent !== label) button.textContent = label;
+      // Keep the caption node stable: replacing pressed content can lose WebKit clicks.
+      const caption = captions[i], shortLabel = kind === 'action' ? ACTION_CAPTIONS[action] || label : label;
+      const captionClass = kind === 'action' ? 'draw-button-label' : 'draw-selection-option-label';
+      if (caption.className !== captionClass) caption.className = captionClass;
+      if (caption.textContent !== shortLabel) caption.textContent = shortLabel;
       button.disabled = !enabled;
     });
     deselectButton.hidden = !s.bounds || s.pending;

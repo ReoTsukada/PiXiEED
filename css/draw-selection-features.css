@@ -103,3 +103,36 @@ body[data-page="draw"] :is(.draw-color-adjustment-open,.draw-text-opener)[aria-l
 }
 @keyframes draw-feature-loading { to { transform:rotate(1turn); } }
 @media (prefers-reduced-motion:reduce) { body[data-page="draw"] [aria-busy="true"]::before { animation:none!important; } }
+
+/* Reuse the selection glyphs without hiding their short visible captions. */
+body[data-page="draw"] :is(#draw-selection-controls [data-slot-kind="action"], .draw-selection-controls__deselect) {
+  grid-template-rows: 20px 11px;
+  align-content: center;
+  justify-items: center;
+  gap: 1px;
+  padding: 3px 2px;
+}
+body[data-page="draw"] :is(#draw-selection-controls [data-slot-kind="action"], .draw-selection-controls__deselect)::before {
+  grid-row: 1;
+  width: 20px;
+  height: 20px;
+}
+body[data-page="draw"] :is(#draw-selection-controls, .draw-selection-controls__deselect) .draw-button-label {
+  grid-row: 2;
+  max-width: 100%;
+  font: 600 10px/11px system-ui, sans-serif;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* The transform entry reuses the same glyph on mobile and desktop. */
+body[data-page="draw"] .draw-selection-numbers > summary { gap: 6px; }
+body[data-page="draw"] .draw-selection-numbers > summary::before {
+  content: '';
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  background-color: currentColor;
+  -webkit-mask: url('/assets/icons/pixieed/selection-transform.svg?rev=20261117-chat-connect-1') center / contain no-repeat;
+  mask: url('/assets/icons/pixieed/selection-transform.svg?rev=20261117-chat-connect-1') center / contain no-repeat;
+}

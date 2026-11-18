@@ -15,6 +15,6 @@ test('compact selected palette tiles stay centered without resizing their hit ar
   assert.match(css, /\.draw-controls #draw-palette \.draw-color:is\(\[aria-pressed="true"\], :active\)\s*\{\s*transform:\s*none !important/);
   assert.match(read('css/draw-ui.css'), /\.draw-color\[aria-pressed="true"\]\s*\{[^}]*border-color:\s*#fff[^}]*box-shadow:/, 'selection ring remains visible');
   const revision = JSON.parse(read('tests/runtime-cache-revisions.json'))['css/draw-compact-controls.css'];
-  assert.equal(revision, '20261108-palette-alignment-1');
+  assert.equal(revision, '20261118-draw-button-label-1');
   assert.ok(read('draw/editor.html').includes('draw-compact-controls.css?rev=' + revision));
 });

@@ -1,6 +1,5 @@
 .draw-normal-map-open {
-  min-width: 2.5rem;
-  min-height: 2.5rem;
+  display:grid; grid-template-rows:19px 12px; align-content:center; justify-items:center; gap:1px; box-sizing:border-box; width:44px; min-width:44px; height:44px; min-height:44px;
   border: 1px solid var(--draw-border, #b9b8b2);
   border-radius: .65rem;
   background: var(--draw-panel, #fff);
@@ -41,7 +40,9 @@
 .draw-normal-map p { margin: 0; }
 .draw-normal-map button,
 .draw-normal-map select { min-height: 44px; font: inherit; }
-.draw-normal-map button { padding: .45rem .7rem; border: 1px solid #aaa; border-radius: .6rem; background: #f8f8f6; color: inherit; cursor: pointer; }
+.draw-normal-map button { display:inline-flex; align-items:center; justify-content:center; gap:.4rem; padding: .45rem .7rem; border: 1px solid #aaa; border-radius: .6rem; background: #f8f8f6; color: inherit; cursor: pointer; }
+.draw-normal-map .draw-button-icon { display:block; width:16px; height:16px; object-fit:contain; flex:0 0 16px; pointer-events:none; }
+.draw-normal-map .draw-button-label { display:inline-block; color:inherit; font:inherit; white-space:nowrap; pointer-events:none; }
 .draw-normal-map button:disabled { opacity: .6; cursor: wait; }
 .draw-normal-map__header,
 .draw-normal-map__source-row,
@@ -176,3 +177,28 @@ body[data-page="draw"].draw-desktop-active .draw-desktop-dock .draw-desktop-laye
 body[data-page="draw"].draw-desktop-active .draw-desktop-dock[data-compact="true"] .draw-desktop-layer-host > .animation-controls__desktop-layers > .animation-controls__wide-button[data-action="normal-map"] { font-size: 0; }
 body[data-page="draw"].draw-desktop-active .draw-desktop-dock[data-compact="true"] .draw-desktop-layer-host > .animation-controls__desktop-layers > .animation-controls__wide-button[data-action="normal-map"]::before { content: '凹凸'; font-size: 12px; }
 body[data-page="draw"] .animation-controls__workspace-panel > [data-action="normal-map"] { margin: 0; }
+
+.draw-normal-map-open[data-draw-button-content] > .draw-button-icon { filter:none; }
+.draw-normal-map-open[data-draw-button-content]::before { content:none !important; display:none !important; }
+.draw-normal-map .draw-button-icon { filter:none; }
+.draw-normal-map-open > .draw-button-label { font:600 10px/11px system-ui,sans-serif; }
+.draw-normal-map__header [data-close] .draw-button-label { font:inherit; }
+.draw-normal-map__edit [data-edit-normal], .draw-normal-map__exports button, .draw-normal-map__source-row [data-refresh], .draw-normal-map__actions button { display:inline-flex; align-items:center; justify-content:center; gap:.4rem; font:inherit; }
+.draw-normal-map__edit [data-edit-normal] .draw-button-label, .draw-normal-map__exports button .draw-button-label, .draw-normal-map__source-row [data-refresh] .draw-button-label, .draw-normal-map__actions button .draw-button-label { font:inherit; white-space:normal; text-align:center; }
+
+/* In the compact layer strip, keep the 44px control and show one concise
+   caption beside the existing vector icon. The wide lane's long span is
+   intentionally hidden only in this compact state. */
+body.draw-desktop-active[data-creation-mode="draw"] .draw-desktop-dock[data-compact="true"] .draw-desktop-layer-host > .animation-controls__desktop-layers > .animation-controls__wide-button[data-action="normal-map"]:has(> .animation-controls__wide-label) {
+  display:grid !important; grid-template-columns:minmax(0,1fr); grid-template-rows:20px 12px; place-items:center; place-content:center; gap:1px;
+  box-sizing:border-box; width:44px !important; min-width:44px !important; max-width:44px !important;
+  height:44px !important; min-height:44px !important; max-height:44px !important; padding:2px !important; overflow:hidden;
+}
+body.draw-desktop-active[data-creation-mode="draw"] .draw-desktop-dock[data-compact="true"] .draw-desktop-layer-host > .animation-controls__desktop-layers > .animation-controls__wide-button[data-action="normal-map"]:has(> .animation-controls__wide-label)::before {
+  grid-column:1; grid-row:2; font:600 10px/12px system-ui,sans-serif; white-space:nowrap;
+}
+body.draw-desktop-active[data-creation-mode="draw"] .draw-desktop-dock[data-compact="true"] .draw-desktop-layer-host > .animation-controls__desktop-layers > .animation-controls__wide-button[data-action="normal-map"]:has(> .animation-controls__wide-label) > svg {
+  grid-column:1; grid-row:1; flex:none; width:20px !important; height:20px !important;
+}
+body.draw-desktop-active[data-creation-mode="draw"] .draw-desktop-dock[data-compact="true"] .draw-desktop-layer-host > .animation-controls__desktop-layers > .animation-controls__wide-button[data-action="normal-map"]:has(> .animation-controls__wide-label) > .animation-controls__wide-label { display:none !important; }
+.draw-normal-map__actions [data-apply] > .draw-button-icon { filter:brightness(0) invert(1); }
