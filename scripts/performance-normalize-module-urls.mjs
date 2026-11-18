@@ -284,7 +284,8 @@ function normalize(source, file) {
     if (!path.startsWith('/') && !path.startsWith('.') || path.startsWith('//')) return whole;
     const target = path.startsWith('/') ? path.slice(1) : posix.normalize(posix.join(posix.dirname(relative(root, file)), path));
     if (!drawToolPanelTargets.has(target) || !/(^|&)rev=/.test(query)) return whole;
-    return `${quote}${path}?${query.replace(/(^|&)rev=[^&]*/, '$1rev=20261118-draw-tool-panel-1')}${quote}`;
+    const revision = target === 'css/draw-tool-picker.css' ? '20261118-draw-text-contrast-1' : '20261118-draw-tool-panel-1';
+    return `${quote}${path}?${query.replace(/(^|&)rev=[^&]*/, `$1rev=${revision}`)}${quote}`;
   });
   return changed;
 }
