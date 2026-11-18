@@ -3,7 +3,9 @@
   if (window.__PIXIEED_AD_RECOVERY_ENTRY__) return;
   const KEY = 'pixieed.ad-recovery.next-entry.v1';
   const DAY = 24 * 60 * 60 * 1000;
+  const deadline = Date.now() + 8000; // A slow provider must not appear long after entry.
   const route = window.location.pathname;
+  const directory = route === '/tools/' || route === '/tools/index.html';
   const tool = /^\/tools\/start\/(draw|camera|audio|spot-difference|hidden-object|jigsaw|convert)\/$/.exec(route)?.[1];
   let retired = false, approved = false, timer = 0, idleHandle = 0;
   const removers = [];
@@ -18,14 +20,15 @@
     for (const remove of removers.splice(0)) remove();
   };
   const safeRoute = () => {
-    if (!tool || window.top !== window.self || window.location.origin !== 'https://pixieed.jp'
+    if ((!tool && !directory) || window.top !== window.self || window.location.origin !== 'https://pixieed.jp'
         || window.location.pathname !== route || window.location.hash) return false;
+    if (directory && window.location.search) return false;
     const allowed = { workspace: '1', runtime: 'direct', mode: tool };
     const params = new URLSearchParams(window.location.search);
     if (![...params.keys()].every(key => params.getAll(key).length === 1 && allowed[key] === params.get(key))) return false;
     const history = window.history?.state || {};
     return history.pixieedWorkspace !== true && history.toolStartActive !== true
-      && !['projectWorkspaceSelection', 'pxd', 'modePxd', 'pixieedConversionRecovery', 'privateView']
+      && !['projectWorkspaceSelection', 'pxd', 'pxdRevision', 'pxdImage', 'modePxd', 'modePxdRevision', 'modePxdImage', 'modeProjectTool', 'pixieedConversionRecovery', 'privateView', 'mcpEndpoint', 'connectionId', 'pairingCode', 'sessionId', 'accessToken', 'browserToken', 'auth', 'code', 'token']
         .some(key => Boolean(history[key]));
   };
   const cooldownFinished = () => {
@@ -34,8 +37,8 @@
       return Number.isFinite(next) && next <= Date.now();
     } catch { return false; } // Do not repeat prompts when persistence is unavailable.
   };
-  const ready = () => !retired && safeRoute() && document.visibilityState === 'visible'
-    && !document.fullscreenElement && !document.querySelector('dialog[open]')
+  const ready = () => !retired && Date.now() <= deadline && safeRoute() && document.visibilityState === 'visible'
+    && !document.fullscreenElement && !document.querySelector('dialog[open], [data-private-view], [data-project-workspace], [data-project-editor], .creation-editor, .tool-embed--expanded')
     && window.matchMedia('(pointer:fine)').matches;
   const allowMessage = () => {
     if (!ready()) return false;
@@ -57,7 +60,7 @@
   listen(window, 'storage', event => { if (event.key === KEY && !approved) retire(); });
   const load = () => {
     if (!ready() || !cooldownFinished()) { retire(); return; }
-    if (document.querySelector('script[data-pixieed-ad-recovery]')) return;
+    if (document.querySelector('script[data-pixieed-ad-recovery], script[src*="fundingchoicesmessages.google.com/i/"]')) return;
     if (!window.frames.googlefcPresent) {
       const signal = document.createElement('iframe');
       signal.name = 'googlefcPresent'; signal.hidden = true; signal.tabIndex = -1;
