@@ -7,11 +7,13 @@ import { maybeLoadOfferwallSDK } from '../../js/tool-offerwall-entry.mjs';
 import { addOfferwallEntryPolicy, OFFERWALL_ENTRY_LOADER_SCRIPT, OFFERWALL_ENTRY_POLICY_SCRIPT, OFFERWALL_ENTRY_POLICY_VERSION, OFFERWALL_TOOL_PATHS, OFFERWALL_OUTPUT_PATHS } from '../../scripts/offerwall-entry-policy.mjs';
 
 const source = await readFile(new URL('../../js/adsense-offerwall-policy.js', import.meta.url), 'utf8');
+const enabledSource = source.replace('const OFFERWALL_ENABLED = false;', 'const OFFERWALL_ENABLED = true;');
+assert.notEqual(enabledSource, source);
 const STARTS = TOOL_START_ROUTES.map(route => route.startPath);
 const OLD_PATHS = TOOL_START_ROUTES.map(route => route.legacyPath);
 const freshHistory = { pixieedWorkspace: false, projectWorkspaceSelection: false, toolStartActive: false };
 
-function setup({ url = `https://pixieed.jp${STARTS[0]}`, frame = false, enumValue = 3, historyState = freshHistory, referrer = '' } = {}) {
+function setup({ url = `https://pixieed.jp${STARTS[0]}`, frame = false, enumValue = 3, historyState = freshHistory, referrer = '', offerwallEnabled = true } = {}) {
   const parsed = new URL(url);
   const listeners = new Map();
   const document = {
@@ -26,7 +28,7 @@ function setup({ url = `https://pixieed.jp${STARTS[0]}`, frame = false, enumValu
     addEventListener(type, callback) { listeners.set(`window:${type}`, { callback }); },
   };
   if (!frame) window.top = window.self;
-  vm.runInContext(source, vm.createContext({ window, document, URL, URLSearchParams }));
+  vm.runInContext(offerwallEnabled ? enabledSource : source, vm.createContext({ window, document, URL, URLSearchParams }));
   const invoke = () => {
     let args;
     window.googlefc.controlledMessagingFunction({ proceed: (...value) => { args = value; } });
@@ -38,7 +40,7 @@ function setup({ url = `https://pixieed.jp${STARTS[0]}`, frame = false, enumValu
 
 test('Offerwall registry exactly matches the seven common start routes, all pending until fresh runtime readiness', () => {
   assert.deepEqual(OFFERWALL_TOOL_PATHS, STARTS);
-  assert.equal(OFFERWALL_ENTRY_POLICY_VERSION, '20261111-output-offerwall-1');
+  assert.equal(OFFERWALL_ENTRY_POLICY_VERSION, '20261118-draw-display-ad-1');
   assert.match(OFFERWALL_ENTRY_LOADER_SCRIPT, /20261111-output-offerwall-1/);
   for (const path of STARTS) {
     const state = setup({ url: `https://pixieed.jp${path}` });
@@ -146,7 +148,7 @@ test('initial history flags, iframe, origins, and malformed readiness fail close
   }
   const sentinel = () => {};
   const frameWindow = { top: {}, self: {}, googlefc: { controlledMessagingFunction: sentinel }, location: {} };
-  vm.runInContext(source, vm.createContext({ window: frameWindow, document: { addEventListener() { throw Error('iframe listener'); } }, URLSearchParams }));
+  vm.runInContext(enabledSource, vm.createContext({ window: frameWindow, document: { addEventListener() { throw Error('iframe listener'); } }, URLSearchParams }));
   assert.equal(frameWindow.googlefc.controlledMessagingFunction, sentinel);
 });
 
@@ -310,4 +312,19 @@ test('successful output SDK loading is shared once across repeated eligible upda
   eligible = false;
   assert.equal(await load({ window: win, document: doc }), false, 'retirement blocks further eligibility even after successful loading');
   assert.equal(requests, 1);
+});
+
+
+test('published Offerwall policy refuses all tool entries, preserves consent, and never loads its SDK', async () => {
+  for (const path of STARTS) {
+    const state = setup({url: `https://pixieed.jp${path}`, offerwallEnabled: false});
+    const policy = state.window.__PIXIEED_OFFERWALL_ENTRY__;
+    assert.equal(policy.ready({fresh:true,output:true}), false);
+    assert.equal(policy.isEligible(), false);
+    assert.deepEqual(Array.from(state.invoke()[1]), [3]);
+    assert.equal(state.listeners.size, 0);
+    state.document.head = {append(){throw Error('disabled Offerwall must not load SDK');}};
+    assert.equal(await maybeLoadOfferwallSDK({window:state.window,document:state.document}), false);
+  }
+  assert.deepEqual(setup({offerwallEnabled:false,enumValue:null}).invoke(), [true]);
 });

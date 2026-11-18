@@ -161,7 +161,7 @@ try {
   await ad.locator('ins.px-display-ad__unit').evaluate((unit) => { unit.dataset.adStatus = 'unfill-optimized'; });
   await page.waitForFunction(() => document.querySelector('[data-display-ad]').dataset.adState === 'filled');
   assert.equal(await ad.isVisible(), true, 'a late optimized creative remains visible'); checks++;
-  await page.evaluate(async () => { const module = await import('/js/display-ads.mjs?rev=20261007-lazy-ads-1'); module.mountDisplayAds(); });
+  await page.evaluate(async () => { const module = await import('/js/display-ads.mjs?rev=20261118-draw-display-ad-1'); module.mountDisplayAds(); });
   assert.equal(await page.evaluate(() => window.__manualAdRequests), 2, 'repeat mount is idempotent across both tools placements');
   assert.equal(await page.locator('ins.px-display-ad__unit').count(), 2); checks++;
   await pending.close();

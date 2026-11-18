@@ -1,6 +1,6 @@
 import { createToolProjectStore } from './tool-project-store.mjs?rev=20261116-normal-release-2';
 import { mountProjectGallery } from './project-gallery.mjs?rev=20261109-import-preview-gallery-1';
-import { mountProjectGalleryAdSeries } from '../ads/project-manager-ad.mjs?rev=20261108-gallery-canvas-viewport-1';
+import { mountProjectGalleryAdSeries } from '../ads/project-manager-ad.mjs?rev=20261118-draw-display-ad-1';
 import { projectGalleryAdConfig } from '../../data/project-gallery-ad-config.mjs?rev=20261108-gallery-canvas-viewport-1';
 
 /** Require real display-ready RGB previews so blank placeholder canvases do not count as publisher content. */

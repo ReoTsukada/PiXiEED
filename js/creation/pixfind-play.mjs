@@ -4,7 +4,7 @@ import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-draf
 import { documentRgba } from './draw-core.mjs?rev=20261116-normal-release-2';
 import { createPuzzleHintController } from './puzzle-hint.mjs?rev=20261016-color-capability-1';
 import { hasSiteReward, requireSiteReward, isSiteRewardPolicyEnabled, subscribeSiteReward } from '../ads/site-reward.mjs?rev=20261024-free-tools-1';
-import { createToolResultView } from '../tool-result-view.mjs?rev=20261012-operation-bar-1';
+import { createToolResultView } from '../tool-result-view.mjs?rev=20261118-draw-display-ad-1';
 import { resolveLocalDrawRevision, validateSpotDifferenceDraft } from './spot-difference-core.mjs?rev=20261116-normal-release-2';
 import { buildHiddenObjectHitBoxes, HIDDEN_OBJECT_MIN_PLAY_IMAGE_CSS_WIDTH, validateHiddenObjectDraft } from './hidden-object-core.mjs?rev=20261116-normal-release-2';
 import { computeDifferenceRegions, computeHiddenObjectRegions, regionContainsPoint, resolvePuzzleFromLocation, validateHiddenObjectMarkers, validateLocalDifferenceGroups, validateStoredDifferenceRegions } from './pixfind-regions.mjs';

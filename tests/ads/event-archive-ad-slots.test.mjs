@@ -20,7 +20,7 @@ test('only the long event archive gets two clearly labelled manual slots after 2
   assert.match(result.html, /aria-label="広告"/);
   assert.match(result.html, /px-display-ad__label">広告/);
   assert.match(result.html, /display-ads\.css\?rev=20261030-event-inline-ads-1/);
-  assert.match(result.html, /display-ads\.mjs\?rev=20261030-event-inline-ads-1/);
+  assert.match(result.html, /display-ads\.mjs\?rev=20261118-draw-display-ad-1/);
   assert.doesNotMatch(result.html, /adsbygoogle\.js|adsense-auto\.js/);
   assert.equal(addEventArchiveAdSlots(result.html, 'events/index.html').html, result.html, 'the build transform is idempotent');
   assert.equal(addEventArchiveAdSlots(source, 'events/pixel-art-event/index.html').added, false);

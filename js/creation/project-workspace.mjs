@@ -12,7 +12,7 @@ import { componentImageRole, freezeProjectComponents } from './project-component
 import { mountProjectGallery, drawProjectThumbnail } from './project-gallery.mjs?rev=20261109-import-preview-gallery-1';
 import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261111-output-offerwall-1&nav=20261016-tool-operations-1';
 import { findPxdOriginalBackup } from './pxd-original-backup.mjs';
-import { mountProjectGalleryAdSeries, hasManagerArtwork } from '../ads/project-manager-ad.mjs?rev=20261108-gallery-canvas-viewport-1';
+import { mountProjectGalleryAdSeries, hasManagerArtwork } from '../ads/project-manager-ad.mjs?rev=20261118-draw-display-ad-1';
 import { projectManagerAdConfig } from '../../data/project-gallery-ad-config.mjs?rev=20261108-gallery-canvas-viewport-1';
 
 const icons = {

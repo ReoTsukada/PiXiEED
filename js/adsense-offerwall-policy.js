@@ -1,5 +1,7 @@
 /** Site-owned entry gate for Google's provider-controlled Offerwall. */
 (() => {
+  // Offerwall has been retired; display ads and consent remain independent.
+  const OFFERWALL_ENABLED = false;
   const START_PATHS = [
     '/tools/start/draw/', '/tools/start/camera/', '/tools/start/audio/',
     '/tools/start/spot-difference/', '/tools/start/hidden-object/',
@@ -52,7 +54,7 @@
     && window.history?.state?.projectWorkspaceSelection !== true
     && window.history?.state?.toolStartActive !== true
     && !hasConverterRecoveryHistory());
-  const initialEntryFresh = window.location?.protocol === 'https:'
+  const initialEntryFresh = OFFERWALL_ENABLED && window.location?.protocol === 'https:'
     && window.location?.origin === 'https://pixieed.jp'
     && (START_PATHS.includes(startPath) || isConverterStart)
     && !window.location.hash
@@ -95,7 +97,7 @@
     && converterReferrerSafe()
     && initialHistoryFresh;
   const isEligible = () => {
-    if (retired || !setupReady) return false;
+    if (!OFFERWALL_ENABLED || retired || !setupReady) return false;
     if (!currentRouteSafe() || (isConverterStart ? !freshInitialSearch(window.location.search)
         : window.location.search !== readySearch && !knownInternalSearch(window.location.search))) {
       retire();
@@ -118,7 +120,7 @@
     notify();
   };
   const ready = (options = {}) => {
-    if (retired || state !== 'pending') return false;
+    if (!OFFERWALL_ENABLED || retired || state !== 'pending') return false;
     if ((options?.fresh !== true || (isConverterStart && options?.output !== true)) || !initialEntryFresh || !currentRouteSafe()
         || !(freshInitialSearch(window.location.search) || knownInternalSearch(window.location.search))) {
       retire();
@@ -161,11 +163,12 @@
 
   const googlefc = window.googlefc = window.googlefc || {};
   googlefc.controlledMessagingFunction = (message) => {
-    const offerwall = window.googlefc?.MessageTypeEnum?.OFFERWALL;
-    // Unknown provider enums must not hold or suppress CMP messaging.
-    if (offerwall == null) { message.proceed(true); return; }
-    // This grants provider permission only; it cannot force or retract an Offerwall.
-    if (isEligible()) message.proceed(true);
-    else message.proceed(false, [offerwall]);
+    const types = window.googlefc?.MessageTypeEnum || {};
+    const suppressed = [];
+    if (types.OFFERWALL != null && !(OFFERWALL_ENABLED && isEligible())) suppressed.push(types.OFFERWALL);
+    // Optional recovery prompts must never delay required consent messages.
+    if (types.AD_BLOCKING != null && window.__PIXIEED_AD_RECOVERY_ENTRY__?.allowMessage?.() !== true) suppressed.push(types.AD_BLOCKING);
+    if (suppressed.length) message.proceed(false, suppressed);
+    else message.proceed(true);
   };
 })();

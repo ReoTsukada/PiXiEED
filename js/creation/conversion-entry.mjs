@@ -50,7 +50,7 @@ if (result?.status === 'ready') {
   // Do not let the provider load until the converter startup view has succeeded.
   const recoveryReady = await Promise.resolve(result.entryRecoveryReady ?? true).catch(() => false);
   notifyToolEntryReady(outputEntry && recoveryReady, { output: true });
-  if (recoveryReady) void import('../ads/conversion-display-ad.mjs?rev=20261111-output-offerwall-1')
+  if (recoveryReady) void import('../ads/conversion-display-ad.mjs?rev=20261118-draw-display-ad-1')
     .then(({ mountConversionDisplayAd }) => mountConversionDisplayAd({ entryHistoryState }))
     .catch(() => { /* Conversion and download remain available without advertising. */ });
 } else notifyToolEntryReady(false);

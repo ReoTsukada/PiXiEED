@@ -1,0 +1,60 @@
+/* A compact ordinary ad occupies its own row in the existing right lane. */
+body.draw-desktop-active .draw-desktop-dock[data-draw-ad-lane="true"] {
+  grid-template-rows: minmax(96px, var(--draw-desktop-palette, 260px)) 10px minmax(112px, 1fr) var(--draw-ad-lane-height);
+}
+.draw-display-ad {
+  box-sizing: border-box;
+  position: relative;
+  grid-row: 4;
+  align-self: end;
+  display: grid;
+  grid-template-rows: 16px var(--draw-ad-height);
+  justify-items: center;
+  row-gap: 8px;
+  width: 100%;
+  min-width: 0;
+  height: var(--draw-ad-lane-height);
+  padding-top: 24px;
+  color: #bac7cc;
+  font: 11px/16px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+.draw-display-ad__label { grid-row: 1; grid-column: 1; margin: 0; font-weight: 400; }
+.draw-display-ad__slot,
+.draw-display-ad__hint {
+  grid-row: 2;
+  grid-column: 1;
+  width: var(--draw-ad-width);
+  height: var(--draw-ad-height);
+}
+.draw-display-ad__hint {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0 4px;
+  color: #d9e2e3;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.draw-display-ad__slot[hidden],
+.draw-display-ad__hint[hidden] { display: none !important; }
+.draw-display-ad__unit { display: block; width: var(--draw-ad-width); height: var(--draw-ad-height); }
+/* The direct editor suppresses generic ads. Only this guarded lane can display its unit. */
+html[data-tool-direct="work"] body.draw-desktop-active #main .draw-desktop-dock[data-draw-ad-lane="true"] > .draw-display-ad:not([hidden]) > .draw-display-ad__slot > .adsbygoogle.draw-display-ad__unit {
+  display: var(--draw-ad-unit-display, block) !important;
+}
+.draw-display-ad[data-preview="true"] { --draw-ad-unit-display: grid; }
+.draw-display-ad[data-preview="true"] .draw-display-ad__unit {
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  border: 1px solid #52616b;
+  background: #18232b;
+  color: #bac7cc;
+  text-align: center;
+}
+.draw-display-ad__preview-copy { max-width: 90%; }
+.draw-display-ad[hidden] { display: none !important; }
+@media (max-width: 1099px) { .draw-display-ad { display: none !important; } }

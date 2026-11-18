@@ -45,7 +45,7 @@ const html = (path) => readFile(new URL(path, root), 'utf8');
 for (const path of MANUAL_PAGES) test(`${path}: manual units own their lazy ad requests`, async () => {
   const source = await html(path);
   assert.match(source, /data-display-ad=/);
-  const moduleRevision = '20261030-event-inline-ads-1';
+  const moduleRevision = '20261118-draw-display-ad-1';
   assert.ok(source.includes(`/js/display-ads.mjs?rev=${moduleRevision}`));
   assert.match(source, /href="\/css\/display-ads\.css\?rev=20261007-lazy-ads-1"/);
   assert.doesNotMatch(source, /adsbygoogle\.js|adsense-auto\.js/);
@@ -98,7 +98,7 @@ test('source HTML inventory has explicit loader decisions before route-scoped bu
   for (const path of expected.filter(path => path !== OFFERWALL_PAGE)) assert.doesNotMatch(await html(path), /adsbygoogle\.js|adsense-auto\.js/, path);
   const output = await html(OFFERWALL_PAGE);
   assert.doesNotMatch(output, /adsense-auto\.js|adsbygoogle\.js/, 'output work no longer loads an unconditional provider');
-  assert.match(output, /<script src="\/js\/adsense-offerwall-policy\.js\?rev=20261111-output-offerwall-1"><\/script>\s*<script type="module" src="\/js\/tool-offerwall-entry\.mjs\?rev=20261111-output-offerwall-1"><\/script>/);
+  assert.match(output, /<script src="\/js\/adsense-offerwall-policy\.js\?rev=20261118-draw-display-ad-1"><\/script>\s*<script type="module" src="\/js\/tool-offerwall-entry\.mjs\?rev=20261111-output-offerwall-1"><\/script>/);
   assert.doesNotMatch(await html('output/index.html'), /adsbygoogle\.js|adsense-auto\.js/);
 });
 

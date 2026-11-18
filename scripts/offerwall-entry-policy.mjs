@@ -1,4 +1,4 @@
-export const OFFERWALL_ENTRY_POLICY_VERSION = '20261111-output-offerwall-1';
+export const OFFERWALL_ENTRY_POLICY_VERSION = '20261118-draw-display-ad-1';
 export const OFFERWALL_TOOL_PATHS = Object.freeze([
   '/tools/start/draw/', '/tools/start/camera/', '/tools/start/audio/',
   '/tools/start/spot-difference/', '/tools/start/hidden-object/',
@@ -6,7 +6,7 @@ export const OFFERWALL_TOOL_PATHS = Object.freeze([
 ]);
 export const OFFERWALL_OUTPUT_PATHS = Object.freeze(['/output/work/', '/output/work/index.html']);
 export const OFFERWALL_ENTRY_POLICY_SCRIPT = `<script src="/js/adsense-offerwall-policy.js?rev=${OFFERWALL_ENTRY_POLICY_VERSION}"></script>`;
-export const OFFERWALL_ENTRY_LOADER_SCRIPT = `<script type="module" src="/js/tool-offerwall-entry.mjs?rev=${OFFERWALL_ENTRY_POLICY_VERSION}"></script>`;
+export const OFFERWALL_ENTRY_LOADER_SCRIPT = '<script type="module" src="/js/tool-offerwall-entry.mjs?rev=20261111-output-offerwall-1"></script>';
 
 /** Put the synchronous Offerwall policy first in the head, without removing other CMP scripts. */
 export function addOfferwallEntryPolicy(html) {

@@ -1,7 +1,7 @@
 /** Ordinary inline Display units after complete six-artwork groups. */
-import { getAdsenseLoader } from '../display-ads.mjs?rev=20261030-event-inline-ads-1';
+import { getAdsenseLoader } from '../display-ads.mjs?rev=20261118-draw-display-ad-1';
 import { claimProjectGalleryAdRequest, hasProjectGalleryAdRequest,
-  PROJECT_GALLERY_AD_PATHS, PROJECT_GALLERY_AD_MIN_GAP, resolveProjectGalleryAdUnit } from './project-gallery-ad.mjs?rev=20261108-gallery-canvas-viewport-1';
+  PROJECT_GALLERY_AD_PATHS, PROJECT_GALLERY_AD_MIN_GAP, resolveProjectGalleryAdUnit } from './project-gallery-ad.mjs?rev=20261118-draw-display-ad-1';
 
 const origins = new Set(['https://pixieed.jp', 'https://www.pixieed.jp']);
 const allowedQuery = { workspace: ['1'], social: ['1'], runtime: ['direct'], mode: ['draw', 'audio', 'camera'] };

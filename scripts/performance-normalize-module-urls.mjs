@@ -64,7 +64,7 @@ const targets = new Map([
   ['social/app.mjs', 'rev=20261108-sns-loading-1'],
   ['ordinary-ad-entry.mjs', 'rev=20261024-side-ad-layout-2'],
   ['information-auto-ads.mjs', 'rev=20261024-side-ad-layout-1'],
-  ['display-ads.mjs', 'rev=20261030-event-inline-ads-1'],
+  ['display-ads.mjs', 'rev=20261118-draw-display-ad-1'],
   ['tool-header-controls.mjs', 'rev=20261018-direct-runtime-1&nav=20261016-tool-operations-1'],
   ['draw-core.mjs', 'rev=20261011-tool-size-1'],
   ['drawing-tool-icons.mjs', 'rev=20261004-canvas-settings-1'],
@@ -231,6 +231,40 @@ function normalize(source, file) {
     const target = path.startsWith('/') ? path.slice(1) : posix.normalize(posix.join(posix.dirname(relative(root, file)), path));
     if (!storeOnboardingTargets.has(target)) return whole;
     const next = /[?&]rev=/.test(query) ? query.replace(/([?&])rev=[^&]*/, '$1rev=20261117-chat-connect-1') : query + (query ? '&' : '?') + 'rev=20261117-chat-connect-1';
+    return `${quote}${path}${next}${quote}`;
+  });
+  // Draw display ads share one bounded cache identity across editor entry
+  // points and the policy/module dependency closure.
+  const drawDisplayAdTargets = new Set([
+    'js/ads/draw-display-ad.mjs', 'css/draw-display-ad.css', 'js/ads/draw-mobile-anchor.mjs', 'css/draw-mobile-anchor.css', 'css/tool-direct.css', 'js/adsense-offerwall-policy.js',
+    'js/creation/draw-page.mjs', 'js/creation/draw-entry.mjs', 'js/creation/creation-runtime.mjs',
+    'js/tool-direct.mjs', 'js/tool-shell.mjs'
+  ]);
+  const drawDisplayAdReferenceOwners = new Set([
+    'about/index.html', 'audio/editor.html', 'audio/index.html', 'books/index.html', 'camera/index.html',
+    'draw/editor.html', 'draw/index.html', 'globe-prototype.html', 'globe/index.html', 'guide/index.html',
+    'hidden-object/index.html', 'jigsaw/index.html', 'js/creation/creation-runtime.mjs', 'js/creation/draw-entry.mjs',
+    'js/tool-direct.mjs', 'js/tool-shell.mjs', 'output/work/index.html', 'pixel-camera.html', 'play/hidden-object/index.html',
+    'play/spot-difference/index.html', 'spot-difference/index.html', 'stores/cafe-hoshi.html',
+    'stores/ecowashcafe-nakanoshima.html', 'stores/index.html', 'stores/kaze-machi.html', 'stores/yoru-akari.html',
+    'tools/index.html', 'welcome/index.html', 'js/ads/draw-mobile-anchor.mjs'
+  ]);
+  changed = changed.replace(/(["'`])([^"'`\s<>]+?\.(?:mjs|js|css))(\?[^"'`\s<>]*)?\1/g, (whole, quote, path, query = '') => {
+    if (!path.startsWith('/') && !path.startsWith('.') || path.startsWith('//')) return whole;
+    if (!drawDisplayAdReferenceOwners.has(relative(root, file).replaceAll('\\', '/'))) return whole;
+    const target = path.startsWith('/') ? path.slice(1) : posix.normalize(posix.join(posix.dirname(relative(root, file)), path));
+    if (!drawDisplayAdTargets.has(target)) return whole;
+    const revision = '20261118-draw-display-ad-1';
+    const next = /[?&]rev=/.test(query) ? query.replace(/([?&])rev=[^&]*/, `$1rev=${revision}`) : query + (query ? '&' : '?') + `rev=${revision}`;
+    return `${quote}${path}${next}${quote}`;
+  });
+  // Invalidate the shared-loader caller closure, stopping at current Draw entries.
+  const sharedAdLoaderTargets = new Set(["js/ads/conversion-display-ad.mjs","js/ads/output-guide-ad.mjs","js/ads/project-gallery-ad.mjs","js/ads/project-manager-ad.mjs","js/ads/shop-ad.mjs","js/creation/audio-entry.mjs","js/creation/audio-page.mjs","js/creation/conversion-entry.mjs","js/creation/creation-camera.mjs","js/creation/creation-modes.mjs","js/creation/hidden-object-page.mjs","js/creation/jigsaw-page.mjs","js/creation/pixfind-play.mjs","js/creation/project-start-picker.mjs","js/creation/project-workspace.mjs","js/creation/pxd-ui.mjs","js/creation/spot-difference-page.mjs","js/display-ads.mjs","js/globe/event-detail-host.mjs","js/pixel-lens/app.mjs","js/pixel-lens/entry.mjs","js/tool-result-view.mjs"]);
+  changed = changed.replace(/(["'`])([^"'`\s<>]+?\.(?:mjs|js))(\?[^"'`\s<>]*)?\1/g, (whole, quote, path, query = '') => {
+    if (!path.startsWith('/') && !path.startsWith('.') || path.startsWith('//')) return whole;
+    const target = path.startsWith('/') ? path.slice(1) : posix.normalize(posix.join(posix.dirname(relative(root, file)), path));
+    if (!sharedAdLoaderTargets.has(target)) return whole;
+    const next = /[?&]rev=/.test(query) ? query.replace(/([?&])rev=[^&]*/, '$1rev=20261118-draw-display-ad-1') : query + (query ? '&' : '?') + 'rev=20261118-draw-display-ad-1';
     return `${quote}${path}${next}${quote}`;
   });
   return changed;

@@ -32,7 +32,7 @@ test('mobile toolbar allows an intrinsic-width action group and keeps touch targ
 
 test('the output entry refreshes the complete changed module and CSS chain', () => {
   for (const [file, dependencies, revision] of [
-    ['output/work/index.html', ['conversion-entry.mjs'], '20261117-normal-apply-1'],
+    ['output/work/index.html', ['conversion-entry.mjs'], '20261118-draw-display-ad-1'],
     ['output/work/index.html', ['conversion-unified-input.css'], '20261117-normal-apply-1'],
     ['js/creation/conversion-entry.mjs', ['output-page.mjs'], '20261117-normal-apply-1'],
     ['js/creation/conversion-entry.mjs', ['output-receive.mjs'], '20261117-normal-apply-1'],

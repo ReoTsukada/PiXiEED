@@ -6,7 +6,7 @@ import {
   getProjectGalleryAdLayout, isProjectGalleryAdEligible, mountProjectGalleryAd,
   PROJECT_GALLERY_AD_MIN_GAP, resolveProjectGalleryAdUnit,
 } from '../../js/ads/project-gallery-ad.mjs';
-import { hasCompleteProjectArtwork } from '../../js/creation/project-start-picker.mjs?rev=20261108-gallery-first-ad-1';
+import { hasCompleteProjectArtwork } from '../../js/creation/project-start-picker.mjs?rev=20261118-draw-display-ad-1';
 
 const base = { config: projectGalleryAdConfig, origin: 'https://pixieed.jp', protocol: 'https:',
   pathname: '/tools/start/draw/', search: '?workspace=1', hash: '', topLevel: true,

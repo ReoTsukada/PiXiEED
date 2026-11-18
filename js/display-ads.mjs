@@ -1,4 +1,5 @@
 import { displayAdConfig } from '../data/site-config.js?rev=20261008-map-detail-1';
+import { drawDisplayAdConfig } from '../data/draw-display-ad-config.mjs';
 
 // Explicit page ownership prevents accidental ads in editors, private pages or embedded tools.
 const placements = new Map([
@@ -12,6 +13,34 @@ const placements = new Map([
 const mounted = new WeakSet();
 const loaders = new WeakMap();
 const flowPlacements = new Set(['home', 'tools', 'info', 'stores', 'store-detail']);
+
+// The chooser may own the first SDK request before Draw is mounted. Configure
+// its permitted mobile overlay at insertion time; never patch an executed SDK.
+function allowsDrawMobileAnchor(doc, win, client) {
+  try {
+    const loc = win.location;
+    const width = Number(win.innerWidth), height = Number(win.innerHeight);
+    if (!drawDisplayAdConfig.enabled || client !== drawDisplayAdConfig.unit.client
+        || !drawDisplayAdConfig.productionOrigins.includes(loc?.origin) || loc.protocol !== 'https:'
+        || !['/tools/start/draw/', '/draw/', '/draw/editor.html'].includes(loc.pathname)
+        || loc.hash || win.top !== win.self || doc.visibilityState !== 'visible' || doc.fullscreenElement
+        || !Number.isFinite(width) || !Number.isFinite(height) || width < 320 || width > 1000 || height < 620) return false;
+    const viewport = win.visualViewport;
+    if (viewport && (viewport.scale !== 1 || viewport.offsetTop !== 0 || viewport.offsetLeft !== 0
+        || viewport.width < 320 || viewport.height < 620)) return false;
+    const params = new URLSearchParams(loc.search);
+    const allowed = { workspace: '1', runtime: 'direct', mode: 'draw' };
+    if (loc.search && !params.size) return false;
+    if ([...params].some(([key, value]) => !(key in allowed) || value !== allowed[key] || params.getAll(key).length !== 1)
+        || (params.has('runtime') || params.has('mode')) && params.size !== 3) return false;
+    if (doc.querySelector?.('[data-private-view], [data-project-workspace], [data-project-editor], .tool-embed--expanded')) return false;
+    const state = win.history?.state;
+    return !state || !['projectWorkspaceSelection', 'privateView', 'pxd', 'pxdRevision', 'pxdImage',
+      'modePxd', 'modePxdRevision', 'modePxdImage', 'modeProjectTool', 'mcpEndpoint', 'connectionId',
+      'pairingCode', 'sessionId', 'accessToken', 'browserToken', 'auth', 'code', 'token']
+      .some(key => Boolean(state[key]));
+  } catch { return false; }
+}
 
 export function getAdsenseLoader(doc, win, client) {
   let state = loaders.get(doc);
@@ -28,6 +57,10 @@ export function getAdsenseLoader(doc, win, client) {
     state.errors.clear();
   }, { once: true });
   if (!script.isConnected) {
+    if (allowsDrawMobileAnchor(doc, win, client)) {
+      script.setAttribute('data-overlays', 'collapsed-bottom');
+      script.setAttribute('data-draw-mobile-anchor', 'true');
+    }
     script.src = source;
     doc.head.append(script);
   }

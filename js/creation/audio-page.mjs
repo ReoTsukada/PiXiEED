@@ -12,7 +12,7 @@ import { AUDIO_INSTRUMENT_GROUPS } from './audio-timbres.mjs?rev=20261005-audio-
 import { getAudioInstrumentIcon, audioInstrumentIconFilter } from './audio-instrument-icons.mjs?rev=20261005-audio-drums-1';
 import { audioHslToHex, replaceAudioSourceColor } from './audio-color-edit.mjs?rev=20261116-normal-release-2';
 import { createPxdProject } from './pxd-codec.mjs';
-import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261116-normal-release-2';
+import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261118-draw-display-ad-1';
 import { pxdImageRoles, putPxdImage, readPxdImage, readPxdSharedImage, putPxdSharedImage } from './pxd-project.mjs?rev=20261116-normal-release-2';
 import { assertPxdAudioPixelCompatibility, assignPxdAudioColor, audioCellLink, audioSongImage, detachPxdAudioImage, prepareSharedAudioImageImport, pxdImageToAudioDocument, readPxdAudioLink, readPxdAudioState, resizePxdAudioWorkingImage, setSharedAudioCell, validatePxdAudioBinding, writePxdAudioState } from './pxd-draw-audio.mjs?rev=20261116-normal-release-2';
 import { documentRgba } from './draw-core.mjs?rev=20261116-normal-release-2';
@@ -21,7 +21,7 @@ import { composeMusicProjectionFrame } from './draw-music-core.mjs?rev=20261116-
 import { mountAnimationControls } from './animation-controls.mjs?rev=20261117-chat-connect-1';
 import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261116-normal-release-2';
 import { AUDIO_ANIMATION_LINK_VERSION, AUDIO_ANIMATION_MAX_COLORS, audioAnimationFrameTicks, audioAnimationCellTiming, audioAnimationSequenceColumn, createAudioAnimationLink, getAudioAnimationCellPitch, getAudioAnimationRowPitchMap, getAudioAnimationColorCount, prepareAudioAnimationImport, setAudioAnimationColorMapping, setAudioAnimationPixel, validateAudioAnimationBinding } from './audio-animation.mjs?rev=20261116-normal-release-2';
-import { createToolResultView } from '../tool-result-view.mjs?rev=20261012-operation-bar-1';
+import { createToolResultView } from '../tool-result-view.mjs?rev=20261118-draw-display-ad-1';
 import { mountCreationEditorUi } from './editor-ui.mjs?rev=20261018-direct-runtime-2';
 import { applyDrawingToolIcons } from './drawing-tool-icons.mjs?rev=20261004-canvas-settings-1';
 import { mountColorPanel } from './color-panel.mjs?rev=20261016-tool-shell-1';
