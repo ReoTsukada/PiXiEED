@@ -1,5 +1,5 @@
 import { displayAdConfig } from '../../data/site-config.js?rev=20261008-map-detail-1';
-import { getAdsenseLoader } from '../display-ads.mjs?rev=20261030-event-inline-ads-1';
+import { getAdsenseLoader } from '../display-ads.mjs?rev=20261118-draw-display-ad-1';
 import { hasConversionRecoveryHistory } from '../tool-start-routes.mjs?rev=20261110-output-result-1';
 
 const mounted = new WeakMap();

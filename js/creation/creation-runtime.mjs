@@ -3,8 +3,8 @@ import { mountDrawDisplayAdWhenReady } from '../ads/draw-display-ad.mjs?rev=2026
 import { createModeScope } from './mode-scope.mjs?rev=20261001-independent-editors-1';
 import { readCreationModePointer } from './mode-entry.mjs?rev=20261016-tool-shell-1';
 import { mountDrawMode } from './draw-page.mjs?rev=20261118-draw-display-ad-1';
-import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261116-normal-release-2';
-import { mountCreationModes } from './creation-modes.mjs?rev=20261116-normal-release-2';
+import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261118-draw-display-ad-1';
+import { mountCreationModes } from './creation-modes.mjs?rev=20261118-draw-display-ad-1';
 import { getCreationSnapshot } from './creation-snapshot.mjs?rev=20261116-normal-release-2';
 
 function lastWorkspacePointer(search, requestedMode, restoreLast) {

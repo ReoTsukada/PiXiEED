@@ -27,13 +27,14 @@ test('delivery plan preserves runtime identities and bounds minification to star
   // The combined store-link and fast Draw graph adds three shared modules and twelve edges; text and normal generation stay lazy.
   // The adapter is bundled; color adjustment stays external as the canonical module also used by its lazy panel.
   // Desktop ads add two modules/three edges; mobile anchor adds one controller/two edges.
+  // The shared SDK loader reuses the same Draw config across the external boundary.
   assert.equal(plan.runtimeGraph.modules.size, 126);
-  assert.equal(plan.runtimeGraph.edges.length, 250);
+  assert.equal(plan.runtimeGraph.edges.length, 251);
   assert.equal(plan.dynamicRoots.length, 26);
-  assert.equal(plan.dynamicGraph.modules.size, 122);
+  assert.equal(plan.dynamicGraph.modules.size, 123);
   assert(plan.dynamicRoots.some(item => item.url === '/js/creation/draw-live-session-panel.mjs?rev=20261117-chat-connect-1'), 'Live-session UI is loaded only on demand.');
-  assert.equal(plan.externalUrls.size, 70);
-  assert.equal(plan.internalizedUrls.length, 56);
+  assert.equal(plan.externalUrls.size, 71);
+  assert.equal(plan.internalizedUrls.length, 55);
   const files = [...plan.runtimeGraph.modules.values()].map(module => module.file);
   assert(files.includes('js/ads/draw-display-ad.mjs'));
   assert(files.includes('js/ads/draw-mobile-anchor.mjs'));
@@ -47,10 +48,10 @@ test('delivery plan preserves runtime identities and bounds minification to star
   assert(plan.externalUrls.has(drawColorAdjustmentsUrl), 'Color adjustment remains one canonical external module shared with its lazy panel.');
   assert(plan.internalizedUrls.includes('/js/creation/draw-agent-operations.mjs?rev=20261117-chat-connect-1'), 'Only the small allowlisted adapter is bundled into startup.');
   assert(!files.some(file => /js\/mcp\/(?:pixel-art-(?:guide|cases|case-index|techniques|settings|expression|review)|guide-page|examples-page|settings-page)\.mjs$/.test(file)), 'Optional guide, case, and settings modules stay outside Draw startup.');
-  assert(plan.pickerGraph.modules.has('/js/creation/project-start-picker.mjs?rev=20261116-normal-release-2'));
+  assert(plan.pickerGraph.modules.has('/js/creation/project-start-picker.mjs?rev=20261118-draw-display-ad-1'));
   assert(![...plan.pickerGraph.modules.values()].some(module => /(?:creation-runtime|draw-page|creation-modes|draw-music)\.mjs$/.test(module.file)), 'Choosing a work must not import editor or mode runtimes');
   assert(plan.physicalFiles.has('js/creation/project-start-picker.mjs'));
-  assert(plan.pickerGraph.modules.has('/js/ads/project-gallery-ad.mjs?rev=20261108-gallery-canvas-viewport-1'));
+  assert(plan.pickerGraph.modules.has('/js/ads/project-gallery-ad.mjs?rev=20261118-draw-display-ad-1'));
   assert(plan.pickerGraph.modules.has('/data/project-gallery-ad-config.mjs?rev=20261108-gallery-canvas-viewport-1'));
   assert(plan.physicalFiles.has('js/ads/project-gallery-ad.mjs'));
   assert(plan.physicalFiles.has('data/project-gallery-ad-config.mjs'));
@@ -158,8 +159,8 @@ test('optimized owned build carries one fingerprinted bundle and no private sour
     assert.equal(report.revision, expectedRevision);
     assert.equal(report.addedFiles, 1);
     assert.equal(report.bundlePath, 'js/creation/creation-runtime.bundle.mjs');
-    assert.equal(report.externalCount, 70);
-    assert.equal(report.internalizedCount, 56);
+    assert.equal(report.externalCount, 71);
+    assert.equal(report.internalizedCount, 55);
     assert(report.startupStandaloneMinifiedCount >= 129);
     assert.match(report.revision, /^20261020-staged-startup-1-[a-f0-9]{12}$/);
 

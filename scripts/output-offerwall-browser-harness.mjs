@@ -69,7 +69,7 @@ async function stored(page,key,id) {
     return {bytes:Array.from(new Uint8Array(await r.blob.arrayBuffer())),filename:r.filename,metadata:r.metadata,returnUrl:r.returnUrl};
   },{key,id});
 }
-async function ready(page) { await page.waitForFunction(()=>document.querySelector('#main a[download]') || document.querySelector('#main [data-convert]')); }
+async function ready(page) { await page.waitForFunction(()=>document.querySelector('#main a[download][href^="blob:"]') || document.querySelector('#main [data-convert]')); }
 async function test(name, run) { try { await run();report.cases.push({name,status:'passed'}); } catch(error) { report.failures.push({name,error:error.stack});report.cases.push({name,status:'failed'}); } }
 try {
   for(const [role,kind,mode,age=0] of [['draw','image','non-fill'],['camera','image','failure'],['audio','audio','non-fill'],['draw','pxd','failure'],['draw','image','non-fill',2*60*60*1000]]) {
@@ -85,7 +85,10 @@ try {
         const original=await stored(page,state.pointer.key,state.pointer.id);
         assert.deepEqual(original.bytes,expected.bytes);assert.equal(original.filename,expected.filename);assert.equal(original.returnUrl,expected.returnUrl);if(kind!=='pxd')assert.deepEqual(original.metadata,expected.metadata);
         if(await page.locator('[data-width]').count()) await page.locator('[data-width]').evaluate(el=>{el.value='3';el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));});
-        await Promise.all([page.waitForEvent('download'),page.locator('#main a[download]').last().evaluate(el=>el.click())]);await page.waitForTimeout(200);assert.equal(sdk.length,0,'Settings/save must not load the retired provider');
+        const saveLink=page.locator('#main a[download][href^="blob:"]').last();
+        await saveLink.waitFor({state:'attached'});
+        assert.match(await saveLink.getAttribute('href'), /^blob:/, 'Wait for the hydrated file, never the static href=# placeholder');
+        await Promise.all([page.waitForEvent('download'),saveLink.evaluate(el=>el.click())]);await page.waitForTimeout(200);assert.equal(sdk.length,0,'Settings/save must not load the retired provider');
         await page.reload();await ready(page);assert.equal(page.url(),origin+'/output/work/');assert.deepEqual((await stored(page,state.pointer.key,state.pointer.id)).bytes,expected.bytes);
         await page.goBack();assert(new URL(page.url()).pathname==='/'+role+'/');assert.equal(await page.evaluate(()=>localStorage.getItem('synthetic-editor-sentinel')),'preserve-me');
         await page.goForward();await ready(page);assert.equal(page.url(),origin+'/output/work/');assert.equal(await page.evaluate(()=>history.state.pixieedOutputRequest.id),state.pointer.id);

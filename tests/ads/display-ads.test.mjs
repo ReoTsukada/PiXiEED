@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { displayAdConfig } from '../../data/site-config.js';
-import { mountDisplayAds, resolveDisplayAd } from '../../js/display-ads.mjs';
+import { getAdsenseLoader, mountDisplayAds, resolveDisplayAd } from '../../js/display-ads.mjs';
 
 const pages = [
   ['welcome/index.html', 'home', '/welcome/'], ['tools/index.html', 'tools', '/tools/'],
@@ -305,4 +305,50 @@ test('resize and visibility recovery waits until a hidden document is visible an
   listeners.visibilitychange();
   assert.equal(requests, 1, 'returning to a visible document retries a nearby placement once');
   cleanup();
+});
+
+// The saved-work chooser can own the first SDK load before Draw starts.
+function mobileChooserFixture({ path = '/tools/start/draw/', search = '', width = 390,
+  height = 844, privateState = null, existing = false } = {}) {
+  const attributes = new Map(), script = new EventTarget(), inserted = [];
+  script.isConnected = existing;
+  script.setAttribute = (key, value) => attributes.set(key, value);
+  script.getAttribute = key => attributes.get(key) ?? null;
+  const doc = { visibilityState: 'visible', fullscreenElement: null,
+    querySelector: selector => selector.startsWith('script[') && existing ? script : null,
+    createElement: () => script,
+    head: { append(node) { inserted.push({ node, attributes: new Map(attributes) }); node.isConnected = true; } } };
+  const win = { location: { protocol: 'https:', origin: 'https://pixieed.jp', pathname: path, search, hash: '' },
+    innerWidth: width, innerHeight: height, history: { state: privateState } };
+  win.top = win.self = win;
+  return { doc, win, script, inserted, attributes };
+}
+test('first mobile Draw chooser SDK carries approved anchor options before insertion and is reused', () => {
+  for (const search of ['', '?workspace=1', '?workspace=1&runtime=direct&mode=draw']) {
+    const f = mobileChooserFixture({ search });
+    const loader = getAdsenseLoader(f.doc, f.win, config.client);
+    assert.equal(f.inserted.length, 1);
+    assert.equal(f.inserted[0].attributes.get('data-overlays'), 'collapsed-bottom');
+    assert.equal(f.inserted[0].attributes.get('data-draw-mobile-anchor'), 'true');
+    assert.equal(getAdsenseLoader(f.doc, f.win, config.client), loader);
+    assert.equal(f.inserted.length, 1);
+    assert.equal(f.win.adsbygoogle, undefined, 'the loader never requests another manual unit');
+  }
+});
+test('shared loader never enables Draw anchors for another route, private context or unsupported viewport', () => {
+  for (const options of [{ path: '/' }, { path: '/tools/start/camera/' }, { width: 1440 }, { width: 0 },
+    { height: 568 }, { search: '?pxd=secret' }, { search: '?workspace=1&workspace=1' },
+    { search: '?mode=draw' }, { search: '?workspace=1&runtime=direct&mode=camera' },
+    { privateState: { projectWorkspaceSelection: true } }, { privateState: { accessToken: 'private' } }]) {
+    const f = mobileChooserFixture(options);
+    getAdsenseLoader(f.doc, f.win, config.client);
+    assert.equal(f.attributes.size, 0, JSON.stringify(options));
+  }
+});
+test('shared loader does not retrofit anchor options on an already inserted SDK', () => {
+  const f = mobileChooserFixture({ existing: true });
+  const loader = getAdsenseLoader(f.doc, f.win, config.client);
+  assert.equal(loader.script, f.script);
+  assert.equal(f.attributes.size, 0);
+  assert.equal(f.inserted.length, 0);
 });

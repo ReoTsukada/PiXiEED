@@ -102,7 +102,7 @@ function render(route) {
   const shopAdMarkup = preview ? '' : '<aside class="shop-ad" data-shop-display-ad aria-label="広告" hidden><p class="shop-ad__label">広告</p><div class="shop-ad__slot" data-shop-ad-slot></div></aside>';
   const catalogItems = listedProducts.map(card);
   if (!preview) catalogItems.splice(8, 0, shopAdMarkup);
-  const shopAdScripts = preview ? '' : `${OFFERWALL_ENTRY_POLICY_SCRIPT}\n  <script type="module" src="/js/ads/shop-ad.mjs?rev=20261108-shop-display-ad-1"></script>`;
+  const shopAdScripts = preview ? '' : `${OFFERWALL_ENTRY_POLICY_SCRIPT}\n  <script type="module" src="/js/ads/shop-ad.mjs?rev=20261118-draw-display-ad-1"></script>`;
   const intro = `<!doctype html>
 <html lang="ja">
 <head>

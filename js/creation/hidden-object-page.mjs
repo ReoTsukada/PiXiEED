@@ -12,7 +12,7 @@ import { imageToDrawDocument } from './pxd-project.mjs?rev=20261116-normal-relea
 import { supabaseConfig } from '../../data/site-config.js?rev=20261004-puzzle-share-1';
 import { HIDDEN_OBJECT_MAX_MASK_PIXELS, confirmHiddenObjectTargets, createHiddenObjectDraft, mapClientPointToPixel, resolveLocalDrawRevision, validateHiddenObjectDraft } from './hidden-object-core.mjs?rev=20261116-normal-release-2';
 import { openPuzzleHandoff } from './puzzle-handoff.mjs?rev=20261116-normal-release-2';
-import { mountPxdTools } from './pxd-ui.mjs?rev=20261116-normal-release-2';
+import { mountPxdTools } from './pxd-ui.mjs?rev=20261118-draw-display-ad-1';
 import { requireSharedCanvasAccess } from './shared-canvas-access.mjs?rev=20261116-normal-release-2';
 import { putPxdSharedImage } from './pxd-project.mjs?rev=20261116-normal-release-2';
 import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20261116-normal-release-2';
@@ -20,7 +20,7 @@ import { wheelZoomFactor } from './viewport-wheel.mjs';
 import { zoomCanvasViewportAt } from './canvas-viewport.mjs?rev=20260930-pinch-anchor-1';
 import { applyDrawingToolIcons } from './drawing-tool-icons.mjs?rev=20261004-canvas-settings-1';
 import { mountPuzzleImageSlot } from './puzzle-image-slot.mjs?rev=20261003-puzzle-import-1';
-import { confirmPxdConversion } from './pxd-ui.mjs?rev=20261116-normal-release-2';
+import { confirmPxdConversion } from './pxd-ui.mjs?rev=20261118-draw-display-ad-1';
 
 const LAST_KEY = 'pixieed:creation:hidden-object:last-draft:v1';
 const $ = (selector) => document.querySelector(selector);

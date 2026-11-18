@@ -176,3 +176,46 @@ test('BFCache preserves provider ownership without a geometry observer or restor
   assert.equal(s.doc.body.getAttribute('data-draw-mobile-ad'), 'true'); assert.equal(sdk.removed, undefined);
   assert.equal(s.doc.head.children.length, 1); assert.equal(s.doc.body.children.length, 0);
 });
+
+
+function approvedSdk() {
+  const sdk = new Element('SCRIPT');
+  sdk.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253';
+  sdk.setAttribute('data-overlays', 'collapsed-bottom'); sdk.setAttribute('data-draw-mobile-anchor', 'true');
+  return sdk;
+}
+
+test('an approved chooser SDK is reused synchronously with only body display permission', () => {
+  for (const readyState of ['loading', 'complete']) {
+    const s = fixture(), sdk = approvedSdk(), outcomes = []; sdk.readyState = readyState; s.doc.head.append(sdk);
+    const before = [...sdk.attributes]; sdk.setAttribute = () => { throw Error('existing SDK must not be changed'); };
+    s.win.adsbygoogle = { push() { throw Error('no new ad request'); } };
+    const cleanup = mountDrawMobileAnchor({ ...s, onOutcome: value => outcomes.push(value) });
+    assert.deepEqual(outcomes, ['existing-anchor']); assert.equal(s.doc.body.getAttribute('data-draw-mobile-ad'), 'true');
+    assert.equal(s.idles.size, 0); assert.equal(s.timers.size, 0); assert.equal(s.doc.head.children.length, 1);
+    assert.deepEqual([...sdk.attributes], before); assert.equal(s.doc.body.children.length, 0);
+    cleanup(); assert.equal(sdk.removed, undefined); assert.equal(s.doc.body.getAttribute('data-draw-mobile-ad'), 'true');
+  }
+});
+
+test('a chooser SDK inserted during idle is reused without a duplicate SDK or request', () => {
+  const s = fixture(), outcomes = []; mountDrawMobileAnchor({ ...s, onOutcome: value => outcomes.push(value) });
+  s.doc.head.append(approvedSdk()); s.idle();
+  assert.deepEqual(outcomes, ['existing-anchor']); assert.equal(s.doc.head.children.length, 1);
+  assert.equal(s.doc.body.getAttribute('data-draw-mobile-ad'), 'true'); assert.equal(s.win.adsbygoogle, undefined);
+});
+
+test('adoption requires both approvals, the exact publisher and the official SDK origin', () => {
+  for (const mutate of [sdk => sdk.attributes.delete('data-overlays'), sdk => sdk.attributes.delete('data-draw-mobile-anchor'),
+    sdk => sdk.setAttribute('data-overlays', 'bottom'), sdk => { sdk.src = sdk.src.replace('9801602250480253', '1111111111111111'); },
+    sdk => { sdk.src = sdk.src.replace('pagead2.googlesyndication.com', 'untrusted.test'); },
+    sdk => { sdk.src = sdk.src.replace('pagead2.googlesyndication.com', 'pagead2.googlesyndication.com:8443'); },
+    sdk => { sdk.src += '&client=ca-pub-9801602250480253'; }]) {
+    const s = fixture(), sdk = approvedSdk(); mutate(sdk); s.doc.head.append(sdk);
+    mountDrawMobileAnchor(s); s.idle();
+    assert.equal(s.doc.body.getAttribute('data-draw-mobile-ad'), null); assert.equal(s.doc.head.children.length, 1);
+  }
+  const privatePage = fixture(); privatePage.doc.head.append(approvedSdk()); privatePage.win.history.state = { pxd: 'private' };
+  mountDrawMobileAnchor(privatePage); assert.equal(privatePage.doc.body.getAttribute('data-draw-mobile-ad'), null);
+  assert.equal(privatePage.idles.size, 0);
+});

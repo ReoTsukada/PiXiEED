@@ -1,7 +1,7 @@
 const PAGE_PATH = 'events/index.html';
 const SECTION_ID = 'event-year-2026';
 const DISPLAY_AD_STYLE = '<link rel="stylesheet" href="/css/display-ads.css?rev=20261030-event-inline-ads-1">';
-const DISPLAY_AD_MODULE = '<script type="module" src="/js/display-ads.mjs?rev=20261030-event-inline-ads-1"></script>';
+const DISPLAY_AD_MODULE = '<script type="module" src="/js/display-ads.mjs?rev=20261118-draw-display-ad-1"></script>';
 const placements = new Map([[24, 24], [48, 48]]);
 
 function renderAdSlot(minimumVisibleEvents) {

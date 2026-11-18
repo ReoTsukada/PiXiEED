@@ -45,7 +45,7 @@ const html = (path) => readFile(new URL(path, root), 'utf8');
 for (const path of MANUAL_PAGES) test(`${path}: manual units own their lazy ad requests`, async () => {
   const source = await html(path);
   assert.match(source, /data-display-ad=/);
-  const moduleRevision = '20261030-event-inline-ads-1';
+  const moduleRevision = '20261118-draw-display-ad-1';
   assert.ok(source.includes(`/js/display-ads.mjs?rev=${moduleRevision}`));
   assert.match(source, /href="\/css\/display-ads\.css\?rev=20261007-lazy-ads-1"/);
   assert.doesNotMatch(source, /adsbygoogle\.js|adsense-auto\.js/);

@@ -1,5 +1,5 @@
 /** One labelled, in-flow ordinary Display placement on the public PiXiEED shop. */
-import { getAdsenseLoader } from '../display-ads.mjs?rev=20261030-event-inline-ads-1';
+import { getAdsenseLoader } from '../display-ads.mjs?rev=20261118-draw-display-ad-1';
 import { SHOP_AD_MARKER, shopAdConfig } from '../../data/shop-ad-config.mjs?rev=20261108-shop-display-ad-1';
 
 export const SHOP_AD_MIN_PRODUCTS = 9;

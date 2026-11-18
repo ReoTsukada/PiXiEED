@@ -1,4 +1,4 @@
-import { getAdsenseLoader } from '../display-ads.mjs?rev=20261030-event-inline-ads-1';
+import { getAdsenseLoader } from '../display-ads.mjs?rev=20261118-draw-display-ad-1';
 import { drawDisplayAdConfig } from '../../data/draw-display-ad-config.mjs';
 
 export const DRAW_DISPLAY_AD_SIZES = Object.freeze([

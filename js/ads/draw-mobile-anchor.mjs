@@ -37,6 +37,16 @@ function localPreview(win) {
   const value = new URLSearchParams(loc.search).get('drawAdPreview');
   return previews.has(value) ? value : null;
 }
+function approvedAnchorScript(script, client) {
+  if (script?.getAttribute?.('data-overlays') !== 'collapsed-bottom'
+      || script.getAttribute('data-draw-mobile-anchor') !== 'true') return false;
+  try {
+    const source = new URL(script.src);
+    return source.origin === 'https://pagead2.googlesyndication.com'
+      && source.pathname === '/pagead/js/adsbygoogle.js' && source.username === '' && source.password === ''
+      && source.searchParams.getAll('client').length === 1 && source.searchParams.get('client') === client;
+  } catch { return false; }
+}
 function listen(target, type, fn, options) {
   target?.addEventListener?.(type, fn, options);
   return () => target?.removeEventListener?.(type, fn, options);
@@ -100,6 +110,15 @@ export function mountDrawMobileAnchor({ doc = globalThis.document, win = globalT
     // Never inspect, reposition, resize, remove, or manually request Google's creative.
   };
   state.cleanup = cleanup; records.set(doc, state);
+  const reuseApprovedAnchor = script => {
+    if (!approvedAnchorScript(script, config.unit.client)) return false;
+    state.started = true;
+    doc.body.setAttribute('data-draw-mobile-ad', 'true');
+    finish('existing-anchor');
+    return true;
+  };
+  // A safe chooser may already own the correctly configured SDK. Reuse its permission only.
+  if (!preview && reuseApprovedAnchor(doc.querySelector?.(SDK_SELECTOR))) return cleanup;
   const showPreview = () => {
     if (state.disposed || state.terminal) return;
     const stub = doc.createElement('aside'); stub.className = 'draw-mobile-ad-preview';
@@ -121,8 +140,12 @@ export function mountDrawMobileAnchor({ doc = globalThis.document, win = globalT
       else showPreview();
       return;
     }
-    // A previous loader belongs to its original placement. Do not rewrite or duplicate it.
-    if (doc.querySelector?.(SDK_SELECTOR) || win.adsbygoogle != null) { finish('existing-sdk'); return; }
+    // A chooser may insert its approved SDK while this idle task is waiting.
+    const existingScript = doc.querySelector?.(SDK_SELECTOR);
+    if (existingScript || win.adsbygoogle != null) {
+      if (!reuseApprovedAnchor(existingScript)) finish('existing-sdk');
+      return;
+    }
     const script = doc.createElement('script');
     script.async = true; script.crossOrigin = 'anonymous';
     script.setAttribute('data-overlays', 'collapsed-bottom'); script.setAttribute('data-draw-mobile-anchor', 'true');
