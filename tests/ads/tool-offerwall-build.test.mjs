@@ -25,8 +25,8 @@ test('all seven real tool entry templates install policy before the guarded SDK 
   assert.match(result,/name="robots" content="noindex,follow"/);
  }
 });
-test('directories, shared play, legacy aliases and private pages do not get a tool SDK entry',()=>{
- for(const name of ['draw/index.html','camera/index.html','audio/index.html','jigsaw/index.html','index.html','tools/index.html','output/index.html','play/spot-difference/index.html','play/hidden-object/index.html','pixiedraw2/index.html','game/index.html','feed/index.html','profile/index.html','draw/editor.html','audio/editor.html']){
+test('other directories, shared play, legacy aliases and private pages do not get a tool SDK entry',()=>{
+ for(const name of ['draw/index.html','camera/index.html','audio/index.html','jigsaw/index.html','index.html','output/index.html','play/spot-difference/index.html','play/hidden-object/index.html','pixiedraw2/index.html','game/index.html','feed/index.html','profile/index.html','draw/editor.html','audio/editor.html']){
   const source='<html><head></head><body>Unchanged</body></html>';
   assert.equal(addToolOfferwallEntry(source,name).html,source,name);
  }

@@ -72,14 +72,16 @@ export function addOrdinaryAdStyle(html, name = '') {
 /** Attach the guarded existing-publisher SDK entry only to real tool entry templates. */
 export function addToolOfferwallEntry(html, name = '') {
   const route = `/${name.replace(/index\.html$/, '')}`;
+  const recoveryDirectory = route === '/tools/';
   const withoutLoaders = html
     .replace(/<script\b(?=[^>]*\bsrc\s*=\s*(["'])\/js\/ad-recovery-entry\.js(?:\?[^"']*)?\1)[^>]*>\s*<\/script\s*>\s*/gi, '')
     .replace(/<script\b(?=[^>]*\bsrc\s*=\s*(["'])\/js\/tool-offerwall-entry\.mjs(?:\?[^"']*)?\1)[^>]*>\s*<\/script\s*>\s*/gi, '')
     .replace(/<script\b(?=[^>]*\bsrc\s*=\s*(["'])\/js\/adsense-auto\.js(?:\?[^"']*)?\1)[^>]*>\s*<\/script\s*>\s*/gi, '');
-  if (!OFFERWALL_TOOL_PATHS.includes(route) && !OFFERWALL_OUTPUT_PATHS.includes(route)) return { html: withoutLoaders, added: false };
+  if (!recoveryDirectory && !OFFERWALL_TOOL_PATHS.includes(route) && !OFFERWALL_OUTPUT_PATHS.includes(route)) return { html: withoutLoaders, added: false };
   const policy = addOfferwallEntryPolicy(withoutLoaders);
-  const recovery = OFFERWALL_TOOL_PATHS.includes(route) ? '\n<script src="/js/ad-recovery-entry.js?rev=20261118-draw-display-ad-1"></script>' : '';
-  const output = policy.html.replace(OFFERWALL_ENTRY_POLICY_SCRIPT, `${OFFERWALL_ENTRY_POLICY_SCRIPT}${recovery}\n${OFFERWALL_ENTRY_LOADER_SCRIPT}`);
+  const recovery = recoveryDirectory || OFFERWALL_TOOL_PATHS.includes(route) ? '\n<script src="/js/ad-recovery-entry.js?rev=20261118-tools-recovery-1"></script>' : '';
+  const loader = recoveryDirectory ? '' : `\n${OFFERWALL_ENTRY_LOADER_SCRIPT}`;
+  const output = policy.html.replace(OFFERWALL_ENTRY_POLICY_SCRIPT, `${OFFERWALL_ENTRY_POLICY_SCRIPT}${recovery}${loader}`);
   return { html: output, added: output !== html };
 }
 
