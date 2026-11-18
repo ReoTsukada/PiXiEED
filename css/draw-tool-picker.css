@@ -345,3 +345,24 @@ body[data-page="draw"] .draw-controls .draw-tool-menu > .draw-panel-header {
   top:-10px; margin:-10px -10px 0; padding:10px; min-height:64px;
   border-radius:15px 15px 0 0;
 }
+
+/* The desktop rail paints the text glyph in the same foreground as its other tools. */
+body.draw-desktop-active [data-desktop-drawing] .draw-text-opener {
+  grid-template-rows: 20px 12px;
+  gap: 1px;
+  background: #172129;
+  color: #edf1ec;
+}
+body.draw-desktop-active [data-desktop-drawing] .draw-text-opener[aria-expanded="true"] {
+  border-color: var(--desktop-accent);
+  background: #403b2b;
+  color: #fff4c6;
+}
+body.draw-desktop-active [data-desktop-drawing] .draw-text-opener[data-draw-button-content] > .draw-button-icon {
+  width: 20px;
+  height: 20px;
+  content: linear-gradient(currentColor, currentColor);
+  -webkit-mask: var(--draw-action-icon) center / contain no-repeat;
+  mask: var(--draw-action-icon) center / contain no-repeat;
+  filter: none;
+}
