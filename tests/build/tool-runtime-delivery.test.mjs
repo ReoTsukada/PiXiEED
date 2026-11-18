@@ -177,7 +177,7 @@ test('optimized owned build carries one fingerprinted bundle and no private sour
     assert(!bundle.includes(tempBase), 'Compiler leaked its private temporary path into public output.');
     const direct = await readFile(path.join(buildRoot, 'js/tool-direct.mjs'), 'utf8');
     assert(direct.includes(`./creation/creation-runtime.bundle.mjs?rev=${report.revision}`));
-    assert(direct.includes('/draw/editor.html?rev=20261118-draw-button-label-1'), 'Minification must preserve the editor HTML cache version.');
+    assert(direct.includes('/draw/editor.html?rev=20261118-draw-tool-panel-1'), 'Minification must preserve the editor HTML cache version.');
     assert.match(direct, /cache:["']no-cache["']/, 'The optimized loader must still revalidate editor HTML.');
     const builtShell = await readFile(shellPath, 'utf8');
     assert(builtShell.includes(`./tool-direct.mjs?rev=${report.revision}`), 'The caller must invalidate the changed template loader.');

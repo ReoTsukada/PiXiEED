@@ -277,6 +277,14 @@ function normalize(source, file) {
     const next = /[?&]rev=/.test(query) ? query.replace(/([?&])rev=[^&]*/, '$1rev=20261118-draw-button-label-1') : query + (query ? '&' : '?') + 'rev=20261118-draw-button-label-1';
     return `${quote}${path}${next}${quote}`;
   });
+  // Keep this tool-panel release's existing versioned references coherent.
+  const drawToolPanelTargets = new Set(["audio/index.html", "camera/index.html", "css/creation-modes.css", "css/draw-tool-picker.css", "draw/editor.html", "draw/index.html", "js/creation/creation-camera.mjs", "js/creation/creation-modes.mjs", "js/creation/creation-runtime.mjs", "js/creation/draw-entry.mjs", "js/tool-direct.mjs", "js/tool-shell.mjs"]);
+  changed = changed.replace(/(["'`])([^"'`\s<>]+\.(?:mjs|js|css|html))\?([^"'`\s<>]*)\1/g, (whole, quote, path, query) => {
+    if (!path.startsWith('/') && !path.startsWith('.') || path.startsWith('//')) return whole;
+    const target = path.startsWith('/') ? path.slice(1) : posix.normalize(posix.join(posix.dirname(relative(root, file)), path));
+    if (!drawToolPanelTargets.has(target) || !/(^|&)rev=/.test(query)) return whole;
+    return `${quote}${path}?${query.replace(/(^|&)rev=[^&]*/, '$1rev=20261118-draw-tool-panel-1')}${quote}`;
+  });
   return changed;
 }
 

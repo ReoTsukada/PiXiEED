@@ -55,7 +55,7 @@ test('music value fields retain readable dark controls against global light inpu
 });
 
 test('music control fixes invalidate the retained editor stylesheet URL', () => {
-  const revision = '20261108-music-controls-1';
+  const revision = '20261118-draw-tool-panel-1';
   assert.equal(JSON.parse(read('tests/runtime-cache-revisions.json'))['css/draw-tool-picker.css'], revision);
-  assert.ok(read('draw/editor.html').includes(`/css/draw-tool-picker.css?rev=${revision}`));
+  assert.ok(read('draw/editor.html').includes(`/css/draw-tool-picker.css?rev=20261118-draw-tool-panel-1`));
 });
