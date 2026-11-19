@@ -1,6 +1,7 @@
 import { SPRITE_Y_SCALE, SPRITE_METADATA, getSpriteAtlas, createRenderSurface } from './sprites.mjs';
 import { isVisible, isExplored } from './fog.mjs';
 import { equipmentDefinition } from './items.mjs';
+import { buildScenery, sceneryTileVariant, paintSceneryFloor, sceneryPropSprite, sceneryMotePosition } from './scenery.mjs';
 
 /** Rendering only. No mutations of GameEngine, items, scores or its RNG. */
 export const Y_SCALE = SPRITE_Y_SCALE;
@@ -127,7 +128,7 @@ export class DungeonRenderer {
     const floor = createRenderSurface(map.width, Math.ceil(map.height * Y_SCALE));
     const ctx = floor.getContext('2d'); ctx.imageSmoothingEnabled = false;
     ctx.fillStyle = '#10212b'; ctx.fillRect(0, 0, floor.width, floor.height);
-    const walls = [], markings = [];
+    const walls = [], markings = [], scenery = buildScenery(map);
     for (let y = 0; y < map.h; y++) for (let x = 0; x < map.w; x++) {
       const n = hash(x, y, map.seed ?? 42), px = x * map.tile, py = y * map.tile;
       if (map.cells[y][x]) {
@@ -136,7 +137,7 @@ export class DungeonRenderer {
         const sprite = this.atlas.wall(map.tile,n%6,pillar,map.biomeId||'meadow');
         walls.push({ x: px, y: py, sprite, height: sprite.height, pillar, depth: py + map.tile, order: y * map.w + x, kind: 'wall' });
       } else {
-        ctx.drawImage(this.atlas.tile(map.tile,n%16,map.biomeId||'meadow'), px, py * Y_SCALE, map.tile, map.tile * Y_SCALE);
+        ctx.drawImage(this.atlas.tile(map.tile,sceneryTileVariant(map,x,y),map.biomeId||'meadow'), px, py * Y_SCALE, map.tile, map.tile * Y_SCALE);
         if (n % 41 === 0) markings.push({ x: px + map.tile / 2, y: py + map.tile / 2, value: n % 3 });
       }
     }
@@ -146,7 +147,8 @@ export class DungeonRenderer {
       ctx.lineTo(m.x + 6, m.y * Y_SCALE); ctx.lineTo(m.x, m.y * Y_SCALE + 6); ctx.closePath(); ctx.stroke();
       ctx.fillStyle = '#629083'; ctx.fillRect(m.x - 1, m.y * Y_SCALE - 2, 2, 4); ctx.globalAlpha = 1;
     }
-    const result = { floor, walls, markings }; this.scenes.set(map, result); return result;
+    paintSceneryFloor(ctx,map,scenery,Y_SCALE);
+    const result = { floor, walls, markings, scenery }; this.scenes.set(map, result); return result;
   }
   knowledge(x,y) {
     const e=this.currentEngine;
@@ -243,6 +245,7 @@ export class DungeonRenderer {
     const view = this.view;
     ctx.save(); ctx.translate(view.centerX - view.x * view.zoom, view.centerY - view.y * Y_SCALE * view.zoom); ctx.scale(view.zoom, view.zoom);
     ctx.drawImage(observedFloor, 0, 0);
+    this.drawSceneryMotes(time,low);
     this.drawHazards(engine,low);
     this.drawTelegraphs(engine);
     // Portal lighting is soft and local; it never changes collision or aim.
@@ -255,6 +258,10 @@ export class DungeonRenderer {
     ctx.restore();
     const entities = [], wallBase = m.w * m.h;
     for (const wall of this.scene.walls) if (this.knowledge(wall.x+m.tile/2,wall.y+m.tile/2)>0 && this.visible(wall.x + m.tile / 2, wall.y + m.tile / 2, wall.height / 2)) entities.push(wall);
+    for(let i=0;i<this.scene.scenery.props.length;i++){
+      const prop=this.scene.scenery.props[i];
+      if(this.knowledge(prop.x,prop.y)>0&&this.visible(prop.x,prop.y,12))entities.push({kind:'scenery',ref:prop,depth:prop.y+1,order:wallBase+20+i});
+    }
     for (const enemy of engine.enemies ?? []) {
       if (enemy.hp <= 0 || !this.canSee(enemy.x,enemy.y) || !this.visible(enemy.x, enemy.y, 20)) continue;
       const given = enemy.sprite || enemy.kind;
@@ -271,6 +278,7 @@ export class DungeonRenderer {
     ellipse(ctx, p.x + 2, p.y * Y_SCALE + 3, 12, 6, '#030b11', .67);
     ctx.strokeStyle = '#8adbc144'; ctx.lineWidth = .8;
     ctx.beginPath(); ctx.ellipse(p.x, p.y * Y_SCALE, 14, 9, 0, 0, TAU); ctx.stroke();
+    this.drawStaffCharge(engine);
     entities.push({ kind: 'player', ref: p, depth: p.y + 4, order: wallBase + 1 });
     const visibleBullets = (engine.bullets ?? []).filter(b => b.life > 0 && this.canSee(b.x,b.y) && this.visible(b.x, b.y, b.z??14, 24));
     const bulletStride = Math.max(1, Math.ceil(visibleBullets.length / (low ? 420 : 950)));
@@ -292,6 +300,7 @@ export class DungeonRenderer {
     entities.sort(compareDepth);
     for (const entity of entities) {
       if (entity.kind === 'wall') this.drawWall(entity, p, m.tile, dt, low);
+      else if(entity.kind==='scenery')this.drawSceneryProp(entity.ref,p);
       else if (entity.kind === 'bullet') this.drawBullet(entity.ref, low);
       else if(entity.kind==='hostile')this.drawHostileBullet(entity.ref);
       else if (entity.kind === 'pickup') this.drawPickup(entity.ref, time);
@@ -319,6 +328,39 @@ export class DungeonRenderer {
     if (stick?.active) this.drawStick(stick);
     if (paused && engine.status === 'playing') this.drawPause(width, height);
     this.lastPlayer = { x: p.x, y: p.y };
+  }
+  drawSceneryProp(prop,player){
+    const ctx=this.ctx,sprite=sceneryPropSprite(this.scene.scenery.biome,prop.variant);
+    // Even the shortest foreground tuft yields to the player and dropped rewards.
+    const nearActor=Math.hypot(prop.x-player.x,prop.y-player.y)<20;
+    const nearLoot=(this.currentEngine.pickups??[]).some(drop=>this.canSee(drop.x,drop.y)&&Math.hypot(prop.x-drop.x,prop.y-drop.y)<19);
+    ctx.globalAlpha=this.lightAt(prop.x,prop.y)*(nearActor||nearLoot ? .32 : 1);
+    ctx.drawImage(sprite.image,Math.round(prop.x-sprite.anchorX),Math.round(prop.y*Y_SCALE-sprite.anchorY));
+    ctx.globalAlpha=1;
+  }
+  drawSceneryMotes(time,low){
+    if(this.reduced)return;
+    const ctx=this.ctx,scenery=this.scene.scenery,m=this.currentEngine.map;
+    const color={meadow:'#e9d9a4',desert:'#e1c897',volcano:'#efb38a',swamp:'#b5dfb8',tundra:'#eef3e9'}[scenery.biome];
+    const budget=low?12:36;let count=0;
+    ctx.save();this.clipVisible();
+    for(const mote of scenery.motes){
+      const p=sceneryMotePosition(mote,time,scenery.biome);
+      if(!this.canSee(p.x,p.y)||!this.visible(p.x,p.y,p.z)||m.cells[Math.floor(p.y/m.tile)]?.[Math.floor(p.x/m.tile)]!==0)continue;
+      ctx.globalAlpha=p.alpha;ctx.fillStyle=color;
+      ctx.fillRect(Math.round(p.x),Math.round(p.y*Y_SCALE-p.z),mote.size,scenery.biome==='tundra'?mote.size:1);
+      if(++count>=budget)break;
+    }
+    ctx.restore();ctx.globalAlpha=1;
+  }
+  drawStaffCharge(engine){
+    if(this.weaponDigit!==8||typeof engine.weaponAttackState!=='function')return;
+    const state=engine.weaponAttackState();if(state.mode!=='preparing'||state.progress<=0)return;
+    const ctx=this.ctx,p=engine.player,progress=clamp(state.progress,0,1);
+    ctx.save();ctx.strokeStyle='#acdcd8';ctx.lineWidth=.8;ctx.globalAlpha=.32+progress*.26;
+    ctx.beginPath();ctx.ellipse(p.x,p.y*Y_SCALE,16,10,0,-Math.PI/2,-Math.PI/2+TAU*progress);ctx.stroke();
+    if(!this.reduced){ctx.fillStyle='#d9ece3';ctx.fillRect(Math.round(p.x+Math.cos(p.facing||0)*9),Math.round(p.y*Y_SCALE-20-progress*4),2,2);}
+    ctx.restore();
   }
   drawWall(wall, p, tile, dt) {
     const ctx = this.ctx, sprite = wall.sprite;

@@ -1,6 +1,6 @@
 /** Local record model. NOT an authenticated online leaderboard. */
-export const SCORE_RULES='0.8.0';
-export const CHALLENGE_ID='fantasy-stance-01';
+export const SCORE_RULES='0.9.0';
+export const CHALLENGE_ID='fantasy-magic-01';
 export const CHALLENGE_SEED=20261119;
 export const BOSS_SECONDS=180;
 export const SCORE_SOURCES=['normal','lab'];

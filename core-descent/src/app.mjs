@@ -14,12 +14,12 @@ const $=id=>document.getElementById(id),storageKey='core-descent-v4';let saveWar
 let normal=makeProfile();try{const stored=localStorage.getItem(storageKey)||localStorage.getItem('core-descent-v3')||localStorage.getItem('core-descent-v2')||localStorage.getItem('core-descent-v1');if(stored)normal=checkProfile(JSON.parse(stored));if(normal.runActive){normal.runActive=false;saveWarning='前回の探索は未帰還で終了。出発前の所持品は保護されています。';}}catch{saveWarning='保存機能を利用できないか、データが不正です。セーブの書き出しをご利用ください。';}
 let lab=laboratory('storm',9,0),labKind='storm',mode='normal',selection=[0,0],tab='home',engine=null,paused=false,lastFrame=0,accumulator=0,toastTimer;
 let challengeContext=null,finishHandled=false,localRecords=[],labStartFloor=1;
-try{localRecords=restoreRecords(JSON.parse(localStorage.getItem('core-descent-records-v8')||'[]'));}catch{}
+try{localRecords=restoreRecords(JSON.parse(localStorage.getItem('core-descent-records-v9')||'[]'));}catch{}
 const profile=()=>mode==='normal'?normal:lab;
 const combatSpec=p=>applyEquipment(compileBoard(p.board,p.inventory),p);
 function esc(text){return String(text).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function num(x,d=1){return Number(x).toLocaleString('ja-JP',{maximumFractionDigits:d});}
-function weaponCondition(weapon){return weapon.stationarySeconds>0?`移動を止めて${num(weapon.stationarySeconds,2)}秒で構える。強い一撃の後はすぐ移動できます。`:'移動しながら自動攻撃。敵の予告を避けながら戦えます。';}
+function weaponCondition(weapon){if(weapon.id==='staff')return `移動を止めて${num(weapon.stationarySeconds,2)}秒詠唱。高威力の魔力球を放ったら、すぐ移動できます。`;if(weapon.id==='spellbook')return '移動しながら3連の追尾魔弾。足を止めずに、敵の予告を避けながら詠唱できます。';return weapon.stationarySeconds>0?`移動を止めて${num(weapon.stationarySeconds,2)}秒で構える。強い一撃の後はすぐ移動できます。`:'移動しながら自動攻撃。敵の予告を避けながら戦えます。';}
 function updateHomeWeapon(){const weapon=weaponForDigit(Number($('home-weapon').value));$('home-weapon-condition').textContent=weaponCondition(weapon);$('home-weapon-condition').classList.toggle('is-heavy',weapon.stationarySeconds>0);}
 function rarityOf(item){return RARITY_BY_ID[item.rarity??'common'];}
 function valueText(key,value){const [label,scale,suffix]=STAT_LABELS[key]||[key,1,''];return `${label} ${value>=0?'+':''}${num(value*scale,4)}${suffix}`;}
@@ -169,7 +169,7 @@ function finishRun(returned,abandoned=false){
  if(finishHandled||!engine)return;finishHandled=true;
  const p=profile();let bankError='';if(returned){try{bankRun(p,engine.loot,engine.gold,engine.floor,engine.cargo);}catch(error){bankError=error.message;p.pendingReturn=structuredClone({loot:engine.loot,cargo:engine.cargo,gold:engine.gold,floor:engine.floor});loseRun(p);returned=false;}}else loseRun(p);if(mode==='normal')persist();
  let recordNote='通常探索はチャレンジ順位には含めません。';
- if(challengeContext){try{const record=makeRecord(engine,challengeContext);localRecords=addRecord(localRecords,record);recordNote='この端末の自己記録へ追加しました（オンライン未検証）。';try{localStorage.setItem('core-descent-records-v8',JSON.stringify(localRecords));}catch{recordNote='自己記録へ追加。自動保存不可のため、記録を書き出してください。';}}catch{recordNote='数値が有効範囲外のため、この挑戦は記録しません。';}}
+ if(challengeContext){try{const record=makeRecord(engine,challengeContext);localRecords=addRecord(localRecords,record);recordNote='この端末の自己記録へ追加しました（オンライン未検証）。';try{localStorage.setItem('core-descent-records-v9',JSON.stringify(localRecords));}catch{recordNote='自己記録へ追加。自動保存不可のため、記録を書き出してください。';}}catch{recordNote='数値が有効範囲外のため、この挑戦は記録しません。';}}
  const boss=!!engine.isBoss,title=bankError?'帰還品を一時保管':boss?(engine.status==='complete'?'180秒の挑戦終了':engine.status==='invalid'?'スコア範囲エラー':'挑戦終了'):returned?'帰還成功':abandoned?'探索終了':'冒険者が倒れた';
  const msg=bankError?`保存を完了できませんでした：${bankError}。戦利品を一時保管しています。「持ち物」から再試行・復旧用の書き出しができます。`:boss?'コア・所持資産は失いません。戦利品のない記録用ステージです。':returned?(mode==='lab'?'実験終了。通常資産には加算されません。':'コア・お金・素材・装備・道具を拠点へ確保しました。'):'今回の未確保品を失います。出発前のコア・装備・素材と攻略記録は残ります。使用した道具は消費されています。';
  const cells=boss?[[num(engine.totalDamage,3),'総ダメージ'],[num(engine.totalDamage/BOSS_SECONDS,1),'180秒換算DPS'],[num(engine.totalTime,1),'生存秒数']]:[[engine.clearedFloor,'攻略済み階層'],[engine.floor,'到達階層'],[returned?engine.loot.length:0,'確保したコア']];
@@ -193,7 +193,8 @@ function updateHud(){
 }
 function updateAttackHud(){
  if(!engine)return;const state=engine.weaponAttackState(),weapon=engine.spec.weapon,heavy=weapon.stationarySeconds>0;
- const label=({mobile:'移動しながら攻撃',moving:'止まると攻撃',preparing:'構え中',cooldown:'次の攻撃まで',ready:'攻撃準備OK'})[state.mode];
+ const casting=weapon.id==='staff';
+ const label=({mobile:weapon.id==='spellbook'?'移動しながら詠唱':'移動しながら攻撃',moving:casting?'止まると詠唱':'止まると攻撃',preparing:casting?'詠唱中':'構え中',cooldown:'次の攻撃まで',ready:casting?'詠唱準備OK':'攻撃準備OK'})[state.mode];
  if($('stance-text').textContent!==label)$('stance-text').textContent=label;
  if($('hud-stance').dataset.mode!==state.mode)$('hud-stance').dataset.mode=state.mode;
  $('hud-stance').title=weaponCondition(weapon);$('stance-meter').classList.toggle('hidden',!heavy);

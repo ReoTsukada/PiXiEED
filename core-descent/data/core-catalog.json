@@ -1,5 +1,5 @@
 {
-  "version": "0.8.0",
+  "version": "0.9.0",
   "source": "src/catalog.mjs",
   "generated": true,
   "weapons": [
@@ -145,7 +145,7 @@
       "mechanic": "往復投擲 / 同じ敵へ最大2回"
     },
     {
-      "stationarySeconds": 0,
+      "stationarySeconds": 0.35,
       "digit": 8,
       "id": "staff",
       "name": "星火の杖",
@@ -153,15 +153,15 @@
       "color": "#87cfdf",
       "kind": "projectile",
       "style": "orb",
-      "baseDamage": 25,
+      "baseDamage": 45,
       "baseRate": 1.35,
       "range": 350,
       "projectileSpeed": 245,
       "projectileRadius": 7,
       "burstRadius": 55,
       "burstDamage": 0.7,
-      "description": "ゆっくり飛ぶ魔力球。最初の命中時、周囲の別の敵へ70%威力の魔力爆発。",
-      "mechanic": "魔力球 / 初回命中時に周囲へ70%爆発"
+      "description": "移動を止めて0.35秒詠唱し、高威力の魔力球を放つ。初回命中時、周囲の別の敵へ70%威力の魔力爆発。発射後はすぐ移動できる。",
+      "mechanic": "停止0.35秒で詠唱 / 高威力の魔力球・周囲へ70%爆発"
     },
     {
       "stationarySeconds": 0,
@@ -180,8 +180,8 @@
       "burst": 3,
       "burstGap": 0.1,
       "innateHoming": 1.2,
-      "description": "0.1秒間隔で3つの魔弾を放つ。魔弾は毎秒1.2ラジアンの速度で敵を追う。",
-      "mechanic": "3連魔弾 / 基礎追尾あり"
+      "description": "移動しながら、0.1秒間隔で3つの魔弾を放つ。魔弾は毎秒1.2ラジアンの速度で敵を追う。",
+      "mechanic": "移動詠唱 / 3連魔弾・基礎追尾あり"
     }
   ],
   "definitions": [

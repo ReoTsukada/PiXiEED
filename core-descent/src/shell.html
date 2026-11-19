@@ -13,10 +13,10 @@
   <div class="home-hero">
     <div class="home-visual"><canvas id="home-scene" aria-label="草原を探索する冒険者。多層スプライトによるゲームの展示シーン。"></canvas><div class="scene-shade"></div><span class="scene-caption">THE FIRST DESCENT</span></div>
     <div class="home-copy">
-      <div class="home-eyebrow"><span class="alpha-tag">ALPHA 0.8</span><span>FANTASY CORE RPG</span></div>
+      <div class="home-eyebrow"><span class="alpha-tag">ALPHA 0.9</span><span>FANTASY CORE RPG</span></div>
       <h1 class="home-title"><span>CORE</span><span>DESCENT<span class="title-period">.</span></span></h1>
       <p class="home-lead">数字を組む。<br>まだ見ぬ深さへ、潜る。</p>
-      <p class="home-description">剣も、魔法も。コアが戦い方を変える。<br>職業はない。自分だけの組み合わせで、五つの大地へ。</p>
+      <p class="home-description">剣も、魔法も。コアが戦い方を変える。<br>花の遺跡、燐光の湿原、白霜の森。自分のコアで、五つの大地へ。</p>
       <div class="home-weapon-select"><label for="home-weapon">体験する武器</label><select id="home-weapon" aria-label="体験する武器"></select><span>9段45コアの完成ビルド</span><p id="home-weapon-condition" class="home-weapon-condition" aria-live="polite"></p></div><div class="home-field-select"><label for="home-field">体験する場所</label><select id="home-field" aria-label="体験するフィールド"></select><label class="boss-toggle"><input type="checkbox" id="home-field-boss">ボスのいる階から</label></div><div class="home-main-actions"><button id="home-start" class="primary home-play">探索を始める</button><button id="home-lab" class="home-demo">選んだフィールドを体験</button></div>
       <p class="home-demo-note">体験は貸し出し品。通常探索は1階から、所持品で出発します。</p><p class="home-controls"><span class="keycap">W</span><span class="keycap">A</span><span class="keycap">S</span><span class="keycap">D</span><span>または画面をドラッグで移動・攻撃は自動</span></p>
     </div>
@@ -39,7 +39,7 @@
 </section>
 <section id="page-rankings" class="hidden">
 <div class="page-head"><div><div class="label">Beyond your best</div><h1>戦う相手は、昨日のビルド。</h1><p>攻略階層と総ダメージ。二つの記録で、コアの組み合わせを磨く。</p></div><button id="ranking-build" class="tiny">編成を変更</button></div>
-<div class="notice ranking-notice"><b>このブラウザーの自己記録</b><p>オンラインランキングは準備中です。実験室と所持コアの記録は分けて保存します。武器・構えルール0.8.0。以前の記録は旧ルールとして保持します。</p><small id="ranking-loadout"></small></div>
+<div class="notice ranking-notice"><b>このブラウザーの自己記録</b><p>オンラインランキングは準備中です。実験室と所持コアの記録は分けて保存します。武器・詠唱ルール0.9.0。以前の記録は旧ルールとして保持します。</p><small id="ranking-loadout"></small></div>
 <div class="challenge-grid">
 <article class="panel challenge-card"><div class="label">DEEP EXPEDITION</div><h2>深層チャレンジ</h2><div class="score-number" id="best-depth">未挑戦</div><small>自己最高・攻略済み階層</small><p>1階から、同じ生成マップへ。20秒生存＋規定数撃破、5階ごとのボス討伐で階層を確定。次の階に入るだけでは更新しません。</p><div class="challenge-tags"><span class="tag mint">所持コアをそのまま使用</span><span class="tag">死亡でも記録は残る</span></div><button class="primary" id="start-depth">階層チャレンジ</button></article>
 <article class="panel challenge-card boss-card"><div class="label">INFINITE GUARDIAN</div><h2>無限ボス・180秒</h2><div class="score-number" id="best-boss">未挑戦</div><small>自己最高・ボスへの総ダメージ</small><p>倒れないボスへ、実際に当てた攻撃を合算。武器の射程で戦い、衝撃波を避ける。最後の60秒は瀕死判定です。</p><div class="challenge-tags"><span class="tag gold">レベル1固定</span><span class="tag">レア度・個体値を維持</span></div><button class="primary" id="start-boss">無限ボスに挑む</button></article>
@@ -53,5 +53,5 @@
 </section>
 <section id="page-catalog" class="hidden"><div class="page-head"><div><div class="label">World &amp; core catalogue</div><h1>狙う相手を知る。次の力を探す。</h1><p>五つの大地に、違う敵と固有の戦利品。5階ごとにボスが待ち、25階で一巡します。各階の3体目は一般コアを1個保証。</p></div></div><div id="field-guide" class="field-guide"></div><div class="page-head core-catalog-head"><div><div class="label">Universal core abilities</div><h2 id="core-count-heading">すべての武器に、すべてのコアを。</h2><p>数字と能力は独立。ドロップ時に数字0〜9・レア度・個体値が決まり、入手後は固定です。</p></div></div><div id="rarity-guide" class="rarity-guide"></div><p class="note" style="margin-bottom:18px">高レアほどプラス効果は強く、代償は小さくなります。接続増幅はプラス・マイナス両方に掛かります。数値は調整用の仮設定。</p><div id="catalog-grid" class="catalog-grid"></div></section>
 <section id="page-market" class="hidden"><div class="page-head"><div><div class="label">Auction sandbox</div><h1>足りない一個を、探す。</h1><p>入札・即決・所有権移転のローカル動作テストです。実プレイヤーとの取引ではありません。</p></div><button id="reset-market" class="tiny">テスト市場を初期化</button></div><div class="notice market-banner"><div class="row between"><b>オンライン未接続 / 探索の資産とは完全に別</b><span id="market-wallet"></span></div><p>仮通貨5,000Gでテストできます。出品品はNPCのサンプル。手数料は5%の仮設定です。</p></div><div id="market-grid" class="market-grid"></div><div class="tools-footer"><button id="market-list-test" class="tiny">自分のサンプルコアを出品する</button><span id="market-owned" class="note"></span></div></section>
-</main><footer><span>CORE DESCENT <span class="footer-version">ALPHA 0.8.0</span> / PiXiEED</span><span>所持品・自己記録はこのブラウザーに保存されます。</span></footer><div id="toast" class="toast hidden" role="status"></div>
+</main><footer><span>CORE DESCENT <span class="footer-version">ALPHA 0.9.0</span> / PiXiEED</span><span>所持品・自己記録はこのブラウザーに保存されます。</span></footer><div id="toast" class="toast hidden" role="status"></div>
 <noscript><p class="noscript-message">このゲームを遊ぶにはJavaScriptを有効にしてください。</p></noscript><script>/*__SCRIPT__*/</script></body></html>

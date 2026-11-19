@@ -1,6 +1,6 @@
 import {compileBoard,makeItem} from './core.mjs';
-/** These helpers describe the v0.8 weapon model; the named PvP helpers remain archival. They do NOT implement networked PvP. */
-export const BALANCE_VERSION='0.8.0-candidate';
+/** These helpers describe the v0.9 weapon model; the named PvP helpers remain archival. They do NOT implement networked PvP. */
+export const BALANCE_VERSION='0.9.0-candidate';
 export function floorStats(floor){
  if(!Number.isSafeInteger(floor)||floor<1)throw Error('階層は1以上の整数');
  const hp=20*Math.pow(1+.16*(floor-1),1.65),contact=7+2.5*Math.pow(floor-1,.65);

@@ -25,8 +25,8 @@ function advance(e,seconds,input={x:0,y:0}){
  for(let left=seconds;left>1e-10;){const dt=Math.min(1/60,left);e.tick(dt,input);left-=dt;}
 }
 
-test('eight weapons attack while moving; only greatsword and hammer require preparation',()=>{
- assert.deepEqual(WEAPONS.filter(w=>w.stationarySeconds>0).map(w=>[w.digit,w.stationarySeconds,w.baseDamage]),[[2,.18,90],[5,.28,88]]);
+test('seven weapons attack while moving; greatsword, hammer and staff require preparation',()=>{
+ assert.deepEqual(WEAPONS.filter(w=>w.stationarySeconds>0).map(w=>[w.digit,w.stationarySeconds,w.baseDamage]),[[2,.18,90],[5,.28,88],[8,.35,45]]);
  for(const w of WEAPONS){
   const e=arena(w.digit),start={x:e.player.x,y:e.player.y};advance(e,.15,{x:0,y:-1});
   assert.ok(e.player.y<start.y);assert.equal(e.player.still,0);
@@ -105,7 +105,7 @@ test('infinite boss uses the same movement and stop-to-attack rules',()=>{
 });
 
 test('heavy theoretical and fixed-hit moving DPS is zero; standing sustained damage retains core scaling',()=>{
- for(const digit of[2,5]){
+ for(const digit of[2,5,8]){
   const s=spec(digit);s.steady=.5;const moving=expectedDirect(s),standing=expectedDirect(s,{stationary:true});
   assert.equal(moving.canAttack,false);assert.equal(moving.dps,0);assert.equal(moving.stationarySeconds,s.weapon.stationarySeconds);
   assert.equal(standing.canAttack,true);near(standing.dps,s.damage*1.5*s.rate);assert.equal(fixedHitTrial(s).directDps,0);
@@ -118,4 +118,43 @@ test('attack HUD state reads do not mutate simulation or RNG',()=>{
  assert.deepEqual(e.weaponAttackState(),{mode:'preparing',progress:.5,remaining:.09});
  assert.deepEqual({player:e.player,timer:e.shotTimer,time:e.totalTime,damage:e.totalDamage},before);
  e.player.still=.18;e.shotTimer=0;assert.deepEqual(e.weaponAttackState(),{mode:'ready',progress:1,remaining:0});
+});
+
+test('staff releases one high-power orb after 0.35 seconds; moving afterward does not cancel the projectile',()=>{
+ const e=arena(8);advance(e,1,{x:0,y:-1});
+ assert.equal(e.totalDamage,0);assert.equal(e.bullets.length,0);near(e.shotTimer,0);
+ Object.assign(e.enemies[0],{x:e.player.x+90,y:e.player.y});
+ advance(e,.2);assert.equal(e.weaponAttackState().mode,'preparing');
+ advance(e,1/60,{x:0,y:-1});near(e.player.still,0);assert.equal(e.bullets.length,0);
+ Object.assign(e.enemies[0],{x:e.player.x+90,y:e.player.y});
+ advance(e,.349);assert.equal(e.bullets.length,0);near(e.weaponAttackState().remaining,.001);
+ advance(e,.001);assert.equal(e.bullets.length,1);assert.equal(e.bullets[0].kind,'orb');
+ near(e.bullets[0].damage,45);assert.equal(e.weaponAttackState().mode,'cooldown');
+ const before=e.player.y;advance(e,.5,{x:0,y:-1});assert.ok(e.player.y<before);
+ near(e.totalDamage,45);assert.equal(e.weaponAttackState().mode,'moving');
+});
+
+test('staff recovery projectiles obey the same cast gate without consuming bonus credit while moving',()=>{
+ const e=arena(8);Object.assign(e.enemies[0],{x:e.player.x+160,y:e.player.y});e.bonusCredit=1;e.shotTimer=10;
+ advance(e,.1,{x:0,y:-1});assert.equal(e.volley(true),false);assert.equal(e.projectileVolley(0,1,true),false);
+ assert.equal(e.bonusCredit,1);assert.equal(e.bullets.length,0);
+ advance(e,.349);assert.equal(e.bonusCredit,1);advance(e,.001);
+ assert.equal(e.bonusCredit,0);assert.equal(e.bullets.length,1);assert.equal(e.bullets[0].noHeal,true);
+ assert.ok(e.shotTimer>0);advance(e,.7,{x:0,y:-1});near(e.totalDamage,45);
+});
+
+test('spellbook keeps all three homing projectiles while moving, with no preparation delay',()=>{
+ const e=arena(9);Object.assign(e.enemies[0],{x:e.player.x+180,y:e.player.y});
+ advance(e,.23,{x:0,y:-1});
+ assert.equal(e.player.moving,true);assert.equal(e.player.still,0);assert.equal(e.weaponAttackState().mode,'mobile');
+ assert.equal(e.bullets.length,3);assert.equal(e.pendingBursts.length,0);
+ assert.ok(e.bullets.every(b=>b.kind==='rune'&&b.damage===12));near(e.spec.weapon.innateHoming,1.2);
+ near(expectedDirect(e.spec).dps,39.6);
+});
+
+test('staff cast requirement also applies to the infinite boss trial',()=>{
+ const e=new BossTrial(spec(8),{seed:314});Object.assign(e.player,{x:e.boss.x,y:e.boss.y+100});
+ advance(e,.2,{x:1,y:0});assert.equal(e.totalDamage,0);assert.equal(e.bullets.length,0);
+ advance(e,.349);assert.equal(e.bullets.length,0);advance(e,.001);assert.equal(e.bullets.length,1);
+ advance(e,.5);assert.ok(e.totalDamage>0);assert.equal(e.weaponAttackState().mode,'cooldown');
 });

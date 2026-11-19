@@ -3,7 +3,7 @@ import {fileURLToPath} from 'node:url';
 const root=fileURLToPath(new URL('../',import.meta.url));
 // Small offline bundler for this fixed set of named ES modules. Module scopes
 // stay isolated: renderer-local identifiers cannot shadow combat calculations.
-const modules=['weapons','catalog','items','core','loot','world','map','fog','combat-math','engine','rankings','boss','market','sprites','renderer','weapon-ui','camp-ui','app'];
+const modules=['weapons','catalog','items','core','loot','world','map','fog','combat-math','engine','rankings','boss','market','actor-art','terrain-art','sprites','scenery','renderer','weapon-ui','camp-ui','app'];
 let source='"use strict";\nconst __modules=Object.create(null);\n';
 const resolved=new Set();
 for(const name of modules){
@@ -28,4 +28,4 @@ console.log(`Built index.html and dist/index.html (${Buffer.byteLength(html)} by
 const {WEAPONS}=await import('../src/weapons.mjs');
 const {CORE_DEFS,RARITIES,ROLL_MIN,ROLL_MAX}=await import('../src/catalog.mjs');
 await mkdir(root+'data',{recursive:true});
-await writeFile(root+'data/core-catalog.json',JSON.stringify({version:'0.8.0',source:'src/catalog.mjs',generated:true,weapons:WEAPONS,definitions:CORE_DEFS,rarities:RARITIES,rollRange:[ROLL_MIN,ROLL_MAX]},null,2));
+await writeFile(root+'data/core-catalog.json',JSON.stringify({version:'0.9.0',source:'src/catalog.mjs',generated:true,weapons:WEAPONS,definitions:CORE_DEFS,rarities:RARITIES,rollRange:[ROLL_MIN,ROLL_MAX]},null,2));

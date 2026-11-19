@@ -20,7 +20,7 @@ CORE DESCENT: 数字パズルで武器と魔法を構築する、職業制限の
 - ルール/新機能: docs/GAME_DESIGN.md
 - 能力/合成: docs/CORE_SYSTEM.md、docs/ABILITIES.md、docs/RARITY_AMPLIFIERS.md
 - オンライン/取引: docs/ONLINE_DESIGN.md
-- 現行仕様と次の作業: docs/RELEASE_V08.md。5フィールド・戦利品の継続仕様はdocs/RELEASE_V07.md。
+- 現行仕様と次の作業: docs/RELEASE_V09.md。視界・構えはdocs/RELEASE_V08.md。5フィールド・戦利品の継続仕様はdocs/RELEASE_V07.md。
 
 ## Verification
 Run `npm run build` and `npm test` after code changes. When modifying UI, inspect the game in an actual browser at desktop and mobile viewport sizes. Keep any local QA outputs in qa/ and do not publish them. Record untested areas honestly. dist/index.html is generated; edit src/ instead. Runtime has no dependencies; adding services or libraries requires a concrete need.
@@ -74,7 +74,7 @@ Client saves and AuctionBook are LOCAL demonstrations, not trusted production st
 - フィールド/ボスからの試遊は実験室のみ。通常探索と階層チャレンジは1階から。無限ボス試験は階層ボスと別で、道具使用不可。
 - 公開対象は生成index.htmlのみ。QAファイル・スクリーンショット・開発サーバー設定は配信対象外。
 
-## v0.8 滑らかな視界・武器の構え（現行）
+## v0.8 滑らかな視界・武器の構えの履歴
 - 明暗は主人公の連続した位置から距離に応じて滑らかに変える。原画スプライトはぼかさず、低画質でも滑らかな暗転を維持。
 - 光と霧の変更は描画のみ。視界半径・壁の遮蔽・自動照準・命中・探索済み記録を変えず、未発見の敵・戦利品・出口を開示しない。
 - 基本の8武器は移動中も攻撃可能。大剣(2)は0.18秒、槌(5)は0.28秒の静止を必要とし、基礎威力はそれぞれ90・88。
@@ -82,3 +82,10 @@ Client saves and AuctionBook are LOCAL demonstrations, not trusted production st
 - 攻撃速度は攻撃間隔へ適用し、武器固有の構え時間は短縮しない。通常探索・階層ボス・無限ボス試験で条件を統一。
 - 武器の攻撃状態を戦闘画面で表示し、説明・理論DPSの前提・実戦挙動を一致させる。全32コアの共通利用を維持。
 - 所持品v4キーを保持。自己記録は0.8.0 / fantasy-stance-01 / core-descent-records-v8。以前の記録キーを削除しない。
+
+## v0.9 二系統の魔法・原画と景観（現行）
+- 杖(8)は0.35秒の静止詠唱、基礎威力45、1.35回/秒、射程350px。初回命中時に別の敵へ70%爆発。魔導書(9)は移動中も3連追尾魔弾を放つ。
+- 移動攻撃7武器、静止準備3武器（大剣・槌・杖）。攻撃間隔・構えキャンセル・発射後の自由移動・回復追加攻撃のv0.8条件を共通適用。
+- actor-art.mjs / terrain-art.mjs が原画レシピ、sprites.mjs が32×32層とキャッシュ、scenery.mjs が決定的な部屋景観、renderer.mjs が表示。
+- 景観は表示のみ。地形判定・危険床・敵AI・視界・探索・乱数列・戦利品を変えず、未探索の物体や光源を表示しない。表示設定は戦闘数値に影響させない。
+- 所持品v4キーを保持。自己記録は0.9.0 / fantasy-magic-01 / core-descent-records-v9。旧キーを削除せず異なる戦闘条件を混ぜない。
