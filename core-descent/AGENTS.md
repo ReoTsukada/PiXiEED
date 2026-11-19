@@ -20,7 +20,7 @@ CORE DESCENT: 数字パズルで武器と魔法を構築する、職業制限の
 - ルール/新機能: docs/GAME_DESIGN.md
 - 能力/合成: docs/CORE_SYSTEM.md、docs/ABILITIES.md、docs/RARITY_AMPLIFIERS.md
 - オンライン/取引: docs/ONLINE_DESIGN.md
-- 現行仕様と次の作業: docs/RELEASE_V07.md
+- 現行仕様と次の作業: docs/RELEASE_V08.md。5フィールド・戦利品の継続仕様はdocs/RELEASE_V07.md。
 
 ## Verification
 Run `npm run build` and `npm test` after code changes. When modifying UI, inspect the game in an actual browser at desktop and mobile viewport sizes. Keep any local QA outputs in qa/ and do not publish them. Record untested areas honestly. dist/index.html is generated; edit src/ instead. Runtime has no dependencies; adding services or libraries requires a concrete need.
@@ -61,7 +61,7 @@ Client saves and AuctionBook are LOCAL demonstrations, not trusted production st
 - 所持セーブv4キーは維持。記録条件は0.6.0・fantasy-rooms-01でv6キーへ保存し、旧記録を削除しない。
 - 自動完成は実験室だけ。通常武器変更で数字を勝手に変えない。
 
-## v0.7 フィールド・固有戦利品（現行）
+## v0.7 フィールド・固有戦利品の履歴
 - ユーザーの追加要件: 草原・砂漠・溶岩・毒沼・氷原、固有モンスターと5階ごとのボス、敵別の行動、コア以外の戦利品。
 - world.mjs がフィールド/敵の数値正本。5階ずつの帯を25階周期で繰り返し、絶対階層で難度を上げる。
 - 32種のコアすべてを10種の武器で使える。固有ドロップ5種も武器制限を追加しない。
@@ -73,3 +73,12 @@ Client saves and AuctionBook are LOCAL demonstrations, not trusted production st
 - 所持品の保存キーv4を保持、追加フィールドを冪等に移行。0.7.0 / fantasy-worlds-01の記録をv7キーに保存。旧記録は消さない。
 - フィールド/ボスからの試遊は実験室のみ。通常探索と階層チャレンジは1階から。無限ボス試験は階層ボスと別で、道具使用不可。
 - 公開対象は生成index.htmlのみ。QAファイル・スクリーンショット・開発サーバー設定は配信対象外。
+
+## v0.8 滑らかな視界・武器の構え（現行）
+- 明暗は主人公の連続した位置から距離に応じて滑らかに変える。原画スプライトはぼかさず、低画質でも滑らかな暗転を維持。
+- 光と霧の変更は描画のみ。視界半径・壁の遮蔽・自動照準・命中・探索済み記録を変えず、未発見の敵・戦利品・出口を開示しない。
+- 基本の8武器は移動中も攻撃可能。大剣(2)は0.18秒、槌(5)は0.28秒の静止を必要とし、基礎威力はそれぞれ90・88。
+- 移動入力で構えをリセット。攻撃後の移動固定は追加しない。移動中も攻撃間隔を進め、未発動の通常攻撃を蓄積しない。回復由来の追加攻撃も同じ構え条件で判定。
+- 攻撃速度は攻撃間隔へ適用し、武器固有の構え時間は短縮しない。通常探索・階層ボス・無限ボス試験で条件を統一。
+- 武器の攻撃状態を戦闘画面で表示し、説明・理論DPSの前提・実戦挙動を一致させる。全32コアの共通利用を維持。
+- 所持品v4キーを保持。自己記録は0.8.0 / fantasy-stance-01 / core-descent-records-v8。以前の記録キーを削除しない。

@@ -14,11 +14,13 @@ const $=id=>document.getElementById(id),storageKey='core-descent-v4';let saveWar
 let normal=makeProfile();try{const stored=localStorage.getItem(storageKey)||localStorage.getItem('core-descent-v3')||localStorage.getItem('core-descent-v2')||localStorage.getItem('core-descent-v1');if(stored)normal=checkProfile(JSON.parse(stored));if(normal.runActive){normal.runActive=false;saveWarning='前回の探索は未帰還で終了。出発前の所持品は保護されています。';}}catch{saveWarning='保存機能を利用できないか、データが不正です。セーブの書き出しをご利用ください。';}
 let lab=laboratory('storm',9,0),labKind='storm',mode='normal',selection=[0,0],tab='home',engine=null,paused=false,lastFrame=0,accumulator=0,toastTimer;
 let challengeContext=null,finishHandled=false,localRecords=[],labStartFloor=1;
-try{localRecords=restoreRecords(JSON.parse(localStorage.getItem('core-descent-records-v7')||'[]'));}catch{}
+try{localRecords=restoreRecords(JSON.parse(localStorage.getItem('core-descent-records-v8')||'[]'));}catch{}
 const profile=()=>mode==='normal'?normal:lab;
 const combatSpec=p=>applyEquipment(compileBoard(p.board,p.inventory),p);
 function esc(text){return String(text).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function num(x,d=1){return Number(x).toLocaleString('ja-JP',{maximumFractionDigits:d});}
+function weaponCondition(weapon){return weapon.stationarySeconds>0?`移動を止めて${num(weapon.stationarySeconds,2)}秒で構える。強い一撃の後はすぐ移動できます。`:'移動しながら自動攻撃。敵の予告を避けながら戦えます。';}
+function updateHomeWeapon(){const weapon=weaponForDigit(Number($('home-weapon').value));$('home-weapon-condition').textContent=weaponCondition(weapon);$('home-weapon-condition').classList.toggle('is-heavy',weapon.stationarySeconds>0);}
 function rarityOf(item){return RARITY_BY_ID[item.rarity??'common'];}
 function valueText(key,value){const [label,scale,suffix]=STAT_LABELS[key]||[key,1,''];return `${label} ${value>=0?'+':''}${num(value*scale,4)}${suffix}`;}
 function itemSummary(item){const v=itemValues(item);return v.ampGain?`接続先 ×${num(1+v.ampGain,4)}`:Object.entries(v.mods).map(([k,n])=>valueText(k,n)).join(' / ');}
@@ -56,7 +58,7 @@ function renderBoard(){
  $('board-status').textContent=validation.valid?'接続成立 — この武器で探索できます':validation.errors[0]+(validation.errors.length>1?` ほか${validation.errors.length-1}件`:'' );$('board-status').className='status-text'+(validation.valid?'':' invalid');$('launch').disabled=!validation.valid;
  let stats=null;if(validation.valid)stats=combatSpec(p);
  const dps=stats?stats.damage*stats.rate*(1+stats.multi)*(stats.innateHits??1)*(stats.comboMultiplier??1)*(1+stats.crit*(stats.critMultiplier-1)):0;
- $('stats').innerHTML=[['攻撃威力',stats?num(stats.damage):'—','1ヒットの基準'],['攻撃速度',stats?num(stats.rate):'—','動作 / 秒'],['射程',stats?num(stats.range/32,1):'—','マス（1マス32）'],[stats?.weapon.id==='chakram'?'往路の参考DPS':'全段命中DPS',stats?num(dps,0):'—','会心・連撃平均／復路・範囲・属性は別'],['追加攻撃なしDPS',stats?num(dps/(1+stats.multi),0):'—','武器固有の連撃は含む参考値'],['吸収回復上限',stats&&stats.drain>0?num(stats.maxHp*.08,1):'—','HP/秒・自然回復は別']].map(([a,b,c])=>`<div class="stat"><span>${a}</span><b>${b}</b><small> ${c}</small></div>`).join('');
+ $('stats').innerHTML=[['攻撃威力',stats?num(stats.damage):'—','1ヒットの基準'],['攻撃速度',stats?num(stats.rate):'—','動作 / 秒'],['射程',stats?num(stats.range/32,1):'—','マス（1マス32）'],[stats?.weapon.stationarySeconds>0?'停止時の参考DPS':stats?.weapon.id==='chakram'?'往路の参考DPS':'全段命中DPS',stats?num(dps,0):'—','会心・連撃平均／条件補正・復路・範囲・属性は別'],['追加攻撃なしDPS',stats?num(dps/(1+stats.multi),0):'—','武器固有の連撃は含む参考値'],['吸収回復上限',stats&&stats.drain>0?num(stats.maxHp*.08,1):'—','HP/秒・自然回復は別']].map(([a,b,c])=>`<div class="stat"><span>${a}</span><b>${b}</b><small> ${c}</small></div>`).join('');
  $('effects').innerHTML=stats?CORE_DEFS.filter(d=>d.id!=='emitter'&&(d.amplify||Object.keys(d.mods).some(k=>stats.raw[k]>0))&&p.board.flat().some(id=>inv.get(id)?.type===d.id)).map(d=>`<span class="tag" style="border-color:${d.color}55">${esc(d.name)}</span>`).join(''):'<span class="note">数字パズルを完成させると最終出力を確認できます。</span>';
  $('mode-note').textContent=mode==='normal'?`所持コア ${p.inventory.length}個 / ${num(p.wallet,0)} G。初期の数字コアに加え、0〜9の武器核を所持。戦利品は緑の帰還陣で持ち帰って確保。「持ち物」で装備と道具を準備できます。`:'実験室：9段完成例と交換用コアを貸し出しています。通常探索の所持品・進行には影響しません。ここでパズルと能力の合成を試せます。';
  $('presets').innerHTML=p.presets.length?p.presets.map((pr,i)=>`<button class="tiny quiet" data-load-preset="${i}">${esc(pr.name)}</button>`).join(''):'<small>数字だけでなく、装着したコアの個体IDも保存します。</small>';
@@ -70,7 +72,7 @@ function renderWeaponPicker(stats=null){
   return `<button class="weapon-choice ${active===w.digit?'active':''}" data-weapon="${w.digit}" aria-pressed="${active===w.digit}" aria-label="数字${w.digit} ${w.name}の武器核" ${available?'':'disabled'} style="--weapon-color:${w.color}"><span class="weapon-digit">${w.digit}</span>${weaponIcon(w.digit)}<span>${weaponLabel(w.digit)}</span></button>`;
  }).join('');
  const w=active===null?null:weaponForDigit(active);
- $('weapon-description').innerHTML=w?`<div class="weapon-title">${weaponIcon(w.digit)}<div><h3>${w.name}<span class="tag">${w.kind==='melee'?'近接':'遠隔・魔法'}</span></h3><p>${esc(w.mechanic)}</p></div></div><div class="weapon-facts"><span>基礎威力 <b>${num(w.baseDamage)}</b></span><span>基礎速度 <b>${num(w.baseRate,2)}回/秒</b></span><span>基礎射程 <b>${num(w.range/32,1)}マス</b></span>${stats?`<span>追加攻撃 <b>＋${num(stats.multi,2)}</b></span>`:''}</div>`:'<p class="note">頂点に装着する武器核を選んでください。</p>';
+ $('weapon-description').innerHTML=w?`<div class="weapon-title">${weaponIcon(w.digit)}<div><h3>${w.name}<span class="tag">${w.kind==='melee'?'近接':'遠隔・魔法'}</span><span class="tag ${w.stationarySeconds>0?'gold':'mint'}">${w.stationarySeconds>0?'停止して攻撃':'移動攻撃'}</span></h3><p>${esc(w.mechanic)}</p><p class="weapon-condition">${esc(weaponCondition(w))}</p></div></div><div class="weapon-facts"><span>基礎威力 <b>${num(w.baseDamage)}</b></span><span>基礎速度 <b>${num(w.baseRate,2)}回/秒</b></span><span>基礎射程 <b>${num(w.range/32,1)}マス</b></span>${stats?`<span>追加攻撃 <b>＋${num(stats.multi,2)}</b></span>`:''}</div>`:'<p class="note">頂点に装着する武器核を選んでください。</p>';
  $('weapon-instruction').textContent=mode==='lab'?'武器を選ぶと、この実験室だけ成立済みの体験編成に切り替わります。':'数字0〜9の武器核を頂点に交換します。武器の数字に合うよう下の配置を組むと出発できます。';
  $('weapon-picker').querySelectorAll('[data-weapon]').forEach(b=>b.onclick=()=>{
   const digit=Number(b.dataset.weapon);
@@ -123,7 +125,7 @@ function retryPendingReturn(){
  try{bankRun(p,pending.loot,pending.gold,pending.floor,pending.cargo);delete p.pendingReturn;if(mode==='normal')persist();renderInventory();toast('一時保管していた帰還品を確保しました。');}catch(error){toast(`まだ確保できません：${error.message}。復旧用の書き出しには戦利品も含まれます。`,true);}
 }
 function exportRecovery(){
- const data=profile(),url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='core-descent-recovery-v07.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+ const data=profile(),url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='core-descent-recovery-v08.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 function startLabField(floor){
  labStartFloor=floor;labKind='storm';lab=laboratory(labKind,9,Number($('home-weapon').value));mode='lab';selection=[0,0];$('lab-rarity').value='';renderBoard();launchGame();
@@ -167,7 +169,7 @@ function finishRun(returned,abandoned=false){
  if(finishHandled||!engine)return;finishHandled=true;
  const p=profile();let bankError='';if(returned){try{bankRun(p,engine.loot,engine.gold,engine.floor,engine.cargo);}catch(error){bankError=error.message;p.pendingReturn=structuredClone({loot:engine.loot,cargo:engine.cargo,gold:engine.gold,floor:engine.floor});loseRun(p);returned=false;}}else loseRun(p);if(mode==='normal')persist();
  let recordNote='通常探索はチャレンジ順位には含めません。';
- if(challengeContext){try{const record=makeRecord(engine,challengeContext);localRecords=addRecord(localRecords,record);recordNote='この端末の自己記録へ追加しました（オンライン未検証）。';try{localStorage.setItem('core-descent-records-v7',JSON.stringify(localRecords));}catch{recordNote='自己記録へ追加。自動保存不可のため、記録を書き出してください。';}}catch{recordNote='数値が有効範囲外のため、この挑戦は記録しません。';}}
+ if(challengeContext){try{const record=makeRecord(engine,challengeContext);localRecords=addRecord(localRecords,record);recordNote='この端末の自己記録へ追加しました（オンライン未検証）。';try{localStorage.setItem('core-descent-records-v8',JSON.stringify(localRecords));}catch{recordNote='自己記録へ追加。自動保存不可のため、記録を書き出してください。';}}catch{recordNote='数値が有効範囲外のため、この挑戦は記録しません。';}}
  const boss=!!engine.isBoss,title=bankError?'帰還品を一時保管':boss?(engine.status==='complete'?'180秒の挑戦終了':engine.status==='invalid'?'スコア範囲エラー':'挑戦終了'):returned?'帰還成功':abandoned?'探索終了':'冒険者が倒れた';
  const msg=bankError?`保存を完了できませんでした：${bankError}。戦利品を一時保管しています。「持ち物」から再試行・復旧用の書き出しができます。`:boss?'コア・所持資産は失いません。戦利品のない記録用ステージです。':returned?(mode==='lab'?'実験終了。通常資産には加算されません。':'コア・お金・素材・装備・道具を拠点へ確保しました。'):'今回の未確保品を失います。出発前のコア・装備・素材と攻略記録は残ります。使用した道具は消費されています。';
  const cells=boss?[[num(engine.totalDamage,3),'総ダメージ'],[num(engine.totalDamage/BOSS_SECONDS,1),'180秒換算DPS'],[num(engine.totalTime,1),'生存秒数']]:[[engine.clearedFloor,'攻略済み階層'],[engine.floor,'到達階層'],[returned?engine.loot.length:0,'確保したコア']];
@@ -181,13 +183,21 @@ function updateHud(){
  if(!engine)return;const e=engine;
  $('hud-floor').textContent=e.isBoss?`BOSS / 残り ${Math.max(0,Math.ceil(BOSS_SECONDS-e.totalTime))}秒`:`FLOOR ${String(e.floor).padStart(2,'0')}`;
  $('hud-biome').textContent=e.isBoss?'記録の聖域':biomeForFloor(e.floor).name+(e.floor%5===0?' · ボス階':'');
- $('hud-weapon').textContent=`${e.spec.weapon.name} · 射程${num(e.spec.range/32,1)}マス`;$('hud-level').textContent=e.isBoss?'Lv.1 固定':`Lv.${e.level}`;$('hp-bar').style.width=`${Math.max(0,e.player.hp/e.spec.maxHp*100)}%`;$('hud-hp').textContent=`HP ${num(e.player.hp,0)} / ${num(e.spec.maxHp,0)}`;
+ $('hud-weapon').textContent=`${weaponLabel(e.spec.weapon.digit)} · 射程${num(e.spec.range/32,1)}マス`;$('hud-weapon').title=e.spec.weapon.name;updateAttackHud();$('hud-level').textContent=e.isBoss?'Lv.1 固定':`Lv.${e.level}`;$('hp-bar').style.width=`${Math.max(0,e.player.hp/e.spec.maxHp*100)}%`;$('hud-hp').textContent=`HP ${num(e.player.hp,0)} / ${num(e.spec.maxHp,0)}`;
  $('hud-gates').textContent=e.isBoss?(e.totalTime>=120?'瀕死判定ON：追い撃ち有効':'通常判定：120秒から追い撃ち有効'):e.gates?`第${e.clearedFloor}階攻略 / 緑＝帰還、金＝次層`:`開通まで ${Math.max(0,Math.ceil(e.goalTime-e.floorTime))}秒・撃破 ${Math.min(e.floorKills,e.goalKills)}/${e.goalKills}${e.floorBoss&&!e.bossDefeated?' · ボス未討伐':''}`;
  const cargo=cargoCounts(e.cargo);$('hud-cargo').textContent=e.isBoss?'道具は使用不可':`素材 ${cargo.materials} · 装備 ${cargo.equipment} · 道具 ${cargo.consumables}`;
  for(const [id,button,count] of [['healing_draught','use-heal','heal-count'],['ward_scroll','use-ward','ward-count']]){$(count).textContent=profile().consumables?.[id]??0;$(button).disabled=e.isBoss||e.status!=='playing'||paused||!(profile().consumables?.[id]>0)||!e.canUseConsumable(id);}
  $('hud-loot').textContent=e.isBoss?`総ダメージ ${num(e.totalDamage,0)}`:`未確保コア ${e.loot.length}`;
  $('hud-gold').textContent=e.isBoss?`平均 ${num(e.totalDamage/Math.max(.001,e.totalTime),1)} DPS`:`未確保 ${num(e.gold,0)} G`;
  $('hud-kills').textContent=e.isBoss?'ボスHP ∞ / 装備の数値はそのまま':`累計 ${e.totalKills}体撃破`;
+}
+function updateAttackHud(){
+ if(!engine)return;const state=engine.weaponAttackState(),weapon=engine.spec.weapon,heavy=weapon.stationarySeconds>0;
+ const label=({mobile:'移動しながら攻撃',moving:'止まると攻撃',preparing:'構え中',cooldown:'次の攻撃まで',ready:'攻撃準備OK'})[state.mode];
+ if($('stance-text').textContent!==label)$('stance-text').textContent=label;
+ if($('hud-stance').dataset.mode!==state.mode)$('hud-stance').dataset.mode=state.mode;
+ $('hud-stance').title=weaponCondition(weapon);$('stance-meter').classList.toggle('hidden',!heavy);
+ if(heavy)$('stance-fill').style.width=`${Math.max(0,Math.min(1,state.progress))*100}%`;
 }
 function recordWeaponName(record){const digit=record.loadout?.[0]?.[0]?.digit;return Number.isInteger(digit)&&digit>=0&&digit<=9?weaponForDigit(digit).name:'武器不明';}
 function renderRankings(){
@@ -239,7 +249,7 @@ function animate(ts){
     const input=renderer.screenInput(x,y);
     while(accumulator>=1/60){engine.tick(1/60,input);accumulator-=1/60;}
    }
-   drawGame();hudTimer+=dt;if(hudTimer>.15){updateHud();hudTimer=0;}
+   drawGame();updateAttackHud();hudTimer+=dt;if(hudTimer>.15){updateHud();hudTimer=0;}
   }else if(tab==='home'){drawHome(dt);}
  }
  requestAnimationFrame(animate);
@@ -259,7 +269,7 @@ $('retry-return').onclick=retryPendingReturn;$('export-recovery').onclick=export
 $('inventory-normal').onclick=()=>{mode='normal';selection=[0,0];renderInventory();};$('inventory-lab').onclick=()=>{mode='lab';selection=[0,0];renderInventory();};$('inventory-build').onclick=()=>changeTab('build');$('inventory-guide').onclick=()=>changeTab('catalog');
 $('start-depth').onclick=()=>launchGame('depth');$('start-boss').onclick=()=>launchGame('boss');
 $('ranking-build').onclick=()=>changeTab('build');
-$('export-records').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify({localOnly:true,verified:false,rules:SCORE_RULES,challenge:CHALLENGE_ID,records:localRecords},null,2)],{type:'application/json'}));a.download='core-descent-local-records-v07.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);};
+$('export-records').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify({localOnly:true,verified:false,rules:SCORE_RULES,challenge:CHALLENGE_ID,records:localRecords},null,2)],{type:'application/json'}));a.download='core-descent-local-records-v08.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);};
 document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>changeTab(b.dataset.tab));$('mode-normal').onclick=()=>{mode='normal';selection=[0,0];renderBoard();};$('mode-lab').onclick=()=>{mode='lab';selection=[0,0];renderBoard();};
 $('lab-rarity').onchange=()=>{if(mode!=='lab')return;const rarity=$('lab-rarity').value;if(!rarity)return;const used=new Set(lab.board.flat());lab.inventory=lab.inventory.map(it=>used.has(it.id)?makeItem(it.id,it.digit,it.type,{rarity}):it);renderBoard();toast('実験室だけを変更しました。全装着コアを個体値100%で比較します。');};
  $('depth').onchange=()=>{const p=profile(),n=+$('depth').value;const board=blankBoard(n);for(let r=0;r<Math.min(n,p.depth);r++)board[r]=[...p.board[r]];p.depth=n;p.board=board;selection=[0,0];if(mode==='normal')persist();renderBoard();};
@@ -271,7 +281,7 @@ $('pause').onclick=togglePause;$('abandon').onclick=()=>{if(engine?.status!=='pl
 $('export-save').onclick=()=>{const blob=new Blob([JSON.stringify(normal,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='core-descent-save.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};$('import-save').onclick=()=>$('import-file').click();$('import-file').onchange=async()=>{const file=$('import-file').files[0];if(!file)return;try{if(file.size>5e6)throw Error('セーブは5MB以下にしてください');const loaded=checkProfile(JSON.parse(await file.text()));if(!confirm('通常探索のセーブを読み込んだ内容で置き換えますか？'))return;loaded.runActive=false;normal=loaded;mode='normal';persist();renderBoard();toast('セーブを読み込みました。');}catch(e){toast(e.message,true);}finally{$('import-file').value='';}};
 $('reset-market').onclick=resetMarket;$('market-list-test').onclick=()=>{try{auction.list('you','your-sample',{start:100,buyout:300,duration:600000});renderMarket();toast('サンプルコアを出品しました。出品中はアイテムをロックします。');}catch(e){toast(e.message,true);}};
 setInterval(()=>{if(tab!=='market'||!auction)return;for(const l of auction.listings.values())if(l.state==='active'&&Date.now()>=l.end)auction.settle(l.id);renderMarket();},2000);
-$('home-weapon').innerHTML=WEAPONS.map(w=>`<option value="${w.digit}">${w.digit} · ${w.name}</option>`).join('');$('home-weapon').value='0';
+$('home-weapon').innerHTML=WEAPONS.map(w=>`<option value="${w.digit}">${w.digit} · ${w.name}</option>`).join('');$('home-weapon').value='0';$('home-weapon').onchange=updateHomeWeapon;updateHomeWeapon();
 $('home-field').innerHTML=BIOMES.map((b,i)=>`<option value="${i*5+1}">${b.shortName} · ${i*5+1}〜${i*5+5}階</option>`).join('');
 $('rarity-filter').innerHTML='<option value="">すべてのレア度</option>'+RARITIES.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');window.addEventListener('resize',drawLinks);renderBoard();renderCatalog();renderFieldGuide(startLabField);resetMarket();if(saveWarning)toast(saveWarning,true);else $('save-state').textContent='ローカル保存 / 書き出しでバックアップ可能';requestAnimationFrame(animate);
 // Explicit local QA hook. Not an authoritative API and not safe for an online economy.

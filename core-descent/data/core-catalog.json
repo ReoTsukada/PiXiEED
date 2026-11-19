@@ -1,9 +1,10 @@
 {
-  "version": "0.7.0",
+  "version": "0.8.0",
   "source": "src/catalog.mjs",
   "generated": true,
   "weapons": [
     {
+      "stationarySeconds": 0,
       "digit": 0,
       "id": "sword",
       "name": "旅人の剣",
@@ -20,6 +21,7 @@
       "mechanic": "前方115°の斬撃 / 巻き込み3体"
     },
     {
+      "stationarySeconds": 0,
       "digit": 1,
       "id": "dagger",
       "name": "双牙の短剣",
@@ -38,6 +40,7 @@
       "mechanic": "高速3連撃 / 3撃目1.8倍"
     },
     {
+      "stationarySeconds": 0.18,
       "digit": 2,
       "id": "greatsword",
       "name": "巨人の大剣",
@@ -45,15 +48,16 @@
       "color": "#b4c8d5",
       "kind": "melee",
       "style": "greatsword",
-      "baseDamage": 68,
+      "baseDamage": 90,
       "baseRate": 0.72,
       "range": 87,
       "arc": 2.45,
       "cleave": 6,
-      "description": "長い間合いから広く薙ぎ払う。振りは遅いが最大6体に命中。",
-      "mechanic": "前方140°の重斬撃 / 巻き込み6体"
+      "description": "移動を止めて0.18秒構えると、高威力の重斬撃。長い間合いから最大6体を薙ぐ。攻撃後はすぐ移動できる。",
+      "mechanic": "停止0.18秒で攻撃 / 前方140°・巻き込み6体"
     },
     {
+      "stationarySeconds": 0,
       "digit": 3,
       "id": "spear",
       "name": "銀枝の槍",
@@ -71,6 +75,7 @@
       "mechanic": "長射程の直線突き / 巻き込み4体"
     },
     {
+      "stationarySeconds": 0,
       "digit": 4,
       "id": "axe",
       "name": "月輪の斧",
@@ -87,6 +92,7 @@
       "mechanic": "広い扇形斬撃 / 巻き込み5体"
     },
     {
+      "stationarySeconds": 0.28,
       "digit": 5,
       "id": "hammer",
       "name": "岩砕きの槌",
@@ -94,16 +100,17 @@
       "color": "#cfb796",
       "kind": "melee",
       "style": "hammer",
-      "baseDamage": 62,
+      "baseDamage": 88,
       "baseRate": 0.7,
       "range": 61,
       "arc": 1.8,
       "cleave": 3,
       "knockback": 24,
-      "description": "重い打撃で敵を押し戻す。最大3体に命中し、その場から24px押す。ボスは押せない。",
-      "mechanic": "重打撃とノックバック / 巻き込み3体"
+      "description": "移動を止めて0.28秒構えると、重い打撃で最大3体を24px押し戻す。ボスは押せない。攻撃後はすぐ移動できる。",
+      "mechanic": "停止0.28秒で攻撃 / 重打撃・ノックバック"
     },
     {
+      "stationarySeconds": 0,
       "digit": 6,
       "id": "bow",
       "name": "風読みの弓",
@@ -121,6 +128,7 @@
       "mechanic": "高速直線矢 / 基礎貫通1回"
     },
     {
+      "stationarySeconds": 0,
       "digit": 7,
       "id": "chakram",
       "name": "帰還の刃輪",
@@ -137,6 +145,7 @@
       "mechanic": "往復投擲 / 同じ敵へ最大2回"
     },
     {
+      "stationarySeconds": 0,
       "digit": 8,
       "id": "staff",
       "name": "星火の杖",
@@ -155,6 +164,7 @@
       "mechanic": "魔力球 / 初回命中時に周囲へ70%爆発"
     },
     {
+      "stationarySeconds": 0,
       "digit": 9,
       "id": "spellbook",
       "name": "古代の魔導書",

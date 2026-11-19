@@ -128,6 +128,15 @@ footer { padding: 18px 28px; color: #93a9ab; font-size: 12px; border-top: 1px so
 .weapon-facts { display: flex; gap: 8px 20px; flex-wrap: wrap; justify-content: flex-end; font-size: 12px; color: var(--muted); }
 .weapon-facts b { color: #ecdfb9; font-weight: 600; white-space: nowrap; }
 .hud-weapon { color: #ddd4a9; font-size: 12px; margin-top: 4px; }
+.home-weapon-condition { flex-basis: 100%; max-width: 36em; margin: 0; color: #a9c9bd; font-size: 14px; line-height: 1.7; }
+.home-weapon-condition.is-heavy { color: #edc990; }
+.weapon-title p.weapon-condition { color: #d2dcc8; font-size: 14px; max-width: 31em; }
+.hud-stance { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 23px; color: #aed8c8; font-size: 13px; }
+.hud-stance[data-mode="moving"], .hud-stance[data-mode="preparing"] { color: #f0cc92; }
+.hud-stance[data-mode="cooldown"] { color: #c4cdce; }
+.stance-meter { display: block; flex: 0 0 54px; height: 4px; overflow: hidden; background: #344647; border-radius: 3px; }
+.stance-meter>span { display: block; width: 0; height: 100%; background: currentColor; }
+.hud-stance[data-mode="ready"] .stance-meter { box-shadow: 0 0 6px #a1e4c244; }
 .home-play, .home-demo { font-size: 15px; min-height: 51px; padding: 13px 23px; border-radius: 5px; }
 .home-demo { background: #16292bd9; border-color: #4c6963; }
 .home-controls { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; font-size: 12px; color: #9bb2b0; margin-top: 16px; }
@@ -554,11 +563,11 @@ footer { padding: 18px 28px; color: #93a9ab; font-size: 12px; border-top: 1px so
   <div class="home-hero">
     <div class="home-visual"><canvas id="home-scene" aria-label="草原を探索する冒険者。多層スプライトによるゲームの展示シーン。"></canvas><div class="scene-shade"></div><span class="scene-caption">THE FIRST DESCENT</span></div>
     <div class="home-copy">
-      <div class="home-eyebrow"><span class="alpha-tag">ALPHA 0.7</span><span>FANTASY CORE RPG</span></div>
+      <div class="home-eyebrow"><span class="alpha-tag">ALPHA 0.8</span><span>FANTASY CORE RPG</span></div>
       <h1 class="home-title"><span>CORE</span><span>DESCENT<span class="title-period">.</span></span></h1>
       <p class="home-lead">数字を組む。<br>まだ見ぬ深さへ、潜る。</p>
       <p class="home-description">剣も、魔法も。コアが戦い方を変える。<br>職業はない。自分だけの組み合わせで、五つの大地へ。</p>
-      <div class="home-weapon-select"><label for="home-weapon">体験する武器</label><select id="home-weapon" aria-label="体験する武器"></select><span>9段45コアの完成ビルド</span></div><div class="home-field-select"><label for="home-field">体験する場所</label><select id="home-field" aria-label="体験するフィールド"></select><label class="boss-toggle"><input type="checkbox" id="home-field-boss">ボスのいる階から</label></div><div class="home-main-actions"><button id="home-start" class="primary home-play">探索を始める</button><button id="home-lab" class="home-demo">選んだフィールドを体験</button></div>
+      <div class="home-weapon-select"><label for="home-weapon">体験する武器</label><select id="home-weapon" aria-label="体験する武器"></select><span>9段45コアの完成ビルド</span><p id="home-weapon-condition" class="home-weapon-condition" aria-live="polite"></p></div><div class="home-field-select"><label for="home-field">体験する場所</label><select id="home-field" aria-label="体験するフィールド"></select><label class="boss-toggle"><input type="checkbox" id="home-field-boss">ボスのいる階から</label></div><div class="home-main-actions"><button id="home-start" class="primary home-play">探索を始める</button><button id="home-lab" class="home-demo">選んだフィールドを体験</button></div>
       <p class="home-demo-note">体験は貸し出し品。通常探索は1階から、所持品で出発します。</p><p class="home-controls"><span class="keycap">W</span><span class="keycap">A</span><span class="keycap">S</span><span class="keycap">D</span><span>または画面をドラッグで移動・攻撃は自動</span></p>
     </div>
     <div class="hero-bottom"><div class="hero-stat"><b>45<span>CORE SLOTS</span></b><span>最大9段の数字パズル</span></div><div class="hero-stat"><b>∞<span>DUNGEON</span></b><span>深く進むか、持ち帰るか</span></div><div class="hero-status">公開アルファ版<br><span>無料・ログイン不要で遊べます</span></div></div>
@@ -570,7 +579,7 @@ footer { padding: 18px 28px; color: #93a9ab; font-size: 12px; border-top: 1px so
 <section id="page-build" class="hidden"><div class="page-head"><div><div class="label">The core laboratory</div><h1>武器を選ぶ。コアで戦い方を組む。</h1><p>下の2つの出力 ＋ 自身の能力。すべてを頂点の武器へ。</p></div><div class="mode-group"><button id="mode-normal" class="active">通常探索</button><button id="mode-lab">ビルド実験室</button></div></div>
 <div class="panel weapon-panel"><div class="panel-top"><div class="row between"><h2>頂点の武器核</h2><span class="tag mint">0〜9 · 職業制限なし</span></div><p class="note" id="weapon-instruction"></p></div><div id="weapon-picker" class="weapon-picker" aria-label="武器核を選ぶ"></div><div id="weapon-description" class="weapon-description" aria-live="polite"></div></div><div class="layout"><div class="stack"><div class="panel"><div class="panel-top row between"><div class="row"><b>コア基盤</b><span id="slot-count" class="tag"></span></div><div class="toolbar"><label class="note" for="depth">段数</label><select id="depth" aria-label="段数"><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option></select><button id="clear-board" class="quiet tiny">全て外す</button></div></div><div id="lab-toolbar" class="panel-body hidden"><div class="row"><span class="tag gold">実験用・通常セーブとは別</span><button class="tiny" data-preset="storm">雷撃の連鎖</button><button class="tiny" data-preset="siege">重撃の一閃</button><button class="tiny" data-preset="sustain">吸収の連撃</button><button class="tiny" data-preset="amplify">9段の増幅回路 ×1.2</button><label class="note" for="lab-rarity">全装着品の比較</label><select id="lab-rarity" aria-label="実験室の一括レア度"><option value="">変更しない</option><option value="common">コモン</option><option value="uncommon">アンコモン</option><option value="rare">レア</option><option value="epic">エピック</option><option value="legendary">レジェンダリー</option></select></div></div><div class="board-area"><div id="board" class="board-tree" aria-label="数字コア基盤"></div></div><div class="board-foot"><div><div id="board-status" class="status-text" aria-live="polite"></div><small>下2数字の和の1の位 ＝ 上。同じ段で数字の重複は不可。</small><small class="scroll-hint">9段は基盤内を横にスクロールできます。</small></div><button id="launch" class="primary">探索開始</button></div><div id="stats" class="stat-grid"></div><div id="effects" class="summary-list"></div><div class="panel-body note">攻略階層と180秒ボスへの総ダメージを記録。「記録」から、今のビルドを試せます。</div></div><div class="notice" id="mode-note"></div><div class="panel"><div class="panel-body"><div class="row between"><h3>編成プリセット</h3><button id="save-preset" class="tiny">現在の配置を保存</button></div><div id="presets" class="saved-list" style="margin-top:10px"></div></div></div><div class="tools-footer"><button id="export-save" class="tiny quiet">セーブを書き出す</button><button id="import-save" class="tiny quiet">セーブを読み込む</button><input type="file" id="import-file" accept="application/json,.json" hidden><span id="save-state" class="note"></span></div></div>
 <aside class="stack core-inspector" style="align-content:start" aria-label="選択したコアと交換候補"><div class="panel"><div class="panel-top"><span class="label">選択したコア</span><div id="selected"></div></div><div class="panel-body"><div class="row between"><h3>交換するコア</h3><button id="remove-core" class="tiny quiet">外す</button></div><input id="search" placeholder="数字・能力・レア度で検索" aria-label="コアを検索" style="margin-top:12px"><select id="rarity-filter" aria-label="レア度で絞り込み" style="margin-top:9px;width:100%"></select><label class="note row" style="margin-top:9px"><input type="checkbox" id="fit-only" checked style="width:auto;min-height:auto">数字条件に合う候補だけ</label><div id="candidates" class="candidate-list"></div><p class="note" style="margin-top:12px">基盤の枠を選び、ここでコアを交換します。赤い枠は数字条件が未成立です。</p></div></div><div class="panel"><div class="panel-body"><h3>同じコアでも、場所で変わる。</h3><p class="note" style="margin-top:7px">枠の「×」は頂点への伝達経路数。9段中央は×70、端は×1。良い効果も悪い効果も重なります。</p><p class="note" style="margin-top:8px">同じ現物の二重装着は不可。同じ数字でも別個体なら別の段に装着できます。</p></div></div></aside></div></section>
-<section id="page-game" class="hidden"><div class="page-head"><div><div class="label">Into the descent</div><h1 id="game-title">生き残って、持ち帰る。</h1><p id="game-description">移動だけ操作。照準・攻撃は自動です。緑の帰還陣で回収を確定、金の階段で次の階層へ。</p></div><span id="game-mode" class="tag"></span></div><div class="game-wrap"><canvas id="game-canvas" aria-label="自動攻撃ダンジョン。矢印キー・WASD、または画面をドラッグして移動。"></canvas><div class="hud"><div class="hud-card"><div class="row between"><b id="hud-floor">FLOOR 01</b><span id="hud-level">Lv.1</span></div><div class="hp-outer"><div id="hp-bar" class="hp-inner"></div></div><span id="hud-hp"></span><div id="hud-biome" class="hud-biome"></div><div id="hud-weapon" class="hud-weapon"></div><div id="hud-gates" class="gate-hint"></div></div><div class="hud-card right"><div id="hud-loot">未確保コア 0</div><div id="hud-cargo">素材 0 · 装備 0</div><div id="hud-gold">0 G</div><small id="hud-kills"></small></div></div><div class="hud-actions"><button id="pause" class="tiny">一時停止</button><button id="abandon" class="tiny danger">探索終了</button></div><div class="supply-actions" aria-label="携行アイテム"><button id="use-heal" aria-label="回復薬を使う" class="tiny"><span>回復薬 <kbd>Q</kbd></span><b id="heal-count">0</b></button><button id="use-ward" aria-label="結界の巻物を使う" class="tiny"><span>結界 <kbd>E</kbd></span><b id="ward-count">0</b></button></div><div class="game-help">移動：WASD・矢印キー・画面ドラッグ</div><div id="game-overlay" class="overlay hidden"></div></div><p id="game-footnote" class="note" style="margin-top:10px">20秒生存＋規定数撃破で開通。5階ごとにボスの討伐も必要です。探索中は編成固定。中断・再読み込みは戦利品未確保のまま終了します。</p></section>
+<section id="page-game" class="hidden"><div class="page-head"><div><div class="label">Into the descent</div><h1 id="game-title">生き残って、持ち帰る。</h1><p id="game-description">移動だけ操作。照準・攻撃は自動です。緑の帰還陣で回収を確定、金の階段で次の階層へ。</p></div><span id="game-mode" class="tag"></span></div><div class="game-wrap"><canvas id="game-canvas" aria-label="自動攻撃ダンジョン。矢印キー・WASD、または画面をドラッグして移動。"></canvas><div class="hud"><div class="hud-card"><div class="row between"><b id="hud-floor">FLOOR 01</b><span id="hud-level">Lv.1</span></div><div class="hp-outer"><div id="hp-bar" class="hp-inner"></div></div><span id="hud-hp"></span><div id="hud-biome" class="hud-biome"></div><div id="hud-weapon" class="hud-weapon"></div><div id="hud-stance" class="hud-stance" aria-label="攻撃状態"><span id="stance-text">移動しながら攻撃</span><span id="stance-meter" class="stance-meter hidden" aria-hidden="true"><span id="stance-fill"></span></span></div><div id="hud-gates" class="gate-hint"></div></div><div class="hud-card right"><div id="hud-loot">未確保コア 0</div><div id="hud-cargo">素材 0 · 装備 0</div><div id="hud-gold">0 G</div><small id="hud-kills"></small></div></div><div class="hud-actions"><button id="pause" class="tiny">一時停止</button><button id="abandon" class="tiny danger">探索終了</button></div><div class="supply-actions" aria-label="携行アイテム"><button id="use-heal" aria-label="回復薬を使う" class="tiny"><span>回復薬 <kbd>Q</kbd></span><b id="heal-count">0</b></button><button id="use-ward" aria-label="結界の巻物を使う" class="tiny"><span>結界 <kbd>E</kbd></span><b id="ward-count">0</b></button></div><div class="game-help">移動：WASD・矢印キー・画面ドラッグ</div><div id="game-overlay" class="overlay hidden"></div></div><p id="game-footnote" class="note" style="margin-top:10px">20秒生存＋規定数撃破で開通。5階ごとにボスの討伐も必要です。探索中は編成固定。中断・再読み込みは戦利品未確保のまま終了します。</p></section>
 <section id="page-inventory" class="hidden" aria-label="持ち物と工房">
 <div class="page-head"><div><div class="label">Camp inventory</div><h1>持ち帰った力を、次の冒険へ。</h1><p>武器は頂点のコアで選び、防具・護符・靴で補強。職業や武器種による装備制限はありません。</p></div><div class="mode-group"><button id="inventory-normal">所持品</button><button id="inventory-lab">実験用サンプル</button></div></div>
 <div id="pending-return" class="notice hidden"><b>一時保管している帰還品があります</b><p>前回の帰還品をまだ所持品へ確定できていません。書き出すと所持品と今回の戦利品を一緒に保存できます。</p><div class="row"><button id="retry-return" class="tiny">保存を再試行</button><button id="export-recovery" class="tiny">復旧用データを書き出す</button></div></div><div class="notice inventory-banner"><b id="inventory-mode"></b><span id="inventory-wallet"></span><p>拾ったコア・お金・素材・装備は、帰還陣で持ち帰ると確保できます。使った回復薬や巻物は消費されます。</p></div>
@@ -580,7 +589,7 @@ footer { padding: 18px 28px; color: #93a9ab; font-size: 12px; border-top: 1px so
 </section>
 <section id="page-rankings" class="hidden">
 <div class="page-head"><div><div class="label">Beyond your best</div><h1>戦う相手は、昨日のビルド。</h1><p>攻略階層と総ダメージ。二つの記録で、コアの組み合わせを磨く。</p></div><button id="ranking-build" class="tiny">編成を変更</button></div>
-<div class="notice ranking-notice"><b>このブラウザーの自己記録</b><p>オンラインランキングは準備中です。実験室と所持コアの記録は分けて保存します。フィールド・装備ルール0.7.0。以前の記録は旧ルールとして保持します。</p><small id="ranking-loadout"></small></div>
+<div class="notice ranking-notice"><b>このブラウザーの自己記録</b><p>オンラインランキングは準備中です。実験室と所持コアの記録は分けて保存します。武器・構えルール0.8.0。以前の記録は旧ルールとして保持します。</p><small id="ranking-loadout"></small></div>
 <div class="challenge-grid">
 <article class="panel challenge-card"><div class="label">DEEP EXPEDITION</div><h2>深層チャレンジ</h2><div class="score-number" id="best-depth">未挑戦</div><small>自己最高・攻略済み階層</small><p>1階から、同じ生成マップへ。20秒生存＋規定数撃破、5階ごとのボス討伐で階層を確定。次の階に入るだけでは更新しません。</p><div class="challenge-tags"><span class="tag mint">所持コアをそのまま使用</span><span class="tag">死亡でも記録は残る</span></div><button class="primary" id="start-depth">階層チャレンジ</button></article>
 <article class="panel challenge-card boss-card"><div class="label">INFINITE GUARDIAN</div><h2>無限ボス・180秒</h2><div class="score-number" id="best-boss">未挑戦</div><small>自己最高・ボスへの総ダメージ</small><p>倒れないボスへ、実際に当てた攻撃を合算。武器の射程で戦い、衝撃波を避ける。最後の60秒は瀕死判定です。</p><div class="challenge-tags"><span class="tag gold">レベル1固定</span><span class="tag">レア度・個体値を維持</span></div><button class="primary" id="start-boss">無限ボスに挑む</button></article>
@@ -594,7 +603,7 @@ footer { padding: 18px 28px; color: #93a9ab; font-size: 12px; border-top: 1px so
 </section>
 <section id="page-catalog" class="hidden"><div class="page-head"><div><div class="label">World &amp; core catalogue</div><h1>狙う相手を知る。次の力を探す。</h1><p>五つの大地に、違う敵と固有の戦利品。5階ごとにボスが待ち、25階で一巡します。各階の3体目は一般コアを1個保証。</p></div></div><div id="field-guide" class="field-guide"></div><div class="page-head core-catalog-head"><div><div class="label">Universal core abilities</div><h2 id="core-count-heading">すべての武器に、すべてのコアを。</h2><p>数字と能力は独立。ドロップ時に数字0〜9・レア度・個体値が決まり、入手後は固定です。</p></div></div><div id="rarity-guide" class="rarity-guide"></div><p class="note" style="margin-bottom:18px">高レアほどプラス効果は強く、代償は小さくなります。接続増幅はプラス・マイナス両方に掛かります。数値は調整用の仮設定。</p><div id="catalog-grid" class="catalog-grid"></div></section>
 <section id="page-market" class="hidden"><div class="page-head"><div><div class="label">Auction sandbox</div><h1>足りない一個を、探す。</h1><p>入札・即決・所有権移転のローカル動作テストです。実プレイヤーとの取引ではありません。</p></div><button id="reset-market" class="tiny">テスト市場を初期化</button></div><div class="notice market-banner"><div class="row between"><b>オンライン未接続 / 探索の資産とは完全に別</b><span id="market-wallet"></span></div><p>仮通貨5,000Gでテストできます。出品品はNPCのサンプル。手数料は5%の仮設定です。</p></div><div id="market-grid" class="market-grid"></div><div class="tools-footer"><button id="market-list-test" class="tiny">自分のサンプルコアを出品する</button><span id="market-owned" class="note"></span></div></section>
-</main><footer><span>CORE DESCENT <span class="footer-version">ALPHA 0.7.0</span> / PiXiEED</span><span>所持品・自己記録はこのブラウザーに保存されます。</span></footer><div id="toast" class="toast hidden" role="status"></div>
+</main><footer><span>CORE DESCENT <span class="footer-version">ALPHA 0.8.0</span> / PiXiEED</span><span>所持品・自己記録はこのブラウザーに保存されます。</span></footer><div id="toast" class="toast hidden" role="status"></div>
 <noscript><p class="noscript-message">このゲームを遊ぶにはJavaScriptを有効にしてください。</p></noscript><script>(()=>{
 "use strict";
 const __modules=Object.create(null);
@@ -607,15 +616,15 @@ __modules["weapons"]=(()=>{
 const WEAPONS = [
  {digit:0,id:'sword',name:'旅人の剣',glyph:'⚔',color:'#bfddbd',kind:'melee',style:'sword',baseDamage:27,baseRate:1.6,range:64,arc:2.0,cleave:3,description:'前方を薙ぐ、扱いやすい剣。1振りで最大3体に命中。',mechanic:'前方115°の斬撃 / 巻き込み3体'},
  {digit:1,id:'dagger',name:'双牙の短剣',glyph:'†',color:'#eee0ae',kind:'melee',style:'dagger',baseDamage:11,baseRate:3.6,range:43,arc:1.1,cleave:1,combo:3,comboDamage:1.8,description:'近距離を素早く刺す。3撃目の威力は1.8倍。連撃は2秒で途切れる。',mechanic:'高速3連撃 / 3撃目1.8倍'},
- {digit:2,id:'greatsword',name:'巨人の大剣',glyph:'╋',color:'#b4c8d5',kind:'melee',style:'greatsword',baseDamage:68,baseRate:.72,range:87,arc:2.45,cleave:6,description:'長い間合いから広く薙ぎ払う。振りは遅いが最大6体に命中。',mechanic:'前方140°の重斬撃 / 巻き込み6体'},
+ {digit:2,id:'greatsword',name:'巨人の大剣',glyph:'╋',color:'#b4c8d5',kind:'melee',style:'greatsword',baseDamage:90,baseRate:.72,range:87,arc:2.45,cleave:6,stationarySeconds:.18,description:'移動を止めて0.18秒構えると、高威力の重斬撃。長い間合いから最大6体を薙ぐ。攻撃後はすぐ移動できる。',mechanic:'停止0.18秒で攻撃 / 前方140°・巻き込み6体'},
  {digit:3,id:'spear',name:'銀枝の槍',glyph:'↑',color:'#c4dfb2',kind:'melee',style:'spear',baseDamage:33,baseRate:1.45,range:116,arc:.3,width:12,cleave:4,description:'細長い直線上を貫く突き。離れた敵にも届き、最大4体に命中。',mechanic:'長射程の直線突き / 巻き込み4体'},
  {digit:4,id:'axe',name:'月輪の斧',glyph:'☽',color:'#f0b17e',kind:'melee',style:'axe',baseDamage:43,baseRate:1.05,range:68,arc:3.7,cleave:5,description:'左右を巻き込む広い斧の一振り。前方212°、最大5体に命中。',mechanic:'広い扇形斬撃 / 巻き込み5体'},
- {digit:5,id:'hammer',name:'岩砕きの槌',glyph:'▣',color:'#cfb796',kind:'melee',style:'hammer',baseDamage:62,baseRate:.7,range:61,arc:1.8,cleave:3,knockback:24,description:'重い打撃で敵を押し戻す。最大3体に命中し、その場から24px押す。ボスは押せない。',mechanic:'重打撃とノックバック / 巻き込み3体'},
+ {digit:5,id:'hammer',name:'岩砕きの槌',glyph:'▣',color:'#cfb796',kind:'melee',style:'hammer',baseDamage:88,baseRate:.7,range:61,arc:1.8,cleave:3,knockback:24,stationarySeconds:.28,description:'移動を止めて0.28秒構えると、重い打撃で最大3体を24px押し戻す。ボスは押せない。攻撃後はすぐ移動できる。',mechanic:'停止0.28秒で攻撃 / 重打撃・ノックバック'},
  {digit:6,id:'bow',name:'風読みの弓',glyph:')',color:'#d7c58e',kind:'projectile',style:'arrow',baseDamage:12,baseRate:3,range:460,projectileSpeed:560,projectileRadius:3,innatePierce:1,description:'速く長い射程の矢。素の状態で1体を貫通し、2体目まで届く。',mechanic:'高速直線矢 / 基礎貫通1回'},
  {digit:7,id:'chakram',name:'帰還の刃輪',glyph:'◌',color:'#e7bc83',kind:'projectile',style:'chakram',baseDamage:24,baseRate:1.1,range:220,projectileSpeed:310,projectileRadius:8,description:'敵を抜け、射程の端で戻る刃。往路と復路にそれぞれ1回ずつ同じ敵へ命中できる。壁で帰還を始める。',mechanic:'往復投擲 / 同じ敵へ最大2回'},
  {digit:8,id:'staff',name:'星火の杖',glyph:'✦',color:'#87cfdf',kind:'projectile',style:'orb',baseDamage:25,baseRate:1.35,range:350,projectileSpeed:245,projectileRadius:7,burstRadius:55,burstDamage:.7,description:'ゆっくり飛ぶ魔力球。最初の命中時、周囲の別の敵へ70%威力の魔力爆発。',mechanic:'魔力球 / 初回命中時に周囲へ70%爆発'},
  {digit:9,id:'spellbook',name:'古代の魔導書',glyph:'▤',color:'#c4a7ed',kind:'projectile',style:'rune',baseDamage:12,baseRate:1.1,range:300,projectileSpeed:300,projectileRadius:4,burst:3,burstGap:.1,innateHoming:1.2,description:'0.1秒間隔で3つの魔弾を放つ。魔弾は毎秒1.2ラジアンの速度で敵を追う。',mechanic:'3連魔弾 / 基礎追尾あり'}
-].map(weapon=>Object.freeze(weapon));
+].map(weapon=>Object.freeze({stationarySeconds:0,...weapon}));
 function weaponForDigit(digit) {
  if(!Number.isInteger(digit)||digit<0||digit>9)throw Error('武器の数字は0〜9');
  return WEAPONS[digit];
@@ -1339,8 +1348,8 @@ return {createExploration,lineOfSight,updateExploration,isVisible,isExplored};
 // module: combat-math
 __modules["combat-math"]=(()=>{
 const {compileBoard,makeItem}=__modules["core"];
-/** These helpers describe the v0.7 weapon model; the named PvP helpers remain archival. They do NOT implement networked PvP. */
-const BALANCE_VERSION='0.7.0-candidate';
+/** These helpers describe the v0.8 weapon model; the named PvP helpers remain archival. They do NOT implement networked PvP. */
+const BALANCE_VERSION='0.8.0-candidate';
 function floorStats(floor){
  if(!Number.isSafeInteger(floor)||floor<1)throw Error('階層は1以上の整数');
  const hp=20*Math.pow(1+.16*(floor-1),1.65),contact=7+2.5*Math.pow(floor-1,.65);
@@ -1352,7 +1361,8 @@ function expectedDirect(spec,{hitsPerVolley=spec.innateHits||1,stationary=false,
  const condition=(stationary?1+spec.steady:1)*(1+spec.longshot*Math.min(1,distance/(pvp?350:(spec.range||500))))*(execute?1+spec.execute:1);
  const noncritHit=spec.damage*(pvp?1:1+.1*(level-1))*condition;
  const critFactor=1+spec.crit*(spec.critMultiplier-1),comboFactor=pvp?1:(spec.comboMultiplier||1);
- return {noncritHit,critHit:noncritHit*spec.critMultiplier,averageHit:noncritHit*critFactor*comboFactor,comboFactor,innateHits:pvp?1:(spec.innateHits||1),dps:noncritHit*critFactor*comboFactor*spec.rate*hitsPerVolley};
+ const stationarySeconds=pvp?0:spec.weapon?.stationarySeconds||0,canAttack=stationarySeconds===0||stationary;
+ return {noncritHit,critHit:noncritHit*spec.critMultiplier,averageHit:noncritHit*critFactor*comboFactor,comboFactor,innateHits:pvp?1:(spec.innateHits||1),stationarySeconds,canAttack,dps:canAttack?noncritHit*critFactor*comboFactor*spec.rate*hitsPerVolley:0};
 }
 /** Loan copies: same digits/types/layout; no ownership, rarity, rolls, legacy quality advantage. */
 function compileStandardPvp(board,inventory){
@@ -1396,6 +1406,7 @@ const {rollEnemyDrops}=__modules["loot"];
 const {CONSUMABLE_BY_ID}=__modules["items"];
 function angleDistance(a,b){return Math.abs(Math.atan2(Math.sin(a-b),Math.cos(a-b)));}
 function pointSegmentDistance(x,y,ax,ay,bx,by){const dx=bx-ax,dy=by-ay,l=dx*dx+dy*dy;const t=l?Math.max(0,Math.min(1,((x-ax)*dx+(y-ay)*dy)/l)):0;return Math.hypot(x-ax-t*dx,y-ay-t*dy);}
+const MOVEMENT_DEADZONE=.05;
 /** Pure simulation. No DOM, no storage, no networking. 60Hz caller recommended. */
 class GameEngine {
  constructor(spec,{seed=Date.now()>>>0,onEvent=()=>{},startFloor=1,runId=`run-${seed}`,cargoCapacity={cores:Infinity,equipment:Infinity}}={}){
@@ -1405,11 +1416,11 @@ class GameEngine {
   if(Object.values(this.cargoCapacity).some(value=>value!==Infinity&&(!Number.isSafeInteger(value)||value<0)))throw Error('戦利品上限は0以上の整数が必要');
   this.fullCargoNotified=new Set();
   this.spec=structuredClone(spec);this.spec.weapon??={...weaponForDigit(6)};this.spec.range??=this.spec.weapon.range;this.seed=seed;this.runId=runId;this.rng=makeRng(seed);this.onEvent=onEvent;
-  this.player={x:0,y:0,hp:spec.maxHp,invuln:0,still:0,facing:0,attackTime:0,weaponId:this.spec.weapon.id,ward:null,slowTime:0,slowStrength:0};this.itemCooldown=0;this.hazardCooldown=0;this.combo=0;this.lastAttackAt=-10;this.pendingBursts=[];this.loot=[];this.cargo={materials:{},equipment:[],consumables:{}};this.gold=0;this.totalKills=0;this.totalTime=0;this.totalDamage=0;this.damageBySource={direct:0,blast:0,chain:0,poison:0};this.damageEvents=0;this.pendingLeech=0;
+  this.player={x:0,y:0,hp:spec.maxHp,invuln:0,still:0,moving:false,facing:0,attackTime:0,weaponId:this.spec.weapon.id,ward:null,slowTime:0,slowStrength:0};this.itemCooldown=0;this.hazardCooldown=0;this.combo=0;this.lastAttackAt=-10;this.pendingBursts=[];this.loot=[];this.cargo={materials:{},equipment:[],consumables:{}};this.gold=0;this.totalKills=0;this.totalTime=0;this.totalDamage=0;this.damageBySource={direct:0,blast:0,chain:0,poison:0};this.damageEvents=0;this.pendingLeech=0;
   this.clearedFloor=0;this.clearTime=0;this.level=1;this.shotCredit=0;this.bonusCredit=0;this.shotTimer=0;this.id=0;this.status='playing';this.logs=[];this.nextFloor(startFloor);
  }
  nextFloor(n=this.floor+1){
-  this.floor=n;this.map=makeMap(this.seed,n);Object.assign(this.player,{x:this.map.spawn.x,y:this.map.spawn.y});this.exploration=createExploration(this.map);this.updateSight();this.pendingBursts=[];this.combo=0;
+  this.floor=n;this.map=makeMap(this.seed,n);Object.assign(this.player,{x:this.map.spawn.x,y:this.map.spawn.y,still:0,moving:false,attackTime:0});this.exploration=createExploration(this.map);this.updateSight();this.pendingBursts=[];this.combo=0;
   this.enemies=[];this.bullets=[];this.hostileBullets=[];this.telegraphs=[];this.pickups=[];this.fx=[];this.floorTime=0;this.floorKills=0;this.spawnTimer=0.5;this.flowTimer=0;this.gates=false;this.hazardCooldown=0;
   this.biome=biomeForFloor(n);this.floorBoss=null;this.bossDefeated=n%5!==0;
   if(!this.bossDefeated){
@@ -1462,7 +1473,21 @@ class GameEngine {
   const b={id:this.id++,x,y,px:x,py:y,originX:x,originY:y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,speed,damage,gen,noHeal,didSplit:false,life:range/speed*(style==='chakram'?3:1)+.3,pierce:this.sampleCount(this.spec.pierce)+(fragment?0:w.innatePierce||0),bounce:this.sampleCount(this.spec.bounce),hit:new Set(hitIds),distance:0,phaseDistance:0,maxDistance:range,kind:style,weaponId:w.id,radius:fragment?3:w.projectileRadius||3,z:15,color:w.color,returning:false,angle,hasBurst:false};
   this.bullets.push(b);return b;
  }
+ isWeaponPrepared(){
+  const required=this.spec.weapon.stationarySeconds||0;
+  return required<=0||(!this.player.moving&&this.player.still+1e-9>=required);
+ }
+ /** Read-only HUD state. Preparation is independent of the ordinary attack cooldown. */
+ weaponAttackState(){
+  const required=this.spec.weapon.stationarySeconds||0;
+  if(required<=0)return {mode:'mobile',progress:1,remaining:0};
+  if(this.player.moving)return {mode:'moving',progress:0,remaining:required};
+  if(!this.isWeaponPrepared())return {mode:'preparing',progress:Math.max(0,Math.min(1,this.player.still/required)),remaining:Math.max(0,required-this.player.still)};
+  if(this.shotTimer>1e-9)return {mode:'cooldown',progress:Math.max(0,Math.min(1,1-this.shotTimer*this.spec.rate)),remaining:this.shotTimer};
+  return {mode:'ready',progress:1,remaining:0};
+ }
  volley(bonus=false){
+  if(!this.isWeaponPrepared())return false;
   const p=this.player,w=this.spec.weapon,t=this.target(p.x,p.y,new Set(),this.spec.range+(w.kind==='melee'?36:0));if(!t)return false;
   // A large target can be struck at its edge; do not swing at a small enemy beyond reach.
   if(w.kind==='melee'&&Math.hypot(t.x-p.x,t.y-p.y)-(t.r||10)>this.spec.range)return false;
@@ -1477,10 +1502,12 @@ class GameEngine {
   return true;
  }
  projectileVolley(angle,count,noHeal){
+  if(!this.isWeaponPrepared())return false;
   const p=this.player;
   for(let i=0;i<count;i++)this.bullet(p.x,p.y,angle+(i-(count-1)/2)*Math.min(.13,1.7/Math.max(1,count)),{noHeal});
  }
  meleeAttack(angle,noHeal=false){
+  if(!this.isWeaponPrepared())return false;
   const p=this.player,s=this.spec,w=s.weapon;
   if(this.totalTime-this.lastAttackAt>2)this.combo=0;this.lastAttackAt=this.totalTime;this.combo++;
   const comboHit=w.combo&&this.combo%w.combo===0,damage=s.damage*(comboHit?w.comboDamage:1);
@@ -1678,11 +1705,19 @@ class GameEngine {
   if(p.hp<=0){p.hp=0;this.status='dead';this.onEvent({type:'dead'});return;}
   this.totalTime+=dt;this.floorTime+=dt;p.invuln=Math.max(0,p.invuln-dt);p.attackTime=Math.max(0,p.attackTime-dt);this.itemCooldown=Math.max(0,this.itemCooldown-dt);p.slowTime=Math.max(0,p.slowTime-dt);if(!p.slowTime)p.slowStrength=0;
   if(p.ward){p.ward.remaining-=dt;if(p.ward.remaining<=0)p.ward=null;}
-  const len=Math.hypot(input.x,input.y);p.still=len>.05?0:p.still+dt;const move=s.move*this.terrainSlow();
-  if(len>.01)this.moveBody(p,input.x/Math.max(1,len)*move,input.y/Math.max(1,len)*move,dt,9);this.updateSight();this.settleLeech(dt);this.heal(s.regen*dt);this.updateHazards(dt);
+  const wasPrepared=this.isWeaponPrepared(),len=Math.hypot(input.x,input.y);p.moving=len>MOVEMENT_DEADZONE;p.still=p.moving?0:p.still+dt;const move=s.move*this.terrainSlow();
+  if(p.moving)this.moveBody(p,input.x/Math.max(1,len)*move,input.y/Math.max(1,len)*move,dt,9);this.updateSight();this.settleLeech(dt);this.heal(s.regen*dt);this.updateHazards(dt);
   this.flowTimer-=dt;if(this.flowTimer<=0){this.flow=distanceGrid(m,Math.floor(p.x/m.tile),Math.floor(p.y/m.tile));this.flowTimer=.3;}
   this.spawnTimer-=dt;if(this.spawnTimer<=0){this.spawn();this.spawnTimer=Math.max(.15,.85-this.floor*.035);}
-  this.shotTimer-=dt;while(this.shotTimer<=0){this.volley();this.shotTimer+=1/s.rate;}
+  this.shotTimer-=dt;
+  // Cooldown keeps running during movement, but missed attacks are never banked.
+  // The first prepared tick can release one ready attack; later ticks retain fractional time for fast builds.
+  if(!(s.weapon.stationarySeconds>0)){while(this.shotTimer<=0){this.volley();this.shotTimer+=1/s.rate;}}
+  else if(!this.isWeaponPrepared())this.shotTimer=Math.max(0,this.shotTimer);
+  else{
+   if(!wasPrepared)this.shotTimer=Math.max(0,this.shotTimer);
+   while(this.shotTimer<=0){if(!this.volley()){this.shotTimer=0;break;}this.shotTimer+=1/s.rate;}
+  }
   if(this.bonusCredit>=1&&this.volley(true))this.bonusCredit-=1;
   const due=this.pendingBursts.filter(b=>b.at<=this.totalTime);this.pendingBursts=this.pendingBursts.filter(b=>b.at>this.totalTime);
   for(const burst of due){const target=this.target(p.x,p.y);if(target){p.facing=Math.atan2(target.y-p.y,target.x-p.x);p.attackTime=.12;this.projectileVolley(p.facing,burst.count,burst.noHeal);}}
@@ -1700,14 +1735,14 @@ class GameEngine {
  }
 }
 
-return {angleDistance,pointSegmentDistance,GameEngine};
+return {angleDistance,pointSegmentDistance,MOVEMENT_DEADZONE,GameEngine};
 })();
 
 // module: rankings
 __modules["rankings"]=(()=>{
 /** Local record model. NOT an authenticated online leaderboard. */
-const SCORE_RULES='0.7.0';
-const CHALLENGE_ID='fantasy-worlds-01';
+const SCORE_RULES='0.8.0';
+const CHALLENGE_ID='fantasy-stance-01';
 const CHALLENGE_SEED=20261119;
 const BOSS_SECONDS=180;
 const SCORE_SOURCES=['normal','lab'];
@@ -2314,6 +2349,41 @@ function compareDepth(a, b) { return a.depth - b.depth || a.order - b.order; }
 function explorationLevel(map, state, x, y) {
   return isVisible(map,state,x,y) ? 2 : isExplored(map,state,x,y) ? 1 : 0;
 }
+/** Visual-only light field. Distance feathering stays inside observed geometry. */
+const FOG_MEMORY_LIGHT = .32;
+const smoothLight = value => { const t=clamp(value,0,1);return t*t*(3-2*t); };
+function makeFogLightField(levels,width,height,{samples=4,revealAll=false}={}) {
+  const w=width*samples,h=height*samples,stride=w+2;
+  const distanceTo=(threshold)=>{
+    const distance=new Float32Array((w+2)*(h+2));
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++)
+      if(levels[Math.floor(y/samples)*width+Math.floor(x/samples)]>=threshold)distance[(y+1)*stride+x+1]=1e6;
+    const diagonal=Math.SQRT2;
+    for(let y=1;y<=h;y++)for(let x=1;x<=w;x++){
+      const i=y*stride+x;distance[i]=Math.min(distance[i],distance[i-1]+1,distance[i-stride]+1,distance[i-stride-1]+diagonal,distance[i-stride+1]+diagonal);
+    }
+    for(let y=h;y>=1;y--)for(let x=w;x>=1;x--){
+      const i=y*stride+x;distance[i]=Math.min(distance[i],distance[i+1]+1,distance[i+stride]+1,distance[i+stride-1]+diagonal,distance[i+stride+1]+diagonal);
+    }
+    return distance;
+  };
+  const values=new Float32Array(w*h);
+  if(revealAll){values.fill(1);return {width:w,height:h,samples,values};}
+  const known=distanceTo(1),visible=distanceTo(2);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const i=(y+1)*stride+x+1;
+    const edge=smoothLight((known[i]-.5)/(samples*1.05));
+    const lit=smoothLight((visible[i]-.5)/(samples*1.25));
+    values[y*w+x]=edge*(FOG_MEMORY_LIGHT+(1-FOG_MEMORY_LIGHT)*lit);
+  }
+  return {width:w,height:h,samples,values};
+}
+function sampleFogLight(field,tileX,tileY) {
+  if(!field||!Number.isFinite(tileX)||!Number.isFinite(tileY))return 0;
+  const px=tileX*field.samples-.5,py=tileY*field.samples-.5,x=Math.floor(px),y=Math.floor(py),fx=px-x,fy=py-y;
+  const at=(xx,yy)=>xx<0||yy<0||xx>=field.width||yy>=field.height?0:field.values[yy*field.width+xx];
+  return (at(x,y)*(1-fx)+at(x+1,y)*fx)*(1-fy)+(at(x,y+1)*(1-fx)+at(x+1,y+1)*fx)*fy;
+}
 function resolveWeaponDigit(weapon) {
   if(Number.isInteger(weapon?.digit))return clamp(weapon.digit,0,9);
   if(Number.isInteger(weapon))return clamp(weapon,0,9);
@@ -2423,7 +2493,7 @@ class DungeonRenderer {
     for(let y=0;y<m.h;y++)for(let x=0;x<m.w;x++){
       const level=this.knowledge((x+.5)*m.tile,(y+.5)*m.tile);levels[y*m.w+x]=level;
       if(!level)continue;
-      ctx.globalAlpha=level===2?1:.26;
+      ctx.globalAlpha=1;
       ctx.drawImage(scene.floor,x*m.tile,y*tileH,m.tile,tileH,x*m.tile,y*tileH,m.tile,tileH);
     }
     ctx.globalAlpha=1;
@@ -2436,21 +2506,33 @@ class DungeonRenderer {
         if(!lit&&start>=0){bands.push([start*m.tile,y*tileH,(x-start)*m.tile,tileH]);start=-1;}
       }
     }
-    // Gradients stay INSIDE a known lit tile: black unexplored cells stay opaque.
-    for(let y=0;y<m.h;y++)for(let x=0;x<m.w;x++){
-      if(levels[y*m.w+x]!==2)continue;
-      const px=x*m.tile,py=y*tileH,feather=7;
-      for(const [dx,dy] of [[-1,0],[1,0],[0,-1],[0,1]]){
-        if(levels[(y+dy)*m.w+x+dx]===2&&x+dx>=0&&x+dx<m.w&&y+dy>=0&&y+dy<m.h)continue;
-        let gradient;
-        if(dx){const edge=dx<0?px:px+m.tile;gradient=ctx.createLinearGradient(edge,py,edge-dx*feather,py);}
-        else {const edge=dy<0?py:py+tileH;gradient=ctx.createLinearGradient(px,edge,px,edge-dy*feather);}
-        gradient.addColorStop(0,'#071311b3');gradient.addColorStop(1,'#07131100');ctx.fillStyle=gradient;
-        if(dx)ctx.fillRect(dx<0?px:px+m.tile-feather,py,feather,tileH);
-        else ctx.fillRect(px,dy<0?py:py+tileH-feather,m.tile,feather);
-      }
+    // Only the lighting mask is interpolated. Floor tiles and all sprites stay crisp.
+    // The floor above contains known cells only, so interpolation cannot reveal a hidden room.
+    const light=makeFogLightField(levels,m.w,m.h,{revealAll:!!state?.revealAll});
+    const mask=scene.lightMask ||= createRenderSurface(light.width,light.height);
+    const maskCtx=mask.getContext('2d'),pixels=maskCtx.createImageData(light.width,light.height);
+    for(let i=0;i<light.values.length;i++){
+      pixels.data[i*4]=7;pixels.data[i*4+1]=19;pixels.data[i*4+2]=17;pixels.data[i*4+3]=Math.round((1-light.values[i])*255);
     }
+    maskCtx.putImageData(pixels,0,0);
+    ctx.imageSmoothingEnabled=true;ctx.drawImage(mask,0,0,observed.width,observed.height);ctx.imageSmoothingEnabled=false;
+    scene.lightField=light;
     scene.exploration=state;scene.revision=revision;scene.levels=levels;scene.visibleBands=bands;return observed;
+  }
+  lightAt(x,y) {
+    const m=this.currentEngine?.map;
+    return m ? sampleFogLight(this.scene?.lightField,x/m.tile,y/m.tile) : 0;
+  }
+  drawSightFalloff(engine) {
+    if(engine.exploration?.revealAll)return;
+    const ctx=this.ctx,m=engine.map,p=engine.player,radius=Math.max(m.tile,(engine.exploration?.radius??engine.spec?.vision??8)*m.tile);
+    // A continuous world-space origin avoids light jumping when crossing a tile boundary.
+    // Project the circular ground light into the same ellipse as the ground plane.
+    ctx.save();ctx.scale(1,Y_SCALE);
+    const gradient=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,radius);
+    for(const [at,alpha] of [[0,0],[.18,0],[.42,.10],[.67,.32],[.85,.52],[1,.64]])
+      gradient.addColorStop(at,`rgba(7,19,17,${alpha})`);
+    ctx.fillStyle=gradient;ctx.globalAlpha=1;ctx.fillRect(-m.width,-m.height,m.width*3,m.height*3);ctx.restore();
   }
   clipVisible(zOffset=0) {
     const ctx=this.ctx;ctx.beginPath();
@@ -2554,6 +2636,7 @@ class DungeonRenderer {
       ctx.strokeStyle = '#a1e4cd99'; ctx.lineWidth = .8;
       ctx.beginPath(); ctx.ellipse(p.x, p.y * Y_SCALE, 10, 6, 0, 0, TAU); ctx.stroke();
     }
+    this.drawSightFalloff(engine);
     ctx.restore();
     this.drawVignette(width, height, low);
     if (showMinimap) this.drawMinimap(engine, width, height);
@@ -2567,7 +2650,7 @@ class DungeonRenderer {
     const previous = this.occlusion.get(wall.order) ?? target;
     const alpha = previous + (target - previous) * Math.min(1, dt * 16 || 1);
     this.occlusion.set(wall.order, alpha);
-    ctx.globalAlpha = alpha * (this.knowledge(wall.x+tile/2,wall.y+tile/2)===2 ? 1 : .22);
+    ctx.globalAlpha = alpha * this.lightAt(wall.x+tile/2,wall.y+tile/2);
     ctx.drawImage(sprite.image, wall.x - sprite.anchorX, wall.y * Y_SCALE - sprite.anchorY);
     ctx.globalAlpha = 1;
     if (alpha < .7 && this.knowledge(wall.x+tile/2,wall.y+tile/2)===2) {
@@ -2827,7 +2910,7 @@ class DungeonRenderer {
   }
 }
 
-return {Y_SCALE,screenVectorToWorld,projectWorld,unprojectScreen,compareDepth,explorationLevel,resolveWeaponDigit,wallOccludesPlayer,makeCamera,makeBossCamera,DungeonRenderer};
+return {Y_SCALE,screenVectorToWorld,projectWorld,unprojectScreen,compareDepth,explorationLevel,FOG_MEMORY_LIGHT,makeFogLightField,sampleFogLight,resolveWeaponDigit,wallOccludesPlayer,makeCamera,makeBossCamera,DungeonRenderer};
 })();
 
 // module: weapon-ui
@@ -2977,11 +3060,13 @@ const $=id=>document.getElementById(id),storageKey='core-descent-v4';let saveWar
 let normal=makeProfile();try{const stored=localStorage.getItem(storageKey)||localStorage.getItem('core-descent-v3')||localStorage.getItem('core-descent-v2')||localStorage.getItem('core-descent-v1');if(stored)normal=checkProfile(JSON.parse(stored));if(normal.runActive){normal.runActive=false;saveWarning='前回の探索は未帰還で終了。出発前の所持品は保護されています。';}}catch{saveWarning='保存機能を利用できないか、データが不正です。セーブの書き出しをご利用ください。';}
 let lab=laboratory('storm',9,0),labKind='storm',mode='normal',selection=[0,0],tab='home',engine=null,paused=false,lastFrame=0,accumulator=0,toastTimer;
 let challengeContext=null,finishHandled=false,localRecords=[],labStartFloor=1;
-try{localRecords=restoreRecords(JSON.parse(localStorage.getItem('core-descent-records-v7')||'[]'));}catch{}
+try{localRecords=restoreRecords(JSON.parse(localStorage.getItem('core-descent-records-v8')||'[]'));}catch{}
 const profile=()=>mode==='normal'?normal:lab;
 const combatSpec=p=>applyEquipment(compileBoard(p.board,p.inventory),p);
 function esc(text){return String(text).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function num(x,d=1){return Number(x).toLocaleString('ja-JP',{maximumFractionDigits:d});}
+function weaponCondition(weapon){return weapon.stationarySeconds>0?`移動を止めて${num(weapon.stationarySeconds,2)}秒で構える。強い一撃の後はすぐ移動できます。`:'移動しながら自動攻撃。敵の予告を避けながら戦えます。';}
+function updateHomeWeapon(){const weapon=weaponForDigit(Number($('home-weapon').value));$('home-weapon-condition').textContent=weaponCondition(weapon);$('home-weapon-condition').classList.toggle('is-heavy',weapon.stationarySeconds>0);}
 function rarityOf(item){return RARITY_BY_ID[item.rarity??'common'];}
 function valueText(key,value){const [label,scale,suffix]=STAT_LABELS[key]||[key,1,''];return `${label} ${value>=0?'+':''}${num(value*scale,4)}${suffix}`;}
 function itemSummary(item){const v=itemValues(item);return v.ampGain?`接続先 ×${num(1+v.ampGain,4)}`:Object.entries(v.mods).map(([k,n])=>valueText(k,n)).join(' / ');}
@@ -3019,7 +3104,7 @@ function renderBoard(){
  $('board-status').textContent=validation.valid?'接続成立 — この武器で探索できます':validation.errors[0]+(validation.errors.length>1?` ほか${validation.errors.length-1}件`:'' );$('board-status').className='status-text'+(validation.valid?'':' invalid');$('launch').disabled=!validation.valid;
  let stats=null;if(validation.valid)stats=combatSpec(p);
  const dps=stats?stats.damage*stats.rate*(1+stats.multi)*(stats.innateHits??1)*(stats.comboMultiplier??1)*(1+stats.crit*(stats.critMultiplier-1)):0;
- $('stats').innerHTML=[['攻撃威力',stats?num(stats.damage):'—','1ヒットの基準'],['攻撃速度',stats?num(stats.rate):'—','動作 / 秒'],['射程',stats?num(stats.range/32,1):'—','マス（1マス32）'],[stats?.weapon.id==='chakram'?'往路の参考DPS':'全段命中DPS',stats?num(dps,0):'—','会心・連撃平均／復路・範囲・属性は別'],['追加攻撃なしDPS',stats?num(dps/(1+stats.multi),0):'—','武器固有の連撃は含む参考値'],['吸収回復上限',stats&&stats.drain>0?num(stats.maxHp*.08,1):'—','HP/秒・自然回復は別']].map(([a,b,c])=>`<div class="stat"><span>${a}</span><b>${b}</b><small> ${c}</small></div>`).join('');
+ $('stats').innerHTML=[['攻撃威力',stats?num(stats.damage):'—','1ヒットの基準'],['攻撃速度',stats?num(stats.rate):'—','動作 / 秒'],['射程',stats?num(stats.range/32,1):'—','マス（1マス32）'],[stats?.weapon.stationarySeconds>0?'停止時の参考DPS':stats?.weapon.id==='chakram'?'往路の参考DPS':'全段命中DPS',stats?num(dps,0):'—','会心・連撃平均／条件補正・復路・範囲・属性は別'],['追加攻撃なしDPS',stats?num(dps/(1+stats.multi),0):'—','武器固有の連撃は含む参考値'],['吸収回復上限',stats&&stats.drain>0?num(stats.maxHp*.08,1):'—','HP/秒・自然回復は別']].map(([a,b,c])=>`<div class="stat"><span>${a}</span><b>${b}</b><small> ${c}</small></div>`).join('');
  $('effects').innerHTML=stats?CORE_DEFS.filter(d=>d.id!=='emitter'&&(d.amplify||Object.keys(d.mods).some(k=>stats.raw[k]>0))&&p.board.flat().some(id=>inv.get(id)?.type===d.id)).map(d=>`<span class="tag" style="border-color:${d.color}55">${esc(d.name)}</span>`).join(''):'<span class="note">数字パズルを完成させると最終出力を確認できます。</span>';
  $('mode-note').textContent=mode==='normal'?`所持コア ${p.inventory.length}個 / ${num(p.wallet,0)} G。初期の数字コアに加え、0〜9の武器核を所持。戦利品は緑の帰還陣で持ち帰って確保。「持ち物」で装備と道具を準備できます。`:'実験室：9段完成例と交換用コアを貸し出しています。通常探索の所持品・進行には影響しません。ここでパズルと能力の合成を試せます。';
  $('presets').innerHTML=p.presets.length?p.presets.map((pr,i)=>`<button class="tiny quiet" data-load-preset="${i}">${esc(pr.name)}</button>`).join(''):'<small>数字だけでなく、装着したコアの個体IDも保存します。</small>';
@@ -3033,7 +3118,7 @@ function renderWeaponPicker(stats=null){
   return `<button class="weapon-choice ${active===w.digit?'active':''}" data-weapon="${w.digit}" aria-pressed="${active===w.digit}" aria-label="数字${w.digit} ${w.name}の武器核" ${available?'':'disabled'} style="--weapon-color:${w.color}"><span class="weapon-digit">${w.digit}</span>${weaponIcon(w.digit)}<span>${weaponLabel(w.digit)}</span></button>`;
  }).join('');
  const w=active===null?null:weaponForDigit(active);
- $('weapon-description').innerHTML=w?`<div class="weapon-title">${weaponIcon(w.digit)}<div><h3>${w.name}<span class="tag">${w.kind==='melee'?'近接':'遠隔・魔法'}</span></h3><p>${esc(w.mechanic)}</p></div></div><div class="weapon-facts"><span>基礎威力 <b>${num(w.baseDamage)}</b></span><span>基礎速度 <b>${num(w.baseRate,2)}回/秒</b></span><span>基礎射程 <b>${num(w.range/32,1)}マス</b></span>${stats?`<span>追加攻撃 <b>＋${num(stats.multi,2)}</b></span>`:''}</div>`:'<p class="note">頂点に装着する武器核を選んでください。</p>';
+ $('weapon-description').innerHTML=w?`<div class="weapon-title">${weaponIcon(w.digit)}<div><h3>${w.name}<span class="tag">${w.kind==='melee'?'近接':'遠隔・魔法'}</span><span class="tag ${w.stationarySeconds>0?'gold':'mint'}">${w.stationarySeconds>0?'停止して攻撃':'移動攻撃'}</span></h3><p>${esc(w.mechanic)}</p><p class="weapon-condition">${esc(weaponCondition(w))}</p></div></div><div class="weapon-facts"><span>基礎威力 <b>${num(w.baseDamage)}</b></span><span>基礎速度 <b>${num(w.baseRate,2)}回/秒</b></span><span>基礎射程 <b>${num(w.range/32,1)}マス</b></span>${stats?`<span>追加攻撃 <b>＋${num(stats.multi,2)}</b></span>`:''}</div>`:'<p class="note">頂点に装着する武器核を選んでください。</p>';
  $('weapon-instruction').textContent=mode==='lab'?'武器を選ぶと、この実験室だけ成立済みの体験編成に切り替わります。':'数字0〜9の武器核を頂点に交換します。武器の数字に合うよう下の配置を組むと出発できます。';
  $('weapon-picker').querySelectorAll('[data-weapon]').forEach(b=>b.onclick=()=>{
   const digit=Number(b.dataset.weapon);
@@ -3086,7 +3171,7 @@ function retryPendingReturn(){
  try{bankRun(p,pending.loot,pending.gold,pending.floor,pending.cargo);delete p.pendingReturn;if(mode==='normal')persist();renderInventory();toast('一時保管していた帰還品を確保しました。');}catch(error){toast(`まだ確保できません：${error.message}。復旧用の書き出しには戦利品も含まれます。`,true);}
 }
 function exportRecovery(){
- const data=profile(),url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='core-descent-recovery-v07.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+ const data=profile(),url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='core-descent-recovery-v08.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 function startLabField(floor){
  labStartFloor=floor;labKind='storm';lab=laboratory(labKind,9,Number($('home-weapon').value));mode='lab';selection=[0,0];$('lab-rarity').value='';renderBoard();launchGame();
@@ -3130,7 +3215,7 @@ function finishRun(returned,abandoned=false){
  if(finishHandled||!engine)return;finishHandled=true;
  const p=profile();let bankError='';if(returned){try{bankRun(p,engine.loot,engine.gold,engine.floor,engine.cargo);}catch(error){bankError=error.message;p.pendingReturn=structuredClone({loot:engine.loot,cargo:engine.cargo,gold:engine.gold,floor:engine.floor});loseRun(p);returned=false;}}else loseRun(p);if(mode==='normal')persist();
  let recordNote='通常探索はチャレンジ順位には含めません。';
- if(challengeContext){try{const record=makeRecord(engine,challengeContext);localRecords=addRecord(localRecords,record);recordNote='この端末の自己記録へ追加しました（オンライン未検証）。';try{localStorage.setItem('core-descent-records-v7',JSON.stringify(localRecords));}catch{recordNote='自己記録へ追加。自動保存不可のため、記録を書き出してください。';}}catch{recordNote='数値が有効範囲外のため、この挑戦は記録しません。';}}
+ if(challengeContext){try{const record=makeRecord(engine,challengeContext);localRecords=addRecord(localRecords,record);recordNote='この端末の自己記録へ追加しました（オンライン未検証）。';try{localStorage.setItem('core-descent-records-v8',JSON.stringify(localRecords));}catch{recordNote='自己記録へ追加。自動保存不可のため、記録を書き出してください。';}}catch{recordNote='数値が有効範囲外のため、この挑戦は記録しません。';}}
  const boss=!!engine.isBoss,title=bankError?'帰還品を一時保管':boss?(engine.status==='complete'?'180秒の挑戦終了':engine.status==='invalid'?'スコア範囲エラー':'挑戦終了'):returned?'帰還成功':abandoned?'探索終了':'冒険者が倒れた';
  const msg=bankError?`保存を完了できませんでした：${bankError}。戦利品を一時保管しています。「持ち物」から再試行・復旧用の書き出しができます。`:boss?'コア・所持資産は失いません。戦利品のない記録用ステージです。':returned?(mode==='lab'?'実験終了。通常資産には加算されません。':'コア・お金・素材・装備・道具を拠点へ確保しました。'):'今回の未確保品を失います。出発前のコア・装備・素材と攻略記録は残ります。使用した道具は消費されています。';
  const cells=boss?[[num(engine.totalDamage,3),'総ダメージ'],[num(engine.totalDamage/BOSS_SECONDS,1),'180秒換算DPS'],[num(engine.totalTime,1),'生存秒数']]:[[engine.clearedFloor,'攻略済み階層'],[engine.floor,'到達階層'],[returned?engine.loot.length:0,'確保したコア']];
@@ -3144,13 +3229,21 @@ function updateHud(){
  if(!engine)return;const e=engine;
  $('hud-floor').textContent=e.isBoss?`BOSS / 残り ${Math.max(0,Math.ceil(BOSS_SECONDS-e.totalTime))}秒`:`FLOOR ${String(e.floor).padStart(2,'0')}`;
  $('hud-biome').textContent=e.isBoss?'記録の聖域':biomeForFloor(e.floor).name+(e.floor%5===0?' · ボス階':'');
- $('hud-weapon').textContent=`${e.spec.weapon.name} · 射程${num(e.spec.range/32,1)}マス`;$('hud-level').textContent=e.isBoss?'Lv.1 固定':`Lv.${e.level}`;$('hp-bar').style.width=`${Math.max(0,e.player.hp/e.spec.maxHp*100)}%`;$('hud-hp').textContent=`HP ${num(e.player.hp,0)} / ${num(e.spec.maxHp,0)}`;
+ $('hud-weapon').textContent=`${weaponLabel(e.spec.weapon.digit)} · 射程${num(e.spec.range/32,1)}マス`;$('hud-weapon').title=e.spec.weapon.name;updateAttackHud();$('hud-level').textContent=e.isBoss?'Lv.1 固定':`Lv.${e.level}`;$('hp-bar').style.width=`${Math.max(0,e.player.hp/e.spec.maxHp*100)}%`;$('hud-hp').textContent=`HP ${num(e.player.hp,0)} / ${num(e.spec.maxHp,0)}`;
  $('hud-gates').textContent=e.isBoss?(e.totalTime>=120?'瀕死判定ON：追い撃ち有効':'通常判定：120秒から追い撃ち有効'):e.gates?`第${e.clearedFloor}階攻略 / 緑＝帰還、金＝次層`:`開通まで ${Math.max(0,Math.ceil(e.goalTime-e.floorTime))}秒・撃破 ${Math.min(e.floorKills,e.goalKills)}/${e.goalKills}${e.floorBoss&&!e.bossDefeated?' · ボス未討伐':''}`;
  const cargo=cargoCounts(e.cargo);$('hud-cargo').textContent=e.isBoss?'道具は使用不可':`素材 ${cargo.materials} · 装備 ${cargo.equipment} · 道具 ${cargo.consumables}`;
  for(const [id,button,count] of [['healing_draught','use-heal','heal-count'],['ward_scroll','use-ward','ward-count']]){$(count).textContent=profile().consumables?.[id]??0;$(button).disabled=e.isBoss||e.status!=='playing'||paused||!(profile().consumables?.[id]>0)||!e.canUseConsumable(id);}
  $('hud-loot').textContent=e.isBoss?`総ダメージ ${num(e.totalDamage,0)}`:`未確保コア ${e.loot.length}`;
  $('hud-gold').textContent=e.isBoss?`平均 ${num(e.totalDamage/Math.max(.001,e.totalTime),1)} DPS`:`未確保 ${num(e.gold,0)} G`;
  $('hud-kills').textContent=e.isBoss?'ボスHP ∞ / 装備の数値はそのまま':`累計 ${e.totalKills}体撃破`;
+}
+function updateAttackHud(){
+ if(!engine)return;const state=engine.weaponAttackState(),weapon=engine.spec.weapon,heavy=weapon.stationarySeconds>0;
+ const label=({mobile:'移動しながら攻撃',moving:'止まると攻撃',preparing:'構え中',cooldown:'次の攻撃まで',ready:'攻撃準備OK'})[state.mode];
+ if($('stance-text').textContent!==label)$('stance-text').textContent=label;
+ if($('hud-stance').dataset.mode!==state.mode)$('hud-stance').dataset.mode=state.mode;
+ $('hud-stance').title=weaponCondition(weapon);$('stance-meter').classList.toggle('hidden',!heavy);
+ if(heavy)$('stance-fill').style.width=`${Math.max(0,Math.min(1,state.progress))*100}%`;
 }
 function recordWeaponName(record){const digit=record.loadout?.[0]?.[0]?.digit;return Number.isInteger(digit)&&digit>=0&&digit<=9?weaponForDigit(digit).name:'武器不明';}
 function renderRankings(){
@@ -3202,7 +3295,7 @@ function animate(ts){
     const input=renderer.screenInput(x,y);
     while(accumulator>=1/60){engine.tick(1/60,input);accumulator-=1/60;}
    }
-   drawGame();hudTimer+=dt;if(hudTimer>.15){updateHud();hudTimer=0;}
+   drawGame();updateAttackHud();hudTimer+=dt;if(hudTimer>.15){updateHud();hudTimer=0;}
   }else if(tab==='home'){drawHome(dt);}
  }
  requestAnimationFrame(animate);
@@ -3222,7 +3315,7 @@ $('retry-return').onclick=retryPendingReturn;$('export-recovery').onclick=export
 $('inventory-normal').onclick=()=>{mode='normal';selection=[0,0];renderInventory();};$('inventory-lab').onclick=()=>{mode='lab';selection=[0,0];renderInventory();};$('inventory-build').onclick=()=>changeTab('build');$('inventory-guide').onclick=()=>changeTab('catalog');
 $('start-depth').onclick=()=>launchGame('depth');$('start-boss').onclick=()=>launchGame('boss');
 $('ranking-build').onclick=()=>changeTab('build');
-$('export-records').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify({localOnly:true,verified:false,rules:SCORE_RULES,challenge:CHALLENGE_ID,records:localRecords},null,2)],{type:'application/json'}));a.download='core-descent-local-records-v07.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);};
+$('export-records').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify({localOnly:true,verified:false,rules:SCORE_RULES,challenge:CHALLENGE_ID,records:localRecords},null,2)],{type:'application/json'}));a.download='core-descent-local-records-v08.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);};
 document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>changeTab(b.dataset.tab));$('mode-normal').onclick=()=>{mode='normal';selection=[0,0];renderBoard();};$('mode-lab').onclick=()=>{mode='lab';selection=[0,0];renderBoard();};
 $('lab-rarity').onchange=()=>{if(mode!=='lab')return;const rarity=$('lab-rarity').value;if(!rarity)return;const used=new Set(lab.board.flat());lab.inventory=lab.inventory.map(it=>used.has(it.id)?makeItem(it.id,it.digit,it.type,{rarity}):it);renderBoard();toast('実験室だけを変更しました。全装着コアを個体値100%で比較します。');};
  $('depth').onchange=()=>{const p=profile(),n=+$('depth').value;const board=blankBoard(n);for(let r=0;r<Math.min(n,p.depth);r++)board[r]=[...p.board[r]];p.depth=n;p.board=board;selection=[0,0];if(mode==='normal')persist();renderBoard();};
@@ -3234,7 +3327,7 @@ $('pause').onclick=togglePause;$('abandon').onclick=()=>{if(engine?.status!=='pl
 $('export-save').onclick=()=>{const blob=new Blob([JSON.stringify(normal,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='core-descent-save.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};$('import-save').onclick=()=>$('import-file').click();$('import-file').onchange=async()=>{const file=$('import-file').files[0];if(!file)return;try{if(file.size>5e6)throw Error('セーブは5MB以下にしてください');const loaded=checkProfile(JSON.parse(await file.text()));if(!confirm('通常探索のセーブを読み込んだ内容で置き換えますか？'))return;loaded.runActive=false;normal=loaded;mode='normal';persist();renderBoard();toast('セーブを読み込みました。');}catch(e){toast(e.message,true);}finally{$('import-file').value='';}};
 $('reset-market').onclick=resetMarket;$('market-list-test').onclick=()=>{try{auction.list('you','your-sample',{start:100,buyout:300,duration:600000});renderMarket();toast('サンプルコアを出品しました。出品中はアイテムをロックします。');}catch(e){toast(e.message,true);}};
 setInterval(()=>{if(tab!=='market'||!auction)return;for(const l of auction.listings.values())if(l.state==='active'&&Date.now()>=l.end)auction.settle(l.id);renderMarket();},2000);
-$('home-weapon').innerHTML=WEAPONS.map(w=>`<option value="${w.digit}">${w.digit} · ${w.name}</option>`).join('');$('home-weapon').value='0';
+$('home-weapon').innerHTML=WEAPONS.map(w=>`<option value="${w.digit}">${w.digit} · ${w.name}</option>`).join('');$('home-weapon').value='0';$('home-weapon').onchange=updateHomeWeapon;updateHomeWeapon();
 $('home-field').innerHTML=BIOMES.map((b,i)=>`<option value="${i*5+1}">${b.shortName} · ${i*5+1}〜${i*5+5}階</option>`).join('');
 $('rarity-filter').innerHTML='<option value="">すべてのレア度</option>'+RARITIES.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');window.addEventListener('resize',drawLinks);renderBoard();renderCatalog();renderFieldGuide(startLabField);resetMarket();if(saveWarning)toast(saveWarning,true);else $('save-state').textContent='ローカル保存 / 書き出しでバックアップ可能';requestAnimationFrame(animate);
 // Explicit local QA hook. Not an authoritative API and not safe for an online economy.

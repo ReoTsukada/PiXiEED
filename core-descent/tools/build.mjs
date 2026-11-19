@@ -28,4 +28,4 @@ console.log(`Built index.html and dist/index.html (${Buffer.byteLength(html)} by
 const {WEAPONS}=await import('../src/weapons.mjs');
 const {CORE_DEFS,RARITIES,ROLL_MIN,ROLL_MAX}=await import('../src/catalog.mjs');
 await mkdir(root+'data',{recursive:true});
-await writeFile(root+'data/core-catalog.json',JSON.stringify({version:'0.7.0',source:'src/catalog.mjs',generated:true,weapons:WEAPONS,definitions:CORE_DEFS,rarities:RARITIES,rollRange:[ROLL_MIN,ROLL_MAX]},null,2));
+await writeFile(root+'data/core-catalog.json',JSON.stringify({version:'0.8.0',source:'src/catalog.mjs',generated:true,weapons:WEAPONS,definitions:CORE_DEFS,rarities:RARITIES,rollRange:[ROLL_MIN,ROLL_MAX]},null,2));

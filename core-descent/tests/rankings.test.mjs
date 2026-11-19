@@ -20,7 +20,7 @@ test('ボスは総ダメージのみ、短時間平均DPSで順位を逆転さ�
 test('同ダメージは同順位、生存時間で勝手に優劣をつけない',()=>{const rows=rankedRecords([record('boss'),{...record('boss','normal','b'),seconds:80}],{mode:'boss'});assert.deepEqual(rows.map(x=>x.rank),[1,1]);});
 test('所持品と実験室を別集計',()=>{const rows=[record(),record('depth','lab','b')];assert.equal(rankedRecords(rows).length,1);assert.equal(rankedRecords(rows,{source:'lab'})[0].id,'b');});
 test('重複登録しない',()=>{const a=record();assert.equal(addRecord(addRecord([],a),a).length,1);});
-test('再読込は不正・重複・旧ルールを除外',()=>{const a=record();assert.equal(restoreRecords([a,a,{...a,id:'x',damage:Infinity},{...a,id:'y',rules:'0.3.0'}]).length,1);});
+test('再読込は不正・重複・旧ルールを除外',()=>{const a=record();const previous={...a,id:'v07',rules:'0.7.0',challenge:'fantasy-worlds-01'};assert.equal(restoreRecords([a,a,{...a,id:'x',damage:Infinity},{...a,id:'y',rules:'0.3.0'},previous]).length,1);assert.equal(previous.damage,a.damage,'以前の記録自体は書き換えない');});
 test('未完了の挑戦を確定しない',()=>{assert.throws(()=>makeRecord(coreEngine(),{id:'z',mode:'depth',source:'normal',depth:3}));});
 test('記録にはコア個体値を固定保存し、後の編成変更に影響されない',()=>{const profile=makeProfile(),snap=captureLoadout(profile);const original=snap[0][0].digit;profile.inventory.find(i=>i.id===profile.board[0][0]).digit=(original+1)%10;assert.equal(snap[0][0].digit,original);});
 test('180秒を越えたスコアと非有限値を拒否',()=>{for(const bad of [{seconds:181},{damage:NaN},{damage:Infinity},{seed:1}])assert.throws(()=>addRecord([],{...record('boss'),...bad}));});

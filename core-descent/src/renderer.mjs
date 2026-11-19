@@ -25,6 +25,41 @@ export function compareDepth(a, b) { return a.depth - b.depth || a.order - b.ord
 export function explorationLevel(map, state, x, y) {
   return isVisible(map,state,x,y) ? 2 : isExplored(map,state,x,y) ? 1 : 0;
 }
+/** Visual-only light field. Distance feathering stays inside observed geometry. */
+export const FOG_MEMORY_LIGHT = .32;
+const smoothLight = value => { const t=clamp(value,0,1);return t*t*(3-2*t); };
+export function makeFogLightField(levels,width,height,{samples=4,revealAll=false}={}) {
+  const w=width*samples,h=height*samples,stride=w+2;
+  const distanceTo=(threshold)=>{
+    const distance=new Float32Array((w+2)*(h+2));
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++)
+      if(levels[Math.floor(y/samples)*width+Math.floor(x/samples)]>=threshold)distance[(y+1)*stride+x+1]=1e6;
+    const diagonal=Math.SQRT2;
+    for(let y=1;y<=h;y++)for(let x=1;x<=w;x++){
+      const i=y*stride+x;distance[i]=Math.min(distance[i],distance[i-1]+1,distance[i-stride]+1,distance[i-stride-1]+diagonal,distance[i-stride+1]+diagonal);
+    }
+    for(let y=h;y>=1;y--)for(let x=w;x>=1;x--){
+      const i=y*stride+x;distance[i]=Math.min(distance[i],distance[i+1]+1,distance[i+stride]+1,distance[i+stride-1]+diagonal,distance[i+stride+1]+diagonal);
+    }
+    return distance;
+  };
+  const values=new Float32Array(w*h);
+  if(revealAll){values.fill(1);return {width:w,height:h,samples,values};}
+  const known=distanceTo(1),visible=distanceTo(2);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const i=(y+1)*stride+x+1;
+    const edge=smoothLight((known[i]-.5)/(samples*1.05));
+    const lit=smoothLight((visible[i]-.5)/(samples*1.25));
+    values[y*w+x]=edge*(FOG_MEMORY_LIGHT+(1-FOG_MEMORY_LIGHT)*lit);
+  }
+  return {width:w,height:h,samples,values};
+}
+export function sampleFogLight(field,tileX,tileY) {
+  if(!field||!Number.isFinite(tileX)||!Number.isFinite(tileY))return 0;
+  const px=tileX*field.samples-.5,py=tileY*field.samples-.5,x=Math.floor(px),y=Math.floor(py),fx=px-x,fy=py-y;
+  const at=(xx,yy)=>xx<0||yy<0||xx>=field.width||yy>=field.height?0:field.values[yy*field.width+xx];
+  return (at(x,y)*(1-fx)+at(x+1,y)*fx)*(1-fy)+(at(x,y+1)*(1-fx)+at(x+1,y+1)*fx)*fy;
+}
 export function resolveWeaponDigit(weapon) {
   if(Number.isInteger(weapon?.digit))return clamp(weapon.digit,0,9);
   if(Number.isInteger(weapon))return clamp(weapon,0,9);
@@ -134,7 +169,7 @@ export class DungeonRenderer {
     for(let y=0;y<m.h;y++)for(let x=0;x<m.w;x++){
       const level=this.knowledge((x+.5)*m.tile,(y+.5)*m.tile);levels[y*m.w+x]=level;
       if(!level)continue;
-      ctx.globalAlpha=level===2?1:.26;
+      ctx.globalAlpha=1;
       ctx.drawImage(scene.floor,x*m.tile,y*tileH,m.tile,tileH,x*m.tile,y*tileH,m.tile,tileH);
     }
     ctx.globalAlpha=1;
@@ -147,21 +182,33 @@ export class DungeonRenderer {
         if(!lit&&start>=0){bands.push([start*m.tile,y*tileH,(x-start)*m.tile,tileH]);start=-1;}
       }
     }
-    // Gradients stay INSIDE a known lit tile: black unexplored cells stay opaque.
-    for(let y=0;y<m.h;y++)for(let x=0;x<m.w;x++){
-      if(levels[y*m.w+x]!==2)continue;
-      const px=x*m.tile,py=y*tileH,feather=7;
-      for(const [dx,dy] of [[-1,0],[1,0],[0,-1],[0,1]]){
-        if(levels[(y+dy)*m.w+x+dx]===2&&x+dx>=0&&x+dx<m.w&&y+dy>=0&&y+dy<m.h)continue;
-        let gradient;
-        if(dx){const edge=dx<0?px:px+m.tile;gradient=ctx.createLinearGradient(edge,py,edge-dx*feather,py);}
-        else {const edge=dy<0?py:py+tileH;gradient=ctx.createLinearGradient(px,edge,px,edge-dy*feather);}
-        gradient.addColorStop(0,'#071311b3');gradient.addColorStop(1,'#07131100');ctx.fillStyle=gradient;
-        if(dx)ctx.fillRect(dx<0?px:px+m.tile-feather,py,feather,tileH);
-        else ctx.fillRect(px,dy<0?py:py+tileH-feather,m.tile,feather);
-      }
+    // Only the lighting mask is interpolated. Floor tiles and all sprites stay crisp.
+    // The floor above contains known cells only, so interpolation cannot reveal a hidden room.
+    const light=makeFogLightField(levels,m.w,m.h,{revealAll:!!state?.revealAll});
+    const mask=scene.lightMask ||= createRenderSurface(light.width,light.height);
+    const maskCtx=mask.getContext('2d'),pixels=maskCtx.createImageData(light.width,light.height);
+    for(let i=0;i<light.values.length;i++){
+      pixels.data[i*4]=7;pixels.data[i*4+1]=19;pixels.data[i*4+2]=17;pixels.data[i*4+3]=Math.round((1-light.values[i])*255);
     }
+    maskCtx.putImageData(pixels,0,0);
+    ctx.imageSmoothingEnabled=true;ctx.drawImage(mask,0,0,observed.width,observed.height);ctx.imageSmoothingEnabled=false;
+    scene.lightField=light;
     scene.exploration=state;scene.revision=revision;scene.levels=levels;scene.visibleBands=bands;return observed;
+  }
+  lightAt(x,y) {
+    const m=this.currentEngine?.map;
+    return m ? sampleFogLight(this.scene?.lightField,x/m.tile,y/m.tile) : 0;
+  }
+  drawSightFalloff(engine) {
+    if(engine.exploration?.revealAll)return;
+    const ctx=this.ctx,m=engine.map,p=engine.player,radius=Math.max(m.tile,(engine.exploration?.radius??engine.spec?.vision??8)*m.tile);
+    // A continuous world-space origin avoids light jumping when crossing a tile boundary.
+    // Project the circular ground light into the same ellipse as the ground plane.
+    ctx.save();ctx.scale(1,Y_SCALE);
+    const gradient=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,radius);
+    for(const [at,alpha] of [[0,0],[.18,0],[.42,.10],[.67,.32],[.85,.52],[1,.64]])
+      gradient.addColorStop(at,`rgba(7,19,17,${alpha})`);
+    ctx.fillStyle=gradient;ctx.globalAlpha=1;ctx.fillRect(-m.width,-m.height,m.width*3,m.height*3);ctx.restore();
   }
   clipVisible(zOffset=0) {
     const ctx=this.ctx;ctx.beginPath();
@@ -265,6 +312,7 @@ export class DungeonRenderer {
       ctx.strokeStyle = '#a1e4cd99'; ctx.lineWidth = .8;
       ctx.beginPath(); ctx.ellipse(p.x, p.y * Y_SCALE, 10, 6, 0, 0, TAU); ctx.stroke();
     }
+    this.drawSightFalloff(engine);
     ctx.restore();
     this.drawVignette(width, height, low);
     if (showMinimap) this.drawMinimap(engine, width, height);
@@ -278,7 +326,7 @@ export class DungeonRenderer {
     const previous = this.occlusion.get(wall.order) ?? target;
     const alpha = previous + (target - previous) * Math.min(1, dt * 16 || 1);
     this.occlusion.set(wall.order, alpha);
-    ctx.globalAlpha = alpha * (this.knowledge(wall.x+tile/2,wall.y+tile/2)===2 ? 1 : .22);
+    ctx.globalAlpha = alpha * this.lightAt(wall.x+tile/2,wall.y+tile/2);
     ctx.drawImage(sprite.image, wall.x - sprite.anchorX, wall.y * Y_SCALE - sprite.anchorY);
     ctx.globalAlpha = 1;
     if (alpha < .7 && this.knowledge(wall.x+tile/2,wall.y+tile/2)===2) {

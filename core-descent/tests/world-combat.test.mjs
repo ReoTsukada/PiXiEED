@@ -73,6 +73,7 @@ test('ボスはHP半減で第2形態となり、次の攻撃待ちが25%短く�
 
 test('槌は通常敵を押し戻すが有限の階層ボスにはダメージだけを与える',()=>{
  const e=arena({floor:5}),core=makeItem('test-hammer',5,'emitter');Object.assign(e.spec,compileBoard([[core.id]],[core]),{damage:1,crit:0});
+ e.player.still=e.spec.weapon.stationarySeconds;
  const boss=enemy(e,'elder_treant',440,400),slime=enemy(e,'slime',445,400),bossHp=boss.hp,slimeHp=slime.hp;
  assert.equal(e.volley(),true);assert.ok(boss.hp<bossHp);assert.ok(slime.hp<slimeHp);
  close(boss.x,440);close(boss.y,400);close(slime.x,469);close(slime.y,400);

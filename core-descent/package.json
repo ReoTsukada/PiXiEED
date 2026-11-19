@@ -1,6 +1,6 @@
 {
   "name": "core-descent",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "private": true,
   "type": "module",
   "description": "PiXiEED CORE DESCENT: 32×32多層スプライト・5フィールド・固有戦利品・10種の武器核を組み合わせたファンタジーRPG",

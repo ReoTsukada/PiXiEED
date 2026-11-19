@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Y_SCALE, screenVectorToWorld, projectWorld, unprojectScreen, compareDepth, wallOccludesPlayer, makeCamera, makeBossCamera, DungeonRenderer, explorationLevel, resolveWeaponDigit } from '../src/renderer.mjs';
+import { Y_SCALE, screenVectorToWorld, projectWorld, unprojectScreen, compareDepth, wallOccludesPlayer, makeCamera, makeBossCamera, DungeonRenderer, explorationLevel, resolveWeaponDigit, makeFogLightField, sampleFogLight, FOG_MEMORY_LIGHT } from '../src/renderer.mjs';
 
 import {createExploration,updateExploration} from '../src/fog.mjs';
 import {TestCanvas,withCanvas} from './render-test-canvas.mjs';
@@ -108,7 +108,7 @@ test('drawing omits enemies, loot, unknown geometry and exit markers behind fog 
   assert.equal(renderer.scene.levels[2*map.w+4],0);
   const floorCalls=renderer.scene.observed.context.calls;
   assert.equal(floorCalls.find(c=>c.method==='fillRect').alpha,1,'unexplored backing must be opaque');
-  const crops=floorCalls.filter(c=>c.method==='drawImage');
+  const crops=floorCalls.filter(c=>c.method==='drawImage'&&c.args[0]===renderer.scene.floor);
   assert.ok(crops.every(c=>explorationLevel(map,exploration,c.args[1]+16,(c.args[2]/Y_SCALE)+16)>0));
   assert.equal(JSON.stringify(engine),before);
   assert.equal(renderer.weaponDigit,8);
@@ -148,4 +148,47 @@ test('five visible finite bosses retain their identities and get a world HP/name
     assert.ok(canvas.context.calls.some(c=>c.method==='fillText'&&c.args[0]==='激昂'));
     const label=renderer.worldToScreen(boss.x,boss.y,129);assert.ok(label.y>=0&&label.y<230);
   }
+}));
+
+
+test('fog light feathers continuously through current view, memory and unknown without lighting unknown samples',()=>{
+  const w=17,h=13,levels=new Uint8Array(w*h);
+  for(let y=0;y<h;y++)for(let x=0;x<15;x++)levels[y*w+x]=x<9?2:1;
+  const field=makeFogLightField(levels,w,h),row=6.5;
+  close(sampleFogLight(field,5,row),1);
+  assert.ok(Math.abs(sampleFogLight(field,11,row)-FOG_MEMORY_LIGHT)<1e-6);
+  close(sampleFogLight(field,16,row),0);
+  let previous=1;
+  for(let x=7;x<=16;x+=.125){
+    const light=sampleFogLight(field,x,row);
+    assert.ok(light<=previous+1e-6,`falloff must not brighten: ${x}`);
+    assert.ok(previous-light<.12,`no hard edge: ${x}`);previous=light;
+  }
+  for(let y=0;y<h*field.samples;y++)for(let x=15*field.samples;x<field.width;x++)assert.equal(field.values[y*field.width+x],0);
+});
+
+test('a two-tile corridor keeps useful light and reveal-all trials keep full lighting',()=>{
+  const w=11,h=11,levels=new Uint8Array(w*h);
+  for(let y=1;y<h-1;y++)for(let x=4;x<=5;x++)levels[y*w+x]=2;
+  const field=makeFogLightField(levels,w,h);
+  assert.ok(sampleFogLight(field,5,5.5)>.65,'narrow paths should remain readable');
+  const open=makeFogLightField(levels,w,h,{revealAll:true});
+  assert.ok(open.values.every(v=>v===1));
+});
+
+test('continuous player motion moves radial light without rebuilding cached discovery, including low quality',()=>withCanvas(()=>{
+  const {map,player,exploration}=fogFixture();
+  const engine={map,player,exploration,spec:{weapon:{digit:0}},status:'playing',totalTime:1,gates:false,enemies:[],pickups:[],bullets:[],fx:[]};
+  const canvas=new TestCanvas(),renderer=new DungeonRenderer(canvas);
+  renderer.render(engine,{width:390,height:844,quality:'low'});
+  const observed=renderer.scene.observed,calls=observed.context.calls.length,field=renderer.scene.lightField;
+  const before=JSON.stringify(exploration),oldX=player.x;
+  player.x+=5;engine.totalTime+=1/60;
+  renderer.render(engine,{width:390,height:844,quality:'low'});
+  const radial=canvas.context.calls.filter(c=>c.method==='createRadialGradient'&&c.args[5]===exploration.radius*map.tile);
+  assert.equal(radial.length,2);assert.equal(radial[0].args[0],oldX);assert.equal(radial[1].args[0],player.x);
+  assert.ok(radial.every(c=>c.stops.length>=5));
+  assert.equal(renderer.scene.lightField,field);assert.equal(observed.context.calls.length,calls);
+  assert.equal(canvas.context.imageSmoothingEnabled,false);
+  assert.equal(JSON.stringify(exploration),before,'visual light must not change sight masks');
 }));

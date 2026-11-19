@@ -8,6 +8,7 @@ import {rollEnemyDrops} from './loot.mjs';
 import {CONSUMABLE_BY_ID} from './items.mjs';
 export function angleDistance(a,b){return Math.abs(Math.atan2(Math.sin(a-b),Math.cos(a-b)));}
 export function pointSegmentDistance(x,y,ax,ay,bx,by){const dx=bx-ax,dy=by-ay,l=dx*dx+dy*dy;const t=l?Math.max(0,Math.min(1,((x-ax)*dx+(y-ay)*dy)/l)):0;return Math.hypot(x-ax-t*dx,y-ay-t*dy);}
+export const MOVEMENT_DEADZONE=.05;
 /** Pure simulation. No DOM, no storage, no networking. 60Hz caller recommended. */
 export class GameEngine {
  constructor(spec,{seed=Date.now()>>>0,onEvent=()=>{},startFloor=1,runId=`run-${seed}`,cargoCapacity={cores:Infinity,equipment:Infinity}}={}){
@@ -17,11 +18,11 @@ export class GameEngine {
   if(Object.values(this.cargoCapacity).some(value=>value!==Infinity&&(!Number.isSafeInteger(value)||value<0)))throw Error('戦利品上限は0以上の整数が必要');
   this.fullCargoNotified=new Set();
   this.spec=structuredClone(spec);this.spec.weapon??={...weaponForDigit(6)};this.spec.range??=this.spec.weapon.range;this.seed=seed;this.runId=runId;this.rng=makeRng(seed);this.onEvent=onEvent;
-  this.player={x:0,y:0,hp:spec.maxHp,invuln:0,still:0,facing:0,attackTime:0,weaponId:this.spec.weapon.id,ward:null,slowTime:0,slowStrength:0};this.itemCooldown=0;this.hazardCooldown=0;this.combo=0;this.lastAttackAt=-10;this.pendingBursts=[];this.loot=[];this.cargo={materials:{},equipment:[],consumables:{}};this.gold=0;this.totalKills=0;this.totalTime=0;this.totalDamage=0;this.damageBySource={direct:0,blast:0,chain:0,poison:0};this.damageEvents=0;this.pendingLeech=0;
+  this.player={x:0,y:0,hp:spec.maxHp,invuln:0,still:0,moving:false,facing:0,attackTime:0,weaponId:this.spec.weapon.id,ward:null,slowTime:0,slowStrength:0};this.itemCooldown=0;this.hazardCooldown=0;this.combo=0;this.lastAttackAt=-10;this.pendingBursts=[];this.loot=[];this.cargo={materials:{},equipment:[],consumables:{}};this.gold=0;this.totalKills=0;this.totalTime=0;this.totalDamage=0;this.damageBySource={direct:0,blast:0,chain:0,poison:0};this.damageEvents=0;this.pendingLeech=0;
   this.clearedFloor=0;this.clearTime=0;this.level=1;this.shotCredit=0;this.bonusCredit=0;this.shotTimer=0;this.id=0;this.status='playing';this.logs=[];this.nextFloor(startFloor);
  }
  nextFloor(n=this.floor+1){
-  this.floor=n;this.map=makeMap(this.seed,n);Object.assign(this.player,{x:this.map.spawn.x,y:this.map.spawn.y});this.exploration=createExploration(this.map);this.updateSight();this.pendingBursts=[];this.combo=0;
+  this.floor=n;this.map=makeMap(this.seed,n);Object.assign(this.player,{x:this.map.spawn.x,y:this.map.spawn.y,still:0,moving:false,attackTime:0});this.exploration=createExploration(this.map);this.updateSight();this.pendingBursts=[];this.combo=0;
   this.enemies=[];this.bullets=[];this.hostileBullets=[];this.telegraphs=[];this.pickups=[];this.fx=[];this.floorTime=0;this.floorKills=0;this.spawnTimer=0.5;this.flowTimer=0;this.gates=false;this.hazardCooldown=0;
   this.biome=biomeForFloor(n);this.floorBoss=null;this.bossDefeated=n%5!==0;
   if(!this.bossDefeated){
@@ -74,7 +75,21 @@ export class GameEngine {
   const b={id:this.id++,x,y,px:x,py:y,originX:x,originY:y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,speed,damage,gen,noHeal,didSplit:false,life:range/speed*(style==='chakram'?3:1)+.3,pierce:this.sampleCount(this.spec.pierce)+(fragment?0:w.innatePierce||0),bounce:this.sampleCount(this.spec.bounce),hit:new Set(hitIds),distance:0,phaseDistance:0,maxDistance:range,kind:style,weaponId:w.id,radius:fragment?3:w.projectileRadius||3,z:15,color:w.color,returning:false,angle,hasBurst:false};
   this.bullets.push(b);return b;
  }
+ isWeaponPrepared(){
+  const required=this.spec.weapon.stationarySeconds||0;
+  return required<=0||(!this.player.moving&&this.player.still+1e-9>=required);
+ }
+ /** Read-only HUD state. Preparation is independent of the ordinary attack cooldown. */
+ weaponAttackState(){
+  const required=this.spec.weapon.stationarySeconds||0;
+  if(required<=0)return {mode:'mobile',progress:1,remaining:0};
+  if(this.player.moving)return {mode:'moving',progress:0,remaining:required};
+  if(!this.isWeaponPrepared())return {mode:'preparing',progress:Math.max(0,Math.min(1,this.player.still/required)),remaining:Math.max(0,required-this.player.still)};
+  if(this.shotTimer>1e-9)return {mode:'cooldown',progress:Math.max(0,Math.min(1,1-this.shotTimer*this.spec.rate)),remaining:this.shotTimer};
+  return {mode:'ready',progress:1,remaining:0};
+ }
  volley(bonus=false){
+  if(!this.isWeaponPrepared())return false;
   const p=this.player,w=this.spec.weapon,t=this.target(p.x,p.y,new Set(),this.spec.range+(w.kind==='melee'?36:0));if(!t)return false;
   // A large target can be struck at its edge; do not swing at a small enemy beyond reach.
   if(w.kind==='melee'&&Math.hypot(t.x-p.x,t.y-p.y)-(t.r||10)>this.spec.range)return false;
@@ -89,10 +104,12 @@ export class GameEngine {
   return true;
  }
  projectileVolley(angle,count,noHeal){
+  if(!this.isWeaponPrepared())return false;
   const p=this.player;
   for(let i=0;i<count;i++)this.bullet(p.x,p.y,angle+(i-(count-1)/2)*Math.min(.13,1.7/Math.max(1,count)),{noHeal});
  }
  meleeAttack(angle,noHeal=false){
+  if(!this.isWeaponPrepared())return false;
   const p=this.player,s=this.spec,w=s.weapon;
   if(this.totalTime-this.lastAttackAt>2)this.combo=0;this.lastAttackAt=this.totalTime;this.combo++;
   const comboHit=w.combo&&this.combo%w.combo===0,damage=s.damage*(comboHit?w.comboDamage:1);
@@ -290,11 +307,19 @@ export class GameEngine {
   if(p.hp<=0){p.hp=0;this.status='dead';this.onEvent({type:'dead'});return;}
   this.totalTime+=dt;this.floorTime+=dt;p.invuln=Math.max(0,p.invuln-dt);p.attackTime=Math.max(0,p.attackTime-dt);this.itemCooldown=Math.max(0,this.itemCooldown-dt);p.slowTime=Math.max(0,p.slowTime-dt);if(!p.slowTime)p.slowStrength=0;
   if(p.ward){p.ward.remaining-=dt;if(p.ward.remaining<=0)p.ward=null;}
-  const len=Math.hypot(input.x,input.y);p.still=len>.05?0:p.still+dt;const move=s.move*this.terrainSlow();
-  if(len>.01)this.moveBody(p,input.x/Math.max(1,len)*move,input.y/Math.max(1,len)*move,dt,9);this.updateSight();this.settleLeech(dt);this.heal(s.regen*dt);this.updateHazards(dt);
+  const wasPrepared=this.isWeaponPrepared(),len=Math.hypot(input.x,input.y);p.moving=len>MOVEMENT_DEADZONE;p.still=p.moving?0:p.still+dt;const move=s.move*this.terrainSlow();
+  if(p.moving)this.moveBody(p,input.x/Math.max(1,len)*move,input.y/Math.max(1,len)*move,dt,9);this.updateSight();this.settleLeech(dt);this.heal(s.regen*dt);this.updateHazards(dt);
   this.flowTimer-=dt;if(this.flowTimer<=0){this.flow=distanceGrid(m,Math.floor(p.x/m.tile),Math.floor(p.y/m.tile));this.flowTimer=.3;}
   this.spawnTimer-=dt;if(this.spawnTimer<=0){this.spawn();this.spawnTimer=Math.max(.15,.85-this.floor*.035);}
-  this.shotTimer-=dt;while(this.shotTimer<=0){this.volley();this.shotTimer+=1/s.rate;}
+  this.shotTimer-=dt;
+  // Cooldown keeps running during movement, but missed attacks are never banked.
+  // The first prepared tick can release one ready attack; later ticks retain fractional time for fast builds.
+  if(!(s.weapon.stationarySeconds>0)){while(this.shotTimer<=0){this.volley();this.shotTimer+=1/s.rate;}}
+  else if(!this.isWeaponPrepared())this.shotTimer=Math.max(0,this.shotTimer);
+  else{
+   if(!wasPrepared)this.shotTimer=Math.max(0,this.shotTimer);
+   while(this.shotTimer<=0){if(!this.volley()){this.shotTimer=0;break;}this.shotTimer+=1/s.rate;}
+  }
   if(this.bonusCredit>=1&&this.volley(true))this.bonusCredit-=1;
   const due=this.pendingBursts.filter(b=>b.at<=this.totalTime);this.pendingBursts=this.pendingBursts.filter(b=>b.at>this.totalTime);
   for(const burst of due){const target=this.target(p.x,p.y);if(target){p.facing=Math.atan2(target.y-p.y,target.x-p.x);p.attackTime=.12;this.projectileVolley(p.facing,burst.count,burst.noHeal);}}

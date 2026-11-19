@@ -13,7 +13,7 @@ function arena(digit=0){
  const e=new GameEngine(spec(digit),{seed:711}),w=35,h=25,tile=32;
  const cells=Array.from({length:h},(_,y)=>Array.from({length:w},(_,x)=>+(x===0||y===0||x===w-1||y===h-1)));
  e.map={w,h,tile,cells,width:w*tile,height:h*tile,spawn:{x:400,y:400},portal:{x:48,y:48},stairs:{x:1000,y:720},open:[]};
- Object.assign(e.player,e.map.spawn);e.exploration=createExploration(e.map);e.spec.vision=24;e.updateSight();e.enemies=[];e.spawn=()=>{};e.goalTime=Infinity;
+ Object.assign(e.player,e.map.spawn,{still:1});e.exploration=createExploration(e.map);e.spec.vision=24;e.updateSight();e.enemies=[];e.spawn=()=>{};e.goalTime=Infinity;
  return e;
 }
 function foe(e,x,y=0,id=e.enemies.length+500){const enemy={id,x:e.player.x+x,y:e.player.y+y,hp:1e8,maxHp:1e8,r:8,warm:0,speed:0,poison:0,poisonDps:0,slow:0,flash:0,color:'#fff'};e.enemies.push(enemy);return enemy;}
@@ -75,7 +75,7 @@ test('斧は剣より左右の広い範囲に届く',()=>{
 });
 test('槌は敵を押し戻し、無限ボスには位置を変更しない',()=>{
  const e=arena(5),a=foe(e,35);const x=a.x;e.volley();near(a.x-x,24);
- const b=new BossTrial(spec(5));Object.assign(b.player,{x:b.boss.x,y:b.boss.y+60});const original={x:b.boss.x,y:b.boss.y};b.volley();assert.deepEqual({x:b.boss.x,y:b.boss.y},original);assert.ok(b.totalDamage>0);
+ const b=new BossTrial(spec(5));Object.assign(b.player,{x:b.boss.x,y:b.boss.y+60,still:1});const original={x:b.boss.x,y:b.boss.y};b.volley();assert.deepEqual({x:b.boss.x,y:b.boss.y},original);assert.ok(b.totalDamage>0);
 });
 test('近接への追尾は薙ぎ幅を増やす',()=>{
  const e=arena(0);foe(e,25);const side=foe(e,0,48);e.volley();assert.equal(side.hp,side.maxHp);e.spec.homing=5;e.volley();assert.ok(side.hp<side.maxHp);

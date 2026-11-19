@@ -128,6 +128,15 @@ footer { padding: 18px 28px; color: #93a9ab; font-size: 12px; border-top: 1px so
 .weapon-facts { display: flex; gap: 8px 20px; flex-wrap: wrap; justify-content: flex-end; font-size: 12px; color: var(--muted); }
 .weapon-facts b { color: #ecdfb9; font-weight: 600; white-space: nowrap; }
 .hud-weapon { color: #ddd4a9; font-size: 12px; margin-top: 4px; }
+.home-weapon-condition { flex-basis: 100%; max-width: 36em; margin: 0; color: #a9c9bd; font-size: 14px; line-height: 1.7; }
+.home-weapon-condition.is-heavy { color: #edc990; }
+.weapon-title p.weapon-condition { color: #d2dcc8; font-size: 14px; max-width: 31em; }
+.hud-stance { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 23px; color: #aed8c8; font-size: 13px; }
+.hud-stance[data-mode="moving"], .hud-stance[data-mode="preparing"] { color: #f0cc92; }
+.hud-stance[data-mode="cooldown"] { color: #c4cdce; }
+.stance-meter { display: block; flex: 0 0 54px; height: 4px; overflow: hidden; background: #344647; border-radius: 3px; }
+.stance-meter>span { display: block; width: 0; height: 100%; background: currentColor; }
+.hud-stance[data-mode="ready"] .stance-meter { box-shadow: 0 0 6px #a1e4c244; }
 .home-play, .home-demo { font-size: 15px; min-height: 51px; padding: 13px 23px; border-radius: 5px; }
 .home-demo { background: #16292bd9; border-color: #4c6963; }
 .home-controls { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; font-size: 12px; color: #9bb2b0; margin-top: 16px; }

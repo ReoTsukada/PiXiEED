@@ -1,6 +1,6 @@
 import {compileBoard,makeItem} from './core.mjs';
-/** These helpers describe the v0.7 weapon model; the named PvP helpers remain archival. They do NOT implement networked PvP. */
-export const BALANCE_VERSION='0.7.0-candidate';
+/** These helpers describe the v0.8 weapon model; the named PvP helpers remain archival. They do NOT implement networked PvP. */
+export const BALANCE_VERSION='0.8.0-candidate';
 export function floorStats(floor){
  if(!Number.isSafeInteger(floor)||floor<1)throw Error('階層は1以上の整数');
  const hp=20*Math.pow(1+.16*(floor-1),1.65),contact=7+2.5*Math.pow(floor-1,.65);
@@ -12,7 +12,8 @@ export function expectedDirect(spec,{hitsPerVolley=spec.innateHits||1,stationary
  const condition=(stationary?1+spec.steady:1)*(1+spec.longshot*Math.min(1,distance/(pvp?350:(spec.range||500))))*(execute?1+spec.execute:1);
  const noncritHit=spec.damage*(pvp?1:1+.1*(level-1))*condition;
  const critFactor=1+spec.crit*(spec.critMultiplier-1),comboFactor=pvp?1:(spec.comboMultiplier||1);
- return {noncritHit,critHit:noncritHit*spec.critMultiplier,averageHit:noncritHit*critFactor*comboFactor,comboFactor,innateHits:pvp?1:(spec.innateHits||1),dps:noncritHit*critFactor*comboFactor*spec.rate*hitsPerVolley};
+ const stationarySeconds=pvp?0:spec.weapon?.stationarySeconds||0,canAttack=stationarySeconds===0||stationary;
+ return {noncritHit,critHit:noncritHit*spec.critMultiplier,averageHit:noncritHit*critFactor*comboFactor,comboFactor,innateHits:pvp?1:(spec.innateHits||1),stationarySeconds,canAttack,dps:canAttack?noncritHit*critFactor*comboFactor*spec.rate*hitsPerVolley:0};
 }
 /** Loan copies: same digits/types/layout; no ownership, rarity, rolls, legacy quality advantage. */
 export function compileStandardPvp(board,inventory){
