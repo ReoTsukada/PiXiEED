@@ -1,0 +1,11 @@
+/*
+  Referrer-Policy: no-referrer
+  Cache-Control: private, no-store
+  Cross-Origin-Opener-Policy: same-origin
+  X-Content-Type-Options: nosniff
+  Origin-Agent-Cluster: ?1
+  Content-Security-Policy: frame-ancestors 'none'; object-src 'none'; base-uri 'none'; form-action 'none'
+/library-import/*
+  Content-Security-Policy: default-src 'self'; frame-ancestors 'none'; connect-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none'
+/library/
+  Content-Security-Policy: script-src 'self' https://*.googlesyndication.com https://*.google.com https://*.gstatic.com https://*.doubleclick.net https://*.googleadservices.com https://*.google.co.jp; frame-src https://pixieed.jp/draw/library-private/ https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com https://*.google.co.jp https://*.googleadservices.com about:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'
