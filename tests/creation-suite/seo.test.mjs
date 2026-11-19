@@ -24,6 +24,7 @@ const canonicalPathOverrides = new Map([
 const sitemapPages = pages
   .filter(([, path]) => !sitemapExcludedPaths.has(path));
 const eventIds = JSON.parse(readFileSync(resolve(root, 'events/catalog.json'), 'utf8')).ids;
+sitemapPages.splice(sitemapPages.findIndex(([, path]) => path === '/jigsaw/') + 1, 0, ['core-descent/index.html', '/core-descent/']);
 sitemapPages.splice(sitemapPages.findIndex(([, path]) => path === '/privacy/') + 1, 0, ['terms/index.html', '/terms/']);
 sitemapPages.push(
   ['help/index.html', '/help/'], ['glossary/index.html', '/glossary/'],

@@ -144,6 +144,9 @@ export async function buildPagesSite({ root = sourceRoot, output, esbuildPath } 
       if (parts[0] === 'events') return false;
       if (parts.some(part => part === '..' || part.startsWith('.')) || excluded.has(parts[0])) return false;
       if (retiredPublicPages.has(name)) return false;
+      // The standalone game bundles its runtime into this one public document.
+      // Keep its source, tests, saves, QA captures and build outputs out of Pages.
+      if (parts[0] === 'core-descent' && name !== 'core-descent/index.html') return false;
       // Publish only the public catalog route and the exact data/runtime it needs.
       // The room preview and prototype-only book assets stay local.
       if (parts[0] === 'books' && !publishableBooksPages.has(name)) return false;

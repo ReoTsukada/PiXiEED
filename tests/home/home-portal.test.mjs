@@ -21,12 +21,12 @@ test('every primary home entrance has a real source document', () => {
 test('play entrance lists real existing games without starting an editor or creating work', () => {
   const play = readFileSync(new URL('../../play/index.html', import.meta.url), 'utf8');
   assert.match(play, /href="https:\/\/pixieed\.jp\/play\/"/);
-  for (const href of ['/play/spot-difference/', '/play/hidden-object/', '/tools/start/jigsaw/']) {
+  for (const href of ['/play/spot-difference/', '/play/hidden-object/', '/tools/start/jigsaw/', '/core-descent/']) {
     assert.ok(play.includes(`href="${href}"`));
     const path = getToolStartRoute(href)?.sourcePath || href.slice(1) + 'index.html';
     assert.ok(existsSync(new URL('../../' + path, import.meta.url)), href);
   }
-  assert.equal((play.match(/class="play-card"/g) || []).length, 3);
+  assert.equal((play.match(/class="play-card"/g) || []).length, 4);
   assert.doesNotMatch(play, /<script|<iframe|<canvas|assets\/screenshots/);
 });
 

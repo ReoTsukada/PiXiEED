@@ -1,0 +1,54 @@
+/** Data-first catalogue. Digits belong to item instances, NOT ability definitions.
+ * Rolled local modifiers are additive after adjacent amplification. Values are provisional.
+ */
+export const CORE_DEFS = [
+ {id:'emitter',name:'弾丸生成',glyph:'◉',family:'射撃',color:'#6ae6ce',mods:{damage:0.02},desc:'頂点に装着すると自動射撃。威力 +2%。下段では威力だけを加える。'},
+ {id:'power',name:'高密度弾',glyph:'◆',family:'射撃',color:'#f5bd74',mods:{damage:0.04},desc:'弾丸の基礎威力 +4%。すべての直接弾に適用。'},
+ {id:'haste',name:'加速装填',glyph:'»',family:'射撃',color:'#f5bd74',mods:{"rate":0.012},desc:'射撃頻度 +1.2%。'},
+ {id:'multi',name:'並列銃身',glyph:'⋮',family:'弾道',color:'#77b7ff',mods:{"multi":0.025},desc:'追加弾数 +0.025。端数は射撃ごとに蓄積され、1で追加弾。'},
+ {id:'pierce',name:'貫通針',glyph:'↑',family:'弾道',color:'#77b7ff',mods:{"pierce":0.06},desc:'貫通回数 +0.06。端数は弾丸生成時の追加貫通確率になる。'},
+ {id:'bounce',name:'反射晶',glyph:'↗',family:'弾道',color:'#77b7ff',mods:{"bounce":0.08},desc:'壁反射 +0.08回。'},
+ {id:'split',name:'裂弾',glyph:'Y',family:'弾道',color:'#77b7ff',mods:{"split":0.025},desc:'初回命中だけで子弾 +0.025発。威力45%。再分裂せず、生成元の敵には当たらない。'},
+ {id:'blast',name:'炸裂核',glyph:'✧',family:'追加効果',color:'#ff9b84',mods:{"blast":0.012},desc:'直接命中時、別の周辺敵へ非会心威力×合計強度×75%の爆発。基準強度+1.2%。'},
+ {id:'chain',name:'放電路',glyph:'ϟ',family:'追加効果',color:'#bba1ff',mods:{"chain":0.012},desc:'直接命中時、別の敵へ非会心威力×合計強度×40%の放電。基準強度+1.2%。'},
+ {id:'poison',name:'腐食弾',glyph:'∴',family:'追加効果',color:'#a2db80',mods:{"poison":0.015},desc:'直接命中時、非会心威力×合計強度の毎秒ダメージを3秒。強い値を保持し時間更新。基準+1.5%。'},
+ {id:'slow',name:'凍結触媒',glyph:'❄',family:'追加効果',color:'#8adcf7',mods:{"slow":0.01},desc:'2秒間、敵速度を1÷(1+合計強度)に。基準強度+1%。'},
+ {id:'homing',name:'追尾レンズ',glyph:'◎',family:'弾道',color:'#77b7ff',mods:{"homing":0.025},desc:'追尾強度+0.025。旋回速度は合計強度×2ラジアン/秒。'},
+ {id:'crit',name:'精密照準',glyph:'⌖',family:'射撃',color:'#f5bd74',mods:{"crit":0.0025},desc:'会心率+0.25ポイント。100%超過分は会心倍率へ加算。'},
+ {id:'drain',name:'吸収回路',glyph:'♥',family:'持久',color:'#e99cbd',mods:{"drain":0.0001},desc:'直接弾の実ダメージの0.01%を吸収。PvE吸収回復は最大HPの8%/秒、未処理回復は1秒分まで。'},
+ {id:'hull',name:'防護殻',glyph:'⬡',family:'持久',color:'#6ae6ce',mods:{"hp":2},desc:'最大HP+2。'},
+ {id:'regen',name:'自己修復',glyph:'+',family:'持久',color:'#6ae6ce',mods:{"regen":0.025},desc:'毎秒HP+0.025。吸収回復の上限とは別。'},
+ {id:'stride',name:'機動補助',glyph:'›',family:'持久',color:'#6ae6ce',mods:{"move":0.25},desc:'移動速度+0.25px/秒。'},
+ {id:'magnet',name:'回収磁場',glyph:'U',family:'持久',color:'#6ae6ce',mods:{pickup:1.5},desc:'戦利品回収半径 +1.5px。'},
+ {id:'overdrive',name:'重砲化',glyph:'▰',family:'取引条件',color:'#ff9b84',mods:{"damage":0.085,"rate":-0.006},desc:'威力+8.5%、射撃頻度-0.6%。高レアは代償軽減、局所増幅は代償も増やす。'},
+ {id:'barrage',name:'散弾化',glyph:'⁙',family:'取引条件',color:'#ff9b84',mods:{"multi":0.04,"damage":-0.025},desc:'追加弾数+0.04、威力-2.5%。'},
+ {id:'execute',name:'追い撃ち',glyph:'×',family:'条件',color:'#bba1ff',mods:{"execute":0.01},desc:'HP35%未満の敵への命中威力+1%。'},
+ {id:'longshot',name:'遠距離増幅',glyph:'↠',family:'条件',color:'#bba1ff',mods:{"longshot":0.005},desc:'累積飛行距離500pxで命中威力最大+0.5%。'},
+ {id:'steady',name:'静止砲台',glyph:'▣',family:'条件',color:'#bba1ff',mods:{"steady":0.0035},desc:'0.7秒以上静止すると命中威力+0.35%。移動で解除。'},
+ {id:'recovery',name:'回復装填',glyph:'↻',family:'条件',color:'#e99cbd',mods:{recovery:0.025},desc:'実回復10HPごとに合計強度ぶんの追加弾を蓄積。追加弾は回復を起こさない。'},
+ {id:'amplifier',name:'接続増幅',glyph:'×',family:'増幅',color:'#f6d47b',mods:{},amplify:{gain:0.10},desc:'上に直接つながるコア自身の数値を強化。基準×1.10。継承済みの効果は再増幅しない。複数は乗算。増幅コアが対象なら増加分だけを強化。'}
+];
+export const CORE_BY_ID = Object.fromEntries(CORE_DEFS.map(c => [c.id,c]));
+export const STAT_KEYS = [...new Set(CORE_DEFS.flatMap(c=>Object.keys(c.mods)))];
+export const PUZZLE_9 = [[6],[1,5],[0,1,4],[9,1,0,4],[5,4,7,3,1],[7,8,6,1,2,9],[4,3,5,1,0,2,7],[1,3,0,5,6,4,8,9],[0,1,2,8,7,9,5,3,6]];
+
+// All numeric ranges are prototype balance values, not rarity drop guarantees.
+export const RARITIES = [
+ {id:'common',name:'コモン',short:'C',color:'#b9c5ce',factor:1},
+ {id:'uncommon',name:'アンコモン',short:'U',color:'#8ddba1',factor:1.5},
+ {id:'rare',name:'レア',short:'R',color:'#7dbdff',factor:2},
+ {id:'epic',name:'エピック',short:'E',color:'#c3a0ff',factor:2.5},
+ {id:'legendary',name:'レジェンダリー',short:'L',color:'#f3bd73',factor:3}
+];
+export const RARITY_BY_ID = Object.fromEntries(RARITIES.map(r=>[r.id,r]));
+export const ROLL_MIN = 9500;
+export const ROLL_MAX = 10500;
+export const STAT_LABELS = {
+ damage:['弾丸威力',100,'%'],rate:['射撃頻度',100,'%'],multi:['追加弾数',1,'発'],
+ pierce:['貫通',1,'回'],bounce:['反射',1,'回'],split:['分裂子弾',1,'発'],
+ blast:['爆発強度',100,'%'],chain:['放電強度',100,'%'],poison:['腐食強度',100,'%'],
+ slow:['鈍足強度',100,'%'],homing:['追尾強度',1,''],crit:['会心率',100,'pt'],
+ drain:['吸収率',100,'%'],hp:['最大HP',1,''],regen:['自己修復',1,'HP/秒'],
+ move:['移動速度',1,'px/秒'],pickup:['回収半径',1,'px'],execute:['追い撃ち',100,'%'],
+ longshot:['遠距離強化',100,'%'],steady:['静止強化',100,'%'],recovery:['回復装填',1,'発/10HP']
+};

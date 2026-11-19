@@ -22,6 +22,7 @@ export const DRAW_CTA_EXCLUDED_ROUTES = Object.freeze({
   '/output/work/': 'output workspace',
   '/telescope/': 'interactive tool',
   '/game/': 'interactive game creator',
+  '/core-descent/': 'interactive survival game',
   '/jigsaw/': 'interactive puzzle tool',
   '/hidden-object/': 'interactive problem creator',
   '/spot-difference/': 'interactive problem creator',

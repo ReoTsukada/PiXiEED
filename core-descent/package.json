@@ -1,0 +1,18 @@
+{
+  "name": "core-descent",
+  "version": "0.5.0",
+  "private": true,
+  "type": "module",
+  "description": "PiXiEED CORE DESCENT: 数字ピラミッドと多層2Dスプライトの自動射撃サバイバル",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "start": "node tools/serve.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "audit:puzzle": "node tools/puzzle-audit.mjs 9",
+    "verify": "node tools/verify.mjs",
+    "balance": "node tools/balance-report.mjs"
+  }
+}

@@ -1,0 +1,15 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {makeMap,distanceGrid} from '../src/map.mjs';import {makeProfile,compileBoard,laboratory} from '../src/core.mjs';import {GameEngine} from '../src/engine.mjs';
+function engine(kind){const p=kind?laboratory(kind):makeProfile();return new GameEngine(compileBoard(p.board,p.inventory),{seed:42});}
+test('100種類のマップで全通路・階段・帰還陣が到達可能',()=>{for(let seed=0;seed<100;seed++){const m=makeMap(seed,seed+1),d=distanceGrid(m,Math.floor(m.spawn.x/m.tile),Math.floor(m.spawn.y/m.tile));for(const t of m.open)assert.ok(d[t.ty][t.tx]>=0);assert.ok(d[Math.floor(m.stairs.y/m.tile)][Math.floor(m.stairs.x/m.tile)]>=0);assert.ok(d[Math.floor(m.portal.y/m.tile)][Math.floor(m.portal.x/m.tile)]>=0);}});
+test('同じ階層・シードは同じマップ',()=>assert.deepEqual(makeMap(2,4).cells,makeMap(2,4).cells));
+test('階層によりマップが変わる',()=>assert.notDeepEqual(makeMap(2,4).cells,makeMap(2,5).cells));
+test('ゲーム時間は有限・不正な貫通ループなし',()=>{const e=engine('storm');for(let i=0;i<3600;i++)e.tick(1/60,{x:Math.sin(i*.02),y:Math.cos(i*.02)});assert.ok(Number.isFinite(e.totalDamage));assert.ok(e.bullets.length<2000);assert.ok(e.totalKills>0);});
+test('HP・戦利品を次層へ引き継ぐ',()=>{const e=engine();e.player.hp=30;e.loot.push({id:'x'});e.gold=22;e.nextFloor();assert.equal(e.floor,2);assert.equal(e.player.hp,30);assert.equal(e.loot.length,1);assert.equal(e.gold,22);});
+test('帰還は封鎖解除後に帰還陣へ触れた時だけ',()=>{const e=engine();Object.assign(e.player,e.map.portal);e.tick(1/60);assert.equal(e.status,'playing');e.floorTime=22;e.floorKills=e.goalKills;e.tick(1/60);assert.equal(e.status,'returned');});
+test('階段で次層へ進める',()=>{const e=engine();e.floorTime=22;e.floorKills=e.goalKills;Object.assign(e.player,{x:e.map.stairs.x,y:e.map.stairs.y});e.tick(1/60);assert.equal(e.floor,2);assert.equal(e.status,'playing');});
+test('回復は欠損HPに制限され、オーバーヒールで追加弾を生まない',()=>{const e=engine('sustain');const before=e.bonusCredit;e.heal(100);assert.equal(e.bonusCredit,before);e.player.hp-=10;e.heal(100);assert.ok(e.bonusCredit>before);assert.equal(e.player.hp,e.spec.maxHp);});
+test('過剰ダメージは与ダメージや吸血の値に含めない',()=>{const e=engine(),target={id:1,x:10,y:10,hp:5,maxHp:5,color:'#fff'};assert.equal(e.hurt(target,9999,'direct'),5);assert.equal(e.totalDamage,5);assert.equal(e.hurt(target,9999,'direct'),0);});
+test('子弾は再分裂せず、追加弾の回復抑止を継承',()=>{const e=engine();e.spec.split=5;e.spec.blast=0;e.spec.chain=0;e.spec.drain=1;e.spec.recovery=1;e.player.hp-=30;const target={id:99,x:10,y:10,hp:999,maxHp:999,warm:0};e.enemies=[target];const b={damage:10,gen:1,noHeal:true,distance:0,vx:1,vy:0};const hp=e.player.hp;e.impact(b,target);assert.equal(e.bullets.length,0);assert.equal(e.player.hp,hp);});
+test('全滅後はシミュレーションが止まる',()=>{const e=engine();e.player.hp=0;e.tick(1/60);const t=e.totalTime;e.tick(1/60);assert.equal(e.status,'dead');assert.equal(e.totalTime,t);});
+test('小数の追加弾は切り捨てず蓄積',()=>{const e=engine();e.spec.multi=.25;e.enemies=[{id:1,x:e.player.x+50,y:e.player.y,hp:100,warm:0}];for(let i=0;i<4;i++)e.volley();assert.equal(e.bullets.length,5);});
