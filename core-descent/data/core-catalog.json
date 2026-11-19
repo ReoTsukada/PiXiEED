@@ -1,62 +1,234 @@
 {
-  "version": "0.5.0",
+  "version": "0.7.0",
   "source": "src/catalog.mjs",
   "generated": true,
+  "weapons": [
+    {
+      "digit": 0,
+      "id": "sword",
+      "name": "旅人の剣",
+      "glyph": "⚔",
+      "color": "#bfddbd",
+      "kind": "melee",
+      "style": "sword",
+      "baseDamage": 27,
+      "baseRate": 1.6,
+      "range": 64,
+      "arc": 2,
+      "cleave": 3,
+      "description": "前方を薙ぐ、扱いやすい剣。1振りで最大3体に命中。",
+      "mechanic": "前方115°の斬撃 / 巻き込み3体"
+    },
+    {
+      "digit": 1,
+      "id": "dagger",
+      "name": "双牙の短剣",
+      "glyph": "†",
+      "color": "#eee0ae",
+      "kind": "melee",
+      "style": "dagger",
+      "baseDamage": 11,
+      "baseRate": 3.6,
+      "range": 43,
+      "arc": 1.1,
+      "cleave": 1,
+      "combo": 3,
+      "comboDamage": 1.8,
+      "description": "近距離を素早く刺す。3撃目の威力は1.8倍。連撃は2秒で途切れる。",
+      "mechanic": "高速3連撃 / 3撃目1.8倍"
+    },
+    {
+      "digit": 2,
+      "id": "greatsword",
+      "name": "巨人の大剣",
+      "glyph": "╋",
+      "color": "#b4c8d5",
+      "kind": "melee",
+      "style": "greatsword",
+      "baseDamage": 68,
+      "baseRate": 0.72,
+      "range": 87,
+      "arc": 2.45,
+      "cleave": 6,
+      "description": "長い間合いから広く薙ぎ払う。振りは遅いが最大6体に命中。",
+      "mechanic": "前方140°の重斬撃 / 巻き込み6体"
+    },
+    {
+      "digit": 3,
+      "id": "spear",
+      "name": "銀枝の槍",
+      "glyph": "↑",
+      "color": "#c4dfb2",
+      "kind": "melee",
+      "style": "spear",
+      "baseDamage": 33,
+      "baseRate": 1.45,
+      "range": 116,
+      "arc": 0.3,
+      "width": 12,
+      "cleave": 4,
+      "description": "細長い直線上を貫く突き。離れた敵にも届き、最大4体に命中。",
+      "mechanic": "長射程の直線突き / 巻き込み4体"
+    },
+    {
+      "digit": 4,
+      "id": "axe",
+      "name": "月輪の斧",
+      "glyph": "☽",
+      "color": "#f0b17e",
+      "kind": "melee",
+      "style": "axe",
+      "baseDamage": 43,
+      "baseRate": 1.05,
+      "range": 68,
+      "arc": 3.7,
+      "cleave": 5,
+      "description": "左右を巻き込む広い斧の一振り。前方212°、最大5体に命中。",
+      "mechanic": "広い扇形斬撃 / 巻き込み5体"
+    },
+    {
+      "digit": 5,
+      "id": "hammer",
+      "name": "岩砕きの槌",
+      "glyph": "▣",
+      "color": "#cfb796",
+      "kind": "melee",
+      "style": "hammer",
+      "baseDamage": 62,
+      "baseRate": 0.7,
+      "range": 61,
+      "arc": 1.8,
+      "cleave": 3,
+      "knockback": 24,
+      "description": "重い打撃で敵を押し戻す。最大3体に命中し、その場から24px押す。ボスは押せない。",
+      "mechanic": "重打撃とノックバック / 巻き込み3体"
+    },
+    {
+      "digit": 6,
+      "id": "bow",
+      "name": "風読みの弓",
+      "glyph": ")",
+      "color": "#d7c58e",
+      "kind": "projectile",
+      "style": "arrow",
+      "baseDamage": 12,
+      "baseRate": 3,
+      "range": 460,
+      "projectileSpeed": 560,
+      "projectileRadius": 3,
+      "innatePierce": 1,
+      "description": "速く長い射程の矢。素の状態で1体を貫通し、2体目まで届く。",
+      "mechanic": "高速直線矢 / 基礎貫通1回"
+    },
+    {
+      "digit": 7,
+      "id": "chakram",
+      "name": "帰還の刃輪",
+      "glyph": "◌",
+      "color": "#e7bc83",
+      "kind": "projectile",
+      "style": "chakram",
+      "baseDamage": 24,
+      "baseRate": 1.1,
+      "range": 220,
+      "projectileSpeed": 310,
+      "projectileRadius": 8,
+      "description": "敵を抜け、射程の端で戻る刃。往路と復路にそれぞれ1回ずつ同じ敵へ命中できる。壁で帰還を始める。",
+      "mechanic": "往復投擲 / 同じ敵へ最大2回"
+    },
+    {
+      "digit": 8,
+      "id": "staff",
+      "name": "星火の杖",
+      "glyph": "✦",
+      "color": "#87cfdf",
+      "kind": "projectile",
+      "style": "orb",
+      "baseDamage": 25,
+      "baseRate": 1.35,
+      "range": 350,
+      "projectileSpeed": 245,
+      "projectileRadius": 7,
+      "burstRadius": 55,
+      "burstDamage": 0.7,
+      "description": "ゆっくり飛ぶ魔力球。最初の命中時、周囲の別の敵へ70%威力の魔力爆発。",
+      "mechanic": "魔力球 / 初回命中時に周囲へ70%爆発"
+    },
+    {
+      "digit": 9,
+      "id": "spellbook",
+      "name": "古代の魔導書",
+      "glyph": "▤",
+      "color": "#c4a7ed",
+      "kind": "projectile",
+      "style": "rune",
+      "baseDamage": 12,
+      "baseRate": 1.1,
+      "range": 300,
+      "projectileSpeed": 300,
+      "projectileRadius": 4,
+      "burst": 3,
+      "burstGap": 0.1,
+      "innateHoming": 1.2,
+      "description": "0.1秒間隔で3つの魔弾を放つ。魔弾は毎秒1.2ラジアンの速度で敵を追う。",
+      "mechanic": "3連魔弾 / 基礎追尾あり"
+    }
+  ],
   "definitions": [
     {
       "id": "emitter",
-      "name": "弾丸生成",
+      "name": "武装の核",
       "glyph": "◉",
-      "family": "射撃",
+      "family": "武装",
       "color": "#6ae6ce",
       "mods": {
         "damage": 0.02
       },
-      "desc": "頂点に装着すると自動射撃。威力 +2%。下段では威力だけを加える。"
+      "desc": "頂点の固定数字で10種の武器を決定。攻撃威力 +2%。下段では威力だけを加え、武器は変えない。"
     },
     {
       "id": "power",
-      "name": "高密度弾",
+      "name": "闘気の結晶",
       "glyph": "◆",
-      "family": "射撃",
+      "family": "攻撃",
       "color": "#f5bd74",
       "mods": {
         "damage": 0.04
       },
-      "desc": "弾丸の基礎威力 +4%。すべての直接弾に適用。"
+      "desc": "基本攻撃威力 +4%。近接・矢・魔法とその追加効果に適用。"
     },
     {
       "id": "haste",
-      "name": "加速装填",
+      "name": "疾風の刻印",
       "glyph": "»",
-      "family": "射撃",
+      "family": "攻撃",
       "color": "#f5bd74",
       "mods": {
         "rate": 0.012
       },
-      "desc": "射撃頻度 +1.2%。"
+      "desc": "攻撃頻度 +1.2%。近接の振り、射撃、魔法の連射周期を速める。"
     },
     {
       "id": "multi",
-      "name": "並列銃身",
+      "name": "連撃の刻印",
       "glyph": "⋮",
       "family": "弾道",
       "color": "#77b7ff",
       "mods": {
         "multi": 0.025
       },
-      "desc": "追加弾数 +0.025。端数は射撃ごとに蓄積され、1で追加弾。"
+      "desc": "追加攻撃 +0.025。端数は蓄積。近接は追加の一振り、遠隔は追加弾。魔導書は連射の各段へ適用。"
     },
     {
       "id": "pierce",
-      "name": "貫通針",
+      "name": "貫通の牙",
       "glyph": "↑",
       "family": "弾道",
       "color": "#77b7ff",
       "mods": {
         "pierce": 0.06
       },
-      "desc": "貫通回数 +0.06。端数は弾丸生成時の追加貫通確率になる。"
+      "desc": "貫通 +0.06。遠隔の貫通回数、近接の巻き込み上限を増やす。刃輪は命中時の追加斬撃へ変換。端数は確率。"
     },
     {
       "id": "bounce",
@@ -67,22 +239,22 @@
       "mods": {
         "bounce": 0.08
       },
-      "desc": "壁反射 +0.08回。"
+      "desc": "反射 +0.08回。遠隔は壁で反射。近接は最初の対象から別の敵へ45%威力の反響斬。端数は確率。"
     },
     {
       "id": "split",
-      "name": "裂弾",
+      "name": "分裂の欠片",
       "glyph": "Y",
       "family": "弾道",
       "color": "#77b7ff",
       "mods": {
         "split": 0.025
       },
-      "desc": "初回命中だけで子弾 +0.025発。威力45%。再分裂せず、生成元の敵には当たらない。"
+      "desc": "初回命中で魔力の欠片 +0.025発。近接にも有効。威力45%、再分裂せず、発生元の敵には当たらない。"
     },
     {
       "id": "blast",
-      "name": "炸裂核",
+      "name": "爆炎の核",
       "glyph": "✧",
       "family": "追加効果",
       "color": "#ff9b84",
@@ -104,7 +276,7 @@
     },
     {
       "id": "poison",
-      "name": "腐食弾",
+      "name": "毒の刻印",
       "glyph": "∴",
       "family": "追加効果",
       "color": "#a2db80",
@@ -126,20 +298,20 @@
     },
     {
       "id": "homing",
-      "name": "追尾レンズ",
+      "name": "導きの眼",
       "glyph": "◎",
       "family": "弾道",
       "color": "#77b7ff",
       "mods": {
         "homing": 0.025
       },
-      "desc": "追尾強度+0.025。旋回速度は合計強度×2ラジアン/秒。"
+      "desc": "追尾強度+0.025。遠隔の旋回速度 +強度×2ラジアン/秒。近接は薙ぎ幅と槍の横幅を広げる。"
     },
     {
       "id": "crit",
-      "name": "精密照準",
+      "name": "会心の刻印",
       "glyph": "⌖",
-      "family": "射撃",
+      "family": "攻撃",
       "color": "#f5bd74",
       "mods": {
         "crit": 0.0025
@@ -148,18 +320,18 @@
     },
     {
       "id": "drain",
-      "name": "吸収回路",
+      "name": "吸命の牙",
       "glyph": "♥",
       "family": "持久",
       "color": "#e99cbd",
       "mods": {
         "drain": 0.0001
       },
-      "desc": "直接弾の実ダメージの0.01%を吸収。PvE吸収回復は最大HPの8%/秒、未処理回復は1秒分まで。"
+      "desc": "直接攻撃の実ダメージの0.01%を吸収。PvE吸収回復は最大HPの8%/秒、未処理回復は1秒分まで。"
     },
     {
       "id": "hull",
-      "name": "防護殻",
+      "name": "守護の石",
       "glyph": "⬡",
       "family": "持久",
       "color": "#6ae6ce",
@@ -170,7 +342,7 @@
     },
     {
       "id": "regen",
-      "name": "自己修復",
+      "name": "再生の息吹",
       "glyph": "+",
       "family": "持久",
       "color": "#6ae6ce",
@@ -181,7 +353,7 @@
     },
     {
       "id": "stride",
-      "name": "機動補助",
+      "name": "旅人の羽",
       "glyph": "›",
       "family": "持久",
       "color": "#6ae6ce",
@@ -192,7 +364,7 @@
     },
     {
       "id": "magnet",
-      "name": "回収磁場",
+      "name": "収集の風",
       "glyph": "U",
       "family": "持久",
       "color": "#6ae6ce",
@@ -203,7 +375,7 @@
     },
     {
       "id": "overdrive",
-      "name": "重砲化",
+      "name": "巨力の誓い",
       "glyph": "▰",
       "family": "取引条件",
       "color": "#ff9b84",
@@ -211,11 +383,11 @@
         "damage": 0.085,
         "rate": -0.006
       },
-      "desc": "威力+8.5%、射撃頻度-0.6%。高レアは代償軽減、局所増幅は代償も増やす。"
+      "desc": "威力+8.5%、攻撃頻度-0.6%。高レアは代償軽減、局所増幅は代償も増やす。"
     },
     {
       "id": "barrage",
-      "name": "散弾化",
+      "name": "群星の誓い",
       "glyph": "⁙",
       "family": "取引条件",
       "color": "#ff9b84",
@@ -223,7 +395,7 @@
         "multi": 0.04,
         "damage": -0.025
       },
-      "desc": "追加弾数+0.04、威力-2.5%。"
+      "desc": "追加攻撃+0.04、威力-2.5%。"
     },
     {
       "id": "execute",
@@ -238,18 +410,18 @@
     },
     {
       "id": "longshot",
-      "name": "遠距離増幅",
+      "name": "間合いの極意",
       "glyph": "↠",
       "family": "条件",
       "color": "#bba1ff",
       "mods": {
         "longshot": 0.005
       },
-      "desc": "累積飛行距離500pxで命中威力最大+0.5%。"
+      "desc": "射程の端で命中威力最大+0.5%。近接は敵との距離、遠隔は累積飛行距離÷射程に応じて増える。"
     },
     {
       "id": "steady",
-      "name": "静止砲台",
+      "name": "不動の誓い",
       "glyph": "▣",
       "family": "条件",
       "color": "#bba1ff",
@@ -260,14 +432,36 @@
     },
     {
       "id": "recovery",
-      "name": "回復装填",
+      "name": "生命の反響",
       "glyph": "↻",
       "family": "条件",
       "color": "#e99cbd",
       "mods": {
         "recovery": 0.025
       },
-      "desc": "実回復10HPごとに合計強度ぶんの追加弾を蓄積。追加弾は回復を起こさない。"
+      "desc": "実回復10HPごとに合計強度ぶんの追加攻撃を蓄積。追加攻撃は回復を起こさない。"
+    },
+    {
+      "id": "vision",
+      "name": "灯火の瞳",
+      "glyph": "◉",
+      "family": "探索",
+      "color": "#e9d78f",
+      "mods": {
+        "vision": 0.025
+      },
+      "desc": "視界・索敵半径 +0.025タイル。基礎8タイル。長射程の武器と組み合わせる。壁の背後は見えない。"
+    },
+    {
+      "id": "reach",
+      "name": "伸長の紋章",
+      "glyph": "↔",
+      "family": "間合い",
+      "color": "#9ad5c8",
+      "mods": {
+        "reach": 0.004
+      },
+      "desc": "射程・間合い +0.4%。近接の届く距離と、遠隔の飛行距離を伸ばす。壁を越えて攻撃することはできない。"
     },
     {
       "id": "amplifier",
@@ -280,6 +474,71 @@
         "gain": 0.1
       },
       "desc": "上に直接つながるコア自身の数値を強化。基準×1.10。継承済みの効果は再増幅しない。複数は乗算。増幅コアが対象なら増加分だけを強化。"
+    },
+    {
+      "id": "elderheart",
+      "name": "古樹の心核",
+      "glyph": "♧",
+      "family": "固有・持久",
+      "color": "#a9ce8a",
+      "exclusiveEnemyId": "elder_treant",
+      "mods": {
+        "hp": 1.5,
+        "regen": 0.02
+      },
+      "desc": "草原の古老樹だけが落とす。最大HP+1.5、自然回復+0.02HP/秒。全武器に有効。"
+    },
+    {
+      "id": "dune_venom",
+      "name": "砂蠍の毒針核",
+      "glyph": "⋔",
+      "family": "固有・追加効果",
+      "color": "#d6ba78",
+      "exclusiveEnemyId": "dune_scorpion",
+      "mods": {
+        "poison": 0.01,
+        "pierce": 0.04
+      },
+      "desc": "砂丘の大蠍だけが落とす。毒強度+1%、貫通+0.04。近接は巻き込み、刃輪は追加斬撃へ適用。"
+    },
+    {
+      "id": "drakeflame",
+      "name": "灰竜の焔核",
+      "glyph": "✧",
+      "family": "固有・攻撃",
+      "color": "#e99469",
+      "exclusiveEnemyId": "cinder_drake",
+      "mods": {
+        "blast": 0.01,
+        "damage": 0.025
+      },
+      "desc": "熾火の古竜だけが落とす。爆発強度+1%、全武器の威力+2.5%。"
+    },
+    {
+      "id": "hydra_blood",
+      "name": "沼蛇竜の血核",
+      "glyph": "♥",
+      "family": "固有・持久",
+      "color": "#b197cf",
+      "exclusiveEnemyId": "mire_hydra",
+      "mods": {
+        "drain": 0.00008,
+        "multi": 0.018
+      },
+      "desc": "瘴気のヒュドラだけが落とす。吸収率+0.008%、追加攻撃+0.018。近接・遠隔ともに有効。"
+    },
+    {
+      "id": "winter_crown",
+      "name": "霜巨人の冠核",
+      "glyph": "❄",
+      "family": "固有・間合い",
+      "color": "#9ed5e8",
+      "exclusiveEnemyId": "frost_giant",
+      "mods": {
+        "slow": 0.008,
+        "reach": 0.003
+      },
+      "desc": "白霜の巨人だけが落とす。鈍足強度+0.8%、射程・間合い+0.3%。全武器に有効。"
     }
   ],
   "rarities": [

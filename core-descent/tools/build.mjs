@@ -3,7 +3,7 @@ import {fileURLToPath} from 'node:url';
 const root=fileURLToPath(new URL('../',import.meta.url));
 // Small offline bundler for this fixed set of named ES modules. Module scopes
 // stay isolated: renderer-local identifiers cannot shadow combat calculations.
-const modules=['catalog','core','map','combat-math','engine','rankings','boss','market','sprites','renderer','app'];
+const modules=['weapons','catalog','items','core','loot','world','map','fog','combat-math','engine','rankings','boss','market','sprites','renderer','weapon-ui','camp-ui','app'];
 let source='"use strict";\nconst __modules=Object.create(null);\n';
 const resolved=new Set();
 for(const name of modules){
@@ -25,6 +25,7 @@ await writeFile(root+'dist/index.html',html);await writeFile(root+'dist/bundle.j
 // The PiXiEED static publisher includes only this entry in /core-descent/.
 await writeFile(root+'index.html',html);
 console.log(`Built index.html and dist/index.html (${Buffer.byteLength(html)} bytes; no runtime dependencies).`);
+const {WEAPONS}=await import('../src/weapons.mjs');
 const {CORE_DEFS,RARITIES,ROLL_MIN,ROLL_MAX}=await import('../src/catalog.mjs');
 await mkdir(root+'data',{recursive:true});
-await writeFile(root+'data/core-catalog.json',JSON.stringify({version:'0.5.0',source:'src/catalog.mjs',generated:true,definitions:CORE_DEFS,rarities:RARITIES,rollRange:[ROLL_MIN,ROLL_MAX]},null,2));
+await writeFile(root+'data/core-catalog.json',JSON.stringify({version:'0.7.0',source:'src/catalog.mjs',generated:true,weapons:WEAPONS,definitions:CORE_DEFS,rarities:RARITIES,rollRange:[ROLL_MIN,ROLL_MAX]},null,2));

@@ -1,18 +1,18 @@
 import {compileBoard,makeItem} from './core.mjs';
-/** These helpers describe the v0.3 model. They do NOT implement networked PvP. */
-export const BALANCE_VERSION='0.3.0-candidate';
+/** These helpers describe the v0.7 weapon model; the named PvP helpers remain archival. They do NOT implement networked PvP. */
+export const BALANCE_VERSION='0.7.0-candidate';
 export function floorStats(floor){
  if(!Number.isSafeInteger(floor)||floor<1)throw Error('階層は1以上の整数');
  const hp=20*Math.pow(1+.16*(floor-1),1.65),contact=7+2.5*Math.pow(floor-1,.65);
  if(!Number.isFinite(hp)||!Number.isFinite(contact))throw Error('表現できない階層');
  return {hp,contact};
 }
-export function expectedDirect(spec,{hitsPerVolley=1,stationary=false,distance=0,execute=false,level=1,pvp=false}={}){
+export function expectedDirect(spec,{hitsPerVolley=spec.innateHits||1,stationary=false,distance=0,execute=false,level=1,pvp=false}={}){
  if(!Number.isFinite(hitsPerVolley)||hitsPerVolley<0||!Number.isFinite(distance)||distance<0||!Number.isInteger(level)||level<1||level>21)throw Error('試算条件が不正');
- const condition=(stationary?1+spec.steady:1)*(1+spec.longshot*Math.min(1,distance/(pvp?350:500)))*(execute?1+spec.execute:1);
+ const condition=(stationary?1+spec.steady:1)*(1+spec.longshot*Math.min(1,distance/(pvp?350:(spec.range||500))))*(execute?1+spec.execute:1);
  const noncritHit=spec.damage*(pvp?1:1+.1*(level-1))*condition;
- const critFactor=1+spec.crit*(spec.critMultiplier-1);
- return {noncritHit,critHit:noncritHit*spec.critMultiplier,averageHit:noncritHit*critFactor,dps:noncritHit*critFactor*spec.rate*hitsPerVolley};
+ const critFactor=1+spec.crit*(spec.critMultiplier-1),comboFactor=pvp?1:(spec.comboMultiplier||1);
+ return {noncritHit,critHit:noncritHit*spec.critMultiplier,averageHit:noncritHit*critFactor*comboFactor,comboFactor,innateHits:pvp?1:(spec.innateHits||1),dps:noncritHit*critFactor*comboFactor*spec.rate*hitsPerVolley};
 }
 /** Loan copies: same digits/types/layout; no ownership, rarity, rolls, legacy quality advantage. */
 export function compileStandardPvp(board,inventory){

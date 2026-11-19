@@ -99,6 +99,35 @@ footer { padding: 18px 28px; color: #93a9ab; font-size: 12px; border-top: 1px so
 .home-lead { font-size: clamp(22px, 2.2vw, 30px); font-weight: 600; line-height: 1.65; margin-top: 26px; letter-spacing: .04em; }
 .home-description { font-size: 15px; color: #b4c8c7; margin-top: 16px; line-height: 1.9; }
 .home-main-actions { display: flex; gap: 10px; margin-top: 27px; flex-wrap: wrap; }
+.home-weapon-select { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 20px; }
+.home-weapon-select label { font-size: 14px; color: #d5dec6; }
+.home-weapon-select select { font-size: 14px; min-height: 42px; min-width: 165px; background-color: #182c2d; }
+.home-weapon-select>span { font-size: 12px; color: var(--muted); }
+.home-weapon-select+.home-main-actions { margin-top: 13px; }
+.home-field-select { display:flex; align-items:center; flex-wrap:wrap; gap:9px 12px; margin-top:10px; }
+.home-field-select>label { color:#d5dec6; font-size:14px; }
+.home-field-select select { min-height:42px; min-width:165px; font-size:14px; background-color:#182c2d; }
+.boss-toggle { display:flex; align-items:center; gap:6px; }
+.boss-toggle input { width:17px; height:17px; min-height:0; accent-color:var(--mint); }
+.home-demo-note { font-size:12px; color:var(--muted); margin-top:10px; max-width:40em; }
+.weapon-panel { margin-bottom: 20px; border-color: #536256; }
+.weapon-panel h2 { font-size: 18px; }
+.weapon-panel .panel-top { padding-bottom: 12px; }
+#weapon-instruction { margin-top: 7px; }
+.weapon-picker { display: grid; grid-template-columns: repeat(10,minmax(0,1fr)); gap: 8px; padding: 0 20px 16px; }
+.weapon-choice { position: relative; display: grid; place-items: center; gap: 5px; min-width: 0; padding: 12px 4px 8px; border-color: #344940; border-radius: 6px; background: #142326; font-size: 14px; line-height: 1.4; }
+.weapon-choice svg { width: 32px; height: 32px; filter: drop-shadow(0 3px 0 #0004); }
+.weapon-choice .weapon-digit { position: absolute; top: 5px; left: 7px; color: #91a79d; font: 12px ui-monospace,monospace; }
+.weapon-choice.active { background: #284334; border-color: var(--weapon-color,var(--mint)); box-shadow: inset 0 0 0 1px var(--weapon-color,var(--mint)); color: #f1ead3; }
+.weapon-choice.active .weapon-digit { color: #f2d69c; }
+.weapon-description { padding: 14px 20px; border-top: 1px solid #34493e; background: #101e20; display: flex; align-items: center; gap: 16px; justify-content: space-between; }
+.weapon-title { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.weapon-title>svg { width: 38px; height: 38px; flex-shrink: 0; }
+.weapon-title h3 { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 16px; }
+.weapon-title p { color: #a9beb4; font-size: 13px; margin-top: 3px; }
+.weapon-facts { display: flex; gap: 8px 20px; flex-wrap: wrap; justify-content: flex-end; font-size: 12px; color: var(--muted); }
+.weapon-facts b { color: #ecdfb9; font-weight: 600; white-space: nowrap; }
+.hud-weapon { color: #ddd4a9; font-size: 12px; margin-top: 4px; }
 .home-play, .home-demo { font-size: 15px; min-height: 51px; padding: 13px 23px; border-radius: 5px; }
 .home-demo { background: #16292bd9; border-color: #4c6963; }
 .home-controls { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; font-size: 12px; color: #9bb2b0; margin-top: 16px; }
@@ -185,6 +214,13 @@ footer { padding: 18px 28px; color: #93a9ab; font-size: 12px; border-top: 1px so
 .hud-actions button { min-height: 44px; background: #102227ed; border-color: #517069; }
 #pause { width: 94px; }
 .game-help { position: absolute; bottom: 23px; left: 50%; transform: translateX(-50%); color: #bdd0c9; background: #0a171dcc; padding: 5px 11px; border-radius: 5px; font-size: 12px; pointer-events: none; white-space: nowrap; }
+.supply-actions { position:absolute; bottom:max(18px,env(safe-area-inset-bottom)); right:max(16px,env(safe-area-inset-right)); display:flex; gap:8px; z-index:6; }
+.supply-actions button { display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:44px; min-width:98px; padding:8px 10px; background:#102227ed; border-color:#517069; }
+.supply-actions button:disabled { opacity:.65; }
+.supply-actions kbd { font:11px ui-monospace,monospace; color:var(--muted); }
+.supply-actions b { color:var(--mint); }
+.hud-biome { color:var(--gold); font-size:13px; margin-top:6px; }
+#hud-cargo { font-size:12px; color:#bdd0c9; margin:4px 0; }
 .gate-hint { font-size: 12px; margin-top: 6px; color: var(--gold); }
 .overlay { position: absolute; inset: 0; display: grid; place-items: center; background: #071216bf; backdrop-filter: blur(4px); z-index: 9; padding: 16px; }
 .result-card { width: min(520px, 100%); max-height: 95%; overflow: auto; background: #11232a; border: 1px solid #456258; border-radius: 12px; padding: 28px; }
@@ -264,6 +300,9 @@ footer { padding: 18px 28px; color: #93a9ab; font-size: 12px; border-top: 1px so
   .home-title { font-size: clamp(66px, 8vw, 94px); }
 }
 @media (max-width: 960px) {
+  .weapon-picker { grid-template-columns: repeat(5,minmax(0,1fr)); }
+  .weapon-description { flex-wrap: wrap; gap: 10px; }
+  .weapon-facts { justify-content: flex-start; }
   .brand b { font-size: 14px; letter-spacing: .1em; }
   .brand small { font-size: 10px; }
   .pixieed-link { display: none; }
@@ -282,6 +321,16 @@ footer { padding: 18px 28px; color: #93a9ab; font-size: 12px; border-top: 1px so
   .rarity-guide { grid-template-columns: repeat(3, 1fr); }
 }
 @media (max-width: 680px) {
+  .weapon-picker { gap: 6px; padding: 0 12px 12px; }
+  .weapon-choice { font-size: 12px; padding: 10px 2px 6px; min-height: 70px; gap: 4px; }
+  .weapon-choice svg { width: 30px; height: 30px; }
+  .weapon-choice .weapon-digit { top: 4px; left: 5px; font-size: 11px; }
+  .weapon-description { padding: 12px 14px; }
+  .weapon-title>svg { width: 32px; height: 32px; }
+  .weapon-facts { gap: 6px 12px; }
+  .home-weapon-select { gap: 8px; margin-top: 14px; }
+  .home-weapon-select>span { width: 100%; font-size: 12px; }
+  .home-weapon-select select { flex: 1; }
   .app-header { padding: 12px 16px 10px; min-height: 0; gap: 12px; flex-wrap: wrap; }
   .brand { gap: 12px; }
   .logo { width: 26px; height: 26px; }
@@ -398,6 +447,94 @@ footer { padding: 18px 28px; color: #93a9ab; font-size: 12px; border-top: 1px so
   .result-card p { margin: 6px 0 10px; font-size: 13px; }
   .result-stats { margin: 10px 0; }
   .result-card>.row>button { min-width: 0; }
+}
+/* Field guide, equipment and the camp workshop. */
+.inventory-banner { margin-bottom:20px; }
+.inventory-banner>span { float:right; color:var(--gold); font-variant-numeric:tabular-nums; }
+.inventory-banner p { margin-top:8px; }
+.equipment-slots { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin-bottom:22px; }
+.equipment-slot { padding:20px; background:linear-gradient(145deg,#19302c,#111d23); border:1px solid var(--line); border-radius:10px; min-width:0; }
+.equipment-slot h3 { font-size:17px; margin:8px 0; }
+.equipment-slot .gear-icon { float:right; }
+.equipment-slot button { margin-top:12px; }
+.equipment-slot .note { min-height:26px; }
+.gear-icon { display:grid; place-items:center; width:44px; height:44px; background:#0d191e; border:1px solid #486255; border-radius:6px; font-size:26px; color:var(--mint); flex-shrink:0; }
+.inventory-layout { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,.8fr); gap:22px; align-items:start; }
+.equipment-list { max-height:620px; overflow:auto; }
+.gear-row { padding:16px 20px; display:flex; gap:13px; align-items:flex-start; border-top:1px solid var(--line); }
+.gear-row:first-child { border-top:0; }
+.gear-row .gear-info { flex:1; min-width:0; }
+.gear-row h3 { font-size:16px; margin-bottom:4px; }
+.gear-row small { display:block; line-height:1.7; }
+.gear-row button { min-height:42px; padding:8px 11px; }
+.gear-row[data-equipped="true"] { background:#28423a35; }
+.gear-empty { padding:24px; color:var(--muted); font-size:14px; line-height:1.85; }
+.material-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; padding:18px; }
+.material-chip { display:flex; gap:10px; align-items:center; background:#0c191e; border:1px solid var(--line); border-radius:7px; padding:11px; }
+.material-chip>span { color:var(--gold); font-size:22px; }
+.material-chip>div { min-width:0; flex:1; }
+.material-chip b { font-size:14px; }
+.material-chip small { display:block; margin-top:3px; font-size:12px; }
+.material-chip .quantity { font-size:18px; color:var(--mint); }
+.craft-list { max-height:720px; overflow:auto; }
+.supply-card,.craft-card { padding:18px 20px; border-top:1px solid var(--line); }
+.supply-card:first-child,.craft-card:first-child { border-top:0; }
+.supply-card h3,.craft-card h3 { font-size:16px; }
+.supply-card p,.craft-card p { margin:8px 0 12px; line-height:1.8; }
+.supply-card .row,.craft-card .row { align-items:center; }
+.craft-card .missing { color:#dba08e; }
+.field-guide { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; margin-bottom:34px; }
+.biome-card { border:1px solid var(--line); border-top:3px solid var(--biome-color); border-radius:10px; background:#102024; min-width:0; overflow:hidden; }
+.biome-card>header { padding:22px; background:linear-gradient(130deg,color-mix(in srgb,var(--biome-color) 18%,#122229),#111d23); }
+.biome-card h2 { font-size:24px; margin:6px 0 8px; }
+.biome-card>header p { color:#b7cbc3; font-size:14px; line-height:1.8; }
+.biome-card>header button { margin-top:14px; }
+.biome-monster { padding:16px 20px; border-top:1px solid var(--line); }
+.biome-monster summary { cursor:pointer; list-style-position:outside; margin-left:14px; font-size:15px; color:#dbe5d3; }
+.biome-monster summary small { display:block; color:#9bb3ad; font-size:12px; margin:5px 0 0; }
+.monster-detail { display:flex; gap:12px; align-items:center; margin-top:12px; }
+.monster-portrait { width:80px; height:80px; flex-shrink:0; image-rendering:pixelated; background:#0c1719; border-radius:7px; }
+.monster-detail p { font-size:14px; color:#b7cbc3; line-height:1.8; }
+.drop-table { width:100%; border-collapse:collapse; margin-top:12px; font-size:13px; }
+.drop-table th,.drop-table td { text-align:left; padding:8px 4px; border-bottom:1px solid #2a3b3d; }
+.drop-table th { color:var(--muted); font-weight:400; }
+.drop-table td:last-child { text-align:right; color:var(--gold); white-space:nowrap; }
+.core-catalog-head { margin-top:42px; }
+.core-catalog-head h2 { font-size:25px; margin:8px 0; }
+.source-note { display:block; font-size:13px; color:var(--gold); margin-top:12px; }
+.result-cargo { font-size:14px; padding:12px; background:#0b191c; border-radius:6px; line-height:1.85; }
+@media (max-width:960px) { .inventory-layout { grid-template-columns:1fr; } }
+@media (max-width:680px) {
+ .home-field-select { gap:8px; }
+ .home-field-select select { flex:1; min-width:0; }
+ .home-field-select .boss-toggle { width:100%; }
+ .home-field-select .boss-toggle input { width:17px; flex:none; }
+ .home-demo-note { font-size:12px; line-height:1.7; }
+ .home-main-actions { flex-wrap:wrap; }
+ .home-main-actions button { min-width:135px; }
+ .equipment-slots { grid-template-columns:1fr; gap:10px; }
+ .equipment-slot { padding:17px; }
+ .equipment-slot .note { min-height:0; }
+ .equipment-slot button { margin-top:8px; }
+ .gear-row { padding:15px 12px; gap:10px; flex-wrap:wrap; }
+ .gear-icon { width:38px; height:38px; }
+ .gear-row .gear-info { min-width:160px; }
+ .gear-row button { margin-left:48px; }
+ .material-list { grid-template-columns:1fr; padding:13px; }
+ .field-guide { grid-template-columns:1fr; gap:14px; }
+ .biome-card>header { padding:20px; }
+ .biome-monster { padding:14px 16px; }
+ .monster-portrait { width:64px; height:72px; }
+ .monster-detail { gap:10px; }
+ .supply-actions { bottom:max(14px,env(safe-area-inset-bottom)); right:max(10px,env(safe-area-inset-right)); gap:6px; }
+ .supply-actions button { min-width:71px; font-size:12px; padding:7px; gap:5px; }
+ .supply-actions kbd { display:none; }
+ .hud-biome,#hud-cargo { font-size:11px; }
+ .game-help { max-width:calc(100% - 155px); overflow:hidden; text-overflow:ellipsis; }
+ nav button { font-size:13px; padding:6px 3px; }
+}
+@media (max-height:520px) and (orientation:landscape) {
+ .supply-actions { bottom:max(10px,env(safe-area-inset-bottom)); }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }

@@ -7,14 +7,14 @@ const near=(a,b,e=1e-8)=>assert.ok(Math.abs(a-b)<e,`${a} != ${b}`);
 function trial(){const p=makeProfile();const e=new GameEngine(compileBoard(p.board,p.inventory),{seed:77});e.spec.crit=0;e.spec.execute=0;e.spec.steady=0;e.spec.longshot=0;e.spec.chain=0;e.spec.blast=0;e.spec.poison=0;e.spec.drain=0;return e;}
 const enemy=id=>({id,x:10+id,y:10,hp:1e6,maxHp:1e6,warm:0,poisonDps:0});
 const bullet=()=>({damage:100,gen:0,didSplit:false,noHeal:false,distance:0,vx:1,vy:0});
-test('初期編成の通常弾12.72・射撃3.072・期待DPS42.055',()=>{const p=makeProfile(),s=compileBoard(p.board,p.inventory);near(s.damage,12.72);near(s.rate,3.072);near(expectedDirect(s,{hitsPerVolley:1+s.multi}).dps,42.0553728);});
+test('初期魔導書:1発12.72・毎秒1.1264回の3連魔弾',()=>{const p=makeProfile(),s=compileBoard(p.board,p.inventory);near(s.damage,12.72);near(s.rate,1.1264);assert.equal(s.innateHits,3);near(expectedDirect(s,{hitsPerVolley:(1+s.multi)*s.innateHits}).dps,46.26091008);});
 test('雷撃弾幕9段legendary: DPSは命中数に応じて区別',()=>{const p=profileAt('storm','legendary'),s=compileBoard(p.board,p.inventory);near(expectedDirect(s).dps,1937.0232);near(expectedDirect(s,{hitsPerVolley:1+s.multi}).dps,14140.26936);});
 test('重砲: 条件倍率を別枠乗算、会心は1回',()=>{const p=profileAt('siege','legendary'),s=compileBoard(p.board,p.inventory);near(expectedDirect(s,{stationary:true,distance:500}).dps,7266.695454955188);});
 test('120秒×10シードの命中処理平均と理論値が2%以内',()=>{const p=profileAt('storm','legendary'),s=compileBoard(p.board,p.inventory);const observed=Array.from({length:10},(_,i)=>fixedHitTrial(s,{seed:800+i}).directDps).reduce((a,b)=>a+b,0)/10;assert.ok(Math.abs(observed/expectedDirect(s).dps-1)<.02);});
 test('貫通した同じ親弾は初回だけ分裂',()=>{const e=trial();e.spec.split=2;const a=enemy(1),b=enemy(2);e.enemies=[a,b];const shot=bullet();e.impact(shot,a);assert.equal(e.bullets.length,2);e.impact(shot,b);assert.equal(e.bullets.length,2);});
 test('子弾威力45%、発生元への再命中を禁止',()=>{const e=trial();e.spec.split=2;const a=enemy(1);e.enemies=[a];e.impact(bullet(),a);for(const b of e.bullets){near(b.damage,45);assert.ok(b.hit.has(a.id));assert.equal(b.gen,1);}});
 test('爆発と放電は直接対象には当たらない',()=>{const e=trial();e.spec.blast=1;e.spec.chain=1;const a=enemy(1);e.enemies=[a];e.impact(bullet(),a);near(e.damageBySource.direct,100);near(e.damageBySource.blast,0);near(e.damageBySource.chain,0);});
-test('追加効果も一時レベルを受けるが会心は二重適用しない',()=>{const e=trial();e.level=2;e.spec.crit=1;e.spec.critMultiplier=2;e.spec.blast=1;const a=enemy(1),b=enemy(2);e.enemies=[a,b];e.impact(bullet(),a);near(e.damageBySource.direct,220);near(e.damageBySource.blast,82.5);});
+test('追加効果も一時レベルを受けるが会心は二重適用しない',()=>{const e=trial();e.level=2;e.spec.crit=1;e.spec.critMultiplier=2;e.spec.blast=1;const a=enemy(1),b=enemy(2);a.x=e.player.x+20;a.y=e.player.y;b.x=a.x+2;b.y=a.y;e.enemies=[a,b];e.impact(bullet(),a);near(e.damageBySource.direct,220);near(e.damageBySource.blast,82.5);});
 test('吸収は8%/秒で処理し、回復装填には実回復だけを渡す',()=>{const e=trial();e.player.hp=1;e.spec.recovery=1;e.leech(9999);near(e.player.hp,1);near(e.pendingLeech,8);near(e.settleLeech(.5),4);near(e.player.hp,5);near(e.bonusCredit,.4);});
 test('満タンへの吸収は貯められない',()=>{const e=trial();near(e.leech(9999),0);near(e.pendingLeech,0);});
 test('追加弾のnoHealは吸収待ち量も発生させない',()=>{const e=trial();e.spec.drain=1;e.player.hp=1;const a=enemy(1);e.enemies=[a];e.impact({...bullet(),noHeal:true},a);near(e.pendingLeech,0);});

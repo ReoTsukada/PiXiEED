@@ -2,31 +2,38 @@
  * Rolled local modifiers are additive after adjacent amplification. Values are provisional.
  */
 export const CORE_DEFS = [
- {id:'emitter',name:'弾丸生成',glyph:'◉',family:'射撃',color:'#6ae6ce',mods:{damage:0.02},desc:'頂点に装着すると自動射撃。威力 +2%。下段では威力だけを加える。'},
- {id:'power',name:'高密度弾',glyph:'◆',family:'射撃',color:'#f5bd74',mods:{damage:0.04},desc:'弾丸の基礎威力 +4%。すべての直接弾に適用。'},
- {id:'haste',name:'加速装填',glyph:'»',family:'射撃',color:'#f5bd74',mods:{"rate":0.012},desc:'射撃頻度 +1.2%。'},
- {id:'multi',name:'並列銃身',glyph:'⋮',family:'弾道',color:'#77b7ff',mods:{"multi":0.025},desc:'追加弾数 +0.025。端数は射撃ごとに蓄積され、1で追加弾。'},
- {id:'pierce',name:'貫通針',glyph:'↑',family:'弾道',color:'#77b7ff',mods:{"pierce":0.06},desc:'貫通回数 +0.06。端数は弾丸生成時の追加貫通確率になる。'},
- {id:'bounce',name:'反射晶',glyph:'↗',family:'弾道',color:'#77b7ff',mods:{"bounce":0.08},desc:'壁反射 +0.08回。'},
- {id:'split',name:'裂弾',glyph:'Y',family:'弾道',color:'#77b7ff',mods:{"split":0.025},desc:'初回命中だけで子弾 +0.025発。威力45%。再分裂せず、生成元の敵には当たらない。'},
- {id:'blast',name:'炸裂核',glyph:'✧',family:'追加効果',color:'#ff9b84',mods:{"blast":0.012},desc:'直接命中時、別の周辺敵へ非会心威力×合計強度×75%の爆発。基準強度+1.2%。'},
+ {id:'emitter',name:'武装の核',glyph:'◉',family:'武装',color:'#6ae6ce',mods:{damage:0.02},desc:'頂点の固定数字で10種の武器を決定。攻撃威力 +2%。下段では威力だけを加え、武器は変えない。'},
+ {id:'power',name:'闘気の結晶',glyph:'◆',family:'攻撃',color:'#f5bd74',mods:{damage:0.04},desc:'基本攻撃威力 +4%。近接・矢・魔法とその追加効果に適用。'},
+ {id:'haste',name:'疾風の刻印',glyph:'»',family:'攻撃',color:'#f5bd74',mods:{"rate":0.012},desc:'攻撃頻度 +1.2%。近接の振り、射撃、魔法の連射周期を速める。'},
+ {id:'multi',name:'連撃の刻印',glyph:'⋮',family:'弾道',color:'#77b7ff',mods:{"multi":0.025},desc:'追加攻撃 +0.025。端数は蓄積。近接は追加の一振り、遠隔は追加弾。魔導書は連射の各段へ適用。'},
+ {id:'pierce',name:'貫通の牙',glyph:'↑',family:'弾道',color:'#77b7ff',mods:{"pierce":0.06},desc:'貫通 +0.06。遠隔の貫通回数、近接の巻き込み上限を増やす。刃輪は命中時の追加斬撃へ変換。端数は確率。'},
+ {id:'bounce',name:'反射晶',glyph:'↗',family:'弾道',color:'#77b7ff',mods:{"bounce":0.08},desc:'反射 +0.08回。遠隔は壁で反射。近接は最初の対象から別の敵へ45%威力の反響斬。端数は確率。'},
+ {id:'split',name:'分裂の欠片',glyph:'Y',family:'弾道',color:'#77b7ff',mods:{"split":0.025},desc:'初回命中で魔力の欠片 +0.025発。近接にも有効。威力45%、再分裂せず、発生元の敵には当たらない。'},
+ {id:'blast',name:'爆炎の核',glyph:'✧',family:'追加効果',color:'#ff9b84',mods:{"blast":0.012},desc:'直接命中時、別の周辺敵へ非会心威力×合計強度×75%の爆発。基準強度+1.2%。'},
  {id:'chain',name:'放電路',glyph:'ϟ',family:'追加効果',color:'#bba1ff',mods:{"chain":0.012},desc:'直接命中時、別の敵へ非会心威力×合計強度×40%の放電。基準強度+1.2%。'},
- {id:'poison',name:'腐食弾',glyph:'∴',family:'追加効果',color:'#a2db80',mods:{"poison":0.015},desc:'直接命中時、非会心威力×合計強度の毎秒ダメージを3秒。強い値を保持し時間更新。基準+1.5%。'},
+ {id:'poison',name:'毒の刻印',glyph:'∴',family:'追加効果',color:'#a2db80',mods:{"poison":0.015},desc:'直接命中時、非会心威力×合計強度の毎秒ダメージを3秒。強い値を保持し時間更新。基準+1.5%。'},
  {id:'slow',name:'凍結触媒',glyph:'❄',family:'追加効果',color:'#8adcf7',mods:{"slow":0.01},desc:'2秒間、敵速度を1÷(1+合計強度)に。基準強度+1%。'},
- {id:'homing',name:'追尾レンズ',glyph:'◎',family:'弾道',color:'#77b7ff',mods:{"homing":0.025},desc:'追尾強度+0.025。旋回速度は合計強度×2ラジアン/秒。'},
- {id:'crit',name:'精密照準',glyph:'⌖',family:'射撃',color:'#f5bd74',mods:{"crit":0.0025},desc:'会心率+0.25ポイント。100%超過分は会心倍率へ加算。'},
- {id:'drain',name:'吸収回路',glyph:'♥',family:'持久',color:'#e99cbd',mods:{"drain":0.0001},desc:'直接弾の実ダメージの0.01%を吸収。PvE吸収回復は最大HPの8%/秒、未処理回復は1秒分まで。'},
- {id:'hull',name:'防護殻',glyph:'⬡',family:'持久',color:'#6ae6ce',mods:{"hp":2},desc:'最大HP+2。'},
- {id:'regen',name:'自己修復',glyph:'+',family:'持久',color:'#6ae6ce',mods:{"regen":0.025},desc:'毎秒HP+0.025。吸収回復の上限とは別。'},
- {id:'stride',name:'機動補助',glyph:'›',family:'持久',color:'#6ae6ce',mods:{"move":0.25},desc:'移動速度+0.25px/秒。'},
- {id:'magnet',name:'回収磁場',glyph:'U',family:'持久',color:'#6ae6ce',mods:{pickup:1.5},desc:'戦利品回収半径 +1.5px。'},
- {id:'overdrive',name:'重砲化',glyph:'▰',family:'取引条件',color:'#ff9b84',mods:{"damage":0.085,"rate":-0.006},desc:'威力+8.5%、射撃頻度-0.6%。高レアは代償軽減、局所増幅は代償も増やす。'},
- {id:'barrage',name:'散弾化',glyph:'⁙',family:'取引条件',color:'#ff9b84',mods:{"multi":0.04,"damage":-0.025},desc:'追加弾数+0.04、威力-2.5%。'},
+ {id:'homing',name:'導きの眼',glyph:'◎',family:'弾道',color:'#77b7ff',mods:{"homing":0.025},desc:'追尾強度+0.025。遠隔の旋回速度 +強度×2ラジアン/秒。近接は薙ぎ幅と槍の横幅を広げる。'},
+ {id:'crit',name:'会心の刻印',glyph:'⌖',family:'攻撃',color:'#f5bd74',mods:{"crit":0.0025},desc:'会心率+0.25ポイント。100%超過分は会心倍率へ加算。'},
+ {id:'drain',name:'吸命の牙',glyph:'♥',family:'持久',color:'#e99cbd',mods:{"drain":0.0001},desc:'直接攻撃の実ダメージの0.01%を吸収。PvE吸収回復は最大HPの8%/秒、未処理回復は1秒分まで。'},
+ {id:'hull',name:'守護の石',glyph:'⬡',family:'持久',color:'#6ae6ce',mods:{"hp":2},desc:'最大HP+2。'},
+ {id:'regen',name:'再生の息吹',glyph:'+',family:'持久',color:'#6ae6ce',mods:{"regen":0.025},desc:'毎秒HP+0.025。吸収回復の上限とは別。'},
+ {id:'stride',name:'旅人の羽',glyph:'›',family:'持久',color:'#6ae6ce',mods:{"move":0.25},desc:'移動速度+0.25px/秒。'},
+ {id:'magnet',name:'収集の風',glyph:'U',family:'持久',color:'#6ae6ce',mods:{pickup:1.5},desc:'戦利品回収半径 +1.5px。'},
+ {id:'overdrive',name:'巨力の誓い',glyph:'▰',family:'取引条件',color:'#ff9b84',mods:{"damage":0.085,"rate":-0.006},desc:'威力+8.5%、攻撃頻度-0.6%。高レアは代償軽減、局所増幅は代償も増やす。'},
+ {id:'barrage',name:'群星の誓い',glyph:'⁙',family:'取引条件',color:'#ff9b84',mods:{"multi":0.04,"damage":-0.025},desc:'追加攻撃+0.04、威力-2.5%。'},
  {id:'execute',name:'追い撃ち',glyph:'×',family:'条件',color:'#bba1ff',mods:{"execute":0.01},desc:'HP35%未満の敵への命中威力+1%。'},
- {id:'longshot',name:'遠距離増幅',glyph:'↠',family:'条件',color:'#bba1ff',mods:{"longshot":0.005},desc:'累積飛行距離500pxで命中威力最大+0.5%。'},
- {id:'steady',name:'静止砲台',glyph:'▣',family:'条件',color:'#bba1ff',mods:{"steady":0.0035},desc:'0.7秒以上静止すると命中威力+0.35%。移動で解除。'},
- {id:'recovery',name:'回復装填',glyph:'↻',family:'条件',color:'#e99cbd',mods:{recovery:0.025},desc:'実回復10HPごとに合計強度ぶんの追加弾を蓄積。追加弾は回復を起こさない。'},
- {id:'amplifier',name:'接続増幅',glyph:'×',family:'増幅',color:'#f6d47b',mods:{},amplify:{gain:0.10},desc:'上に直接つながるコア自身の数値を強化。基準×1.10。継承済みの効果は再増幅しない。複数は乗算。増幅コアが対象なら増加分だけを強化。'}
+ {id:'longshot',name:'間合いの極意',glyph:'↠',family:'条件',color:'#bba1ff',mods:{"longshot":0.005},desc:'射程の端で命中威力最大+0.5%。近接は敵との距離、遠隔は累積飛行距離÷射程に応じて増える。'},
+ {id:'steady',name:'不動の誓い',glyph:'▣',family:'条件',color:'#bba1ff',mods:{"steady":0.0035},desc:'0.7秒以上静止すると命中威力+0.35%。移動で解除。'},
+ {id:'recovery',name:'生命の反響',glyph:'↻',family:'条件',color:'#e99cbd',mods:{recovery:0.025},desc:'実回復10HPごとに合計強度ぶんの追加攻撃を蓄積。追加攻撃は回復を起こさない。'},
+ {id:'vision',name:'灯火の瞳',glyph:'◉',family:'探索',color:'#e9d78f',mods:{vision:0.025},desc:'視界・索敵半径 +0.025タイル。基礎8タイル。長射程の武器と組み合わせる。壁の背後は見えない。'},
+ {id:'reach',name:'伸長の紋章',glyph:'↔',family:'間合い',color:'#9ad5c8',mods:{reach:0.004},desc:'射程・間合い +0.4%。近接の届く距離と、遠隔の飛行距離を伸ばす。壁を越えて攻撃することはできない。'},
+ {id:'amplifier',name:'接続増幅',glyph:'×',family:'増幅',color:'#f6d47b',mods:{},amplify:{gain:0.10},desc:'上に直接つながるコア自身の数値を強化。基準×1.10。継承済みの効果は再増幅しない。複数は乗算。増幅コアが対象なら増加分だけを強化。'},
+ {id:'elderheart',name:'古樹の心核',glyph:'♧',family:'固有・持久',color:'#a9ce8a',exclusiveEnemyId:'elder_treant',mods:{hp:1.5,regen:.02},desc:'草原の古老樹だけが落とす。最大HP+1.5、自然回復+0.02HP/秒。全武器に有効。'},
+ {id:'dune_venom',name:'砂蠍の毒針核',glyph:'⋔',family:'固有・追加効果',color:'#d6ba78',exclusiveEnemyId:'dune_scorpion',mods:{poison:.01,pierce:.04},desc:'砂丘の大蠍だけが落とす。毒強度+1%、貫通+0.04。近接は巻き込み、刃輪は追加斬撃へ適用。'},
+ {id:'drakeflame',name:'灰竜の焔核',glyph:'✧',family:'固有・攻撃',color:'#e99469',exclusiveEnemyId:'cinder_drake',mods:{blast:.01,damage:.025},desc:'熾火の古竜だけが落とす。爆発強度+1%、全武器の威力+2.5%。'},
+ {id:'hydra_blood',name:'沼蛇竜の血核',glyph:'♥',family:'固有・持久',color:'#b197cf',exclusiveEnemyId:'mire_hydra',mods:{drain:.00008,multi:.018},desc:'瘴気のヒュドラだけが落とす。吸収率+0.008%、追加攻撃+0.018。近接・遠隔ともに有効。'},
+ {id:'winter_crown',name:'霜巨人の冠核',glyph:'❄',family:'固有・間合い',color:'#9ed5e8',exclusiveEnemyId:'frost_giant',mods:{slow:.008,reach:.003},desc:'白霜の巨人だけが落とす。鈍足強度+0.8%、射程・間合い+0.3%。全武器に有効。'}
 ];
 export const CORE_BY_ID = Object.fromEntries(CORE_DEFS.map(c => [c.id,c]));
 export const STAT_KEYS = [...new Set(CORE_DEFS.flatMap(c=>Object.keys(c.mods)))];
@@ -44,11 +51,11 @@ export const RARITY_BY_ID = Object.fromEntries(RARITIES.map(r=>[r.id,r]));
 export const ROLL_MIN = 9500;
 export const ROLL_MAX = 10500;
 export const STAT_LABELS = {
- damage:['弾丸威力',100,'%'],rate:['射撃頻度',100,'%'],multi:['追加弾数',1,'発'],
+ damage:['攻撃威力',100,'%'],rate:['攻撃頻度',100,'%'],multi:['追加攻撃',1,'回'],
  pierce:['貫通',1,'回'],bounce:['反射',1,'回'],split:['分裂子弾',1,'発'],
  blast:['爆発強度',100,'%'],chain:['放電強度',100,'%'],poison:['腐食強度',100,'%'],
  slow:['鈍足強度',100,'%'],homing:['追尾強度',1,''],crit:['会心率',100,'pt'],
- drain:['吸収率',100,'%'],hp:['最大HP',1,''],regen:['自己修復',1,'HP/秒'],
+ drain:['吸収率',100,'%'],hp:['最大HP',1,''],regen:['自己回復',1,'HP/秒'],
  move:['移動速度',1,'px/秒'],pickup:['回収半径',1,'px'],execute:['追い撃ち',100,'%'],
- longshot:['遠距離強化',100,'%'],steady:['静止強化',100,'%'],recovery:['回復装填',1,'発/10HP']
+ longshot:['間合い強化',100,'%'],steady:['静止強化',100,'%'],recovery:['回復連撃',1,'回/10HP'],reach:['射程・間合い',100,'%'],vision:['視界・索敵',1,'タイル']
 };

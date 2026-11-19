@@ -53,7 +53,7 @@ test('深層ほど高レアが出やすいが確率の総和は100',()=>{
  const first=rarityWeights(1),deep=rarityWeights(1024);near(first.reduce((a,b)=>a+b),100);near(deep.reduce((a,b)=>a+b),100);assert.ok(deep[4]>first[4]);assert.ok(deep[0]<first[0]);assert.throws(()=>rarityWeights(0));
 });
 test('旧v1セーブの品質と実性能を損なわずv2へ移行',()=>{
- const p=makeProfile();p.version=1;p.inventory=p.inventory.map((it,i)=>({id:it.id,digit:it.digit,type:it.type,quality:.5+i/10}));
+ const p=makeProfile();p.version=1;p.inventory=p.inventory.slice(0,10).map((it,i)=>({id:it.id,digit:it.digit,type:it.type,quality:.5+i/10}));
  const before=compileBoard(p.board,p.inventory),loaded=checkProfile(structuredClone(p)),after=compileBoard(loaded.board,loaded.inventory);
  assert.equal(loaded.version,2);assert.deepEqual(after.raw,before.raw);for(let n=0;n<10;n++)near(itemValues(loaded.inventory[n]).mods[rollKeys(loaded.inventory[n].type)[0]],itemValues(p.inventory[n]).mods[rollKeys(p.inventory[n].type)[0]]);
 });
@@ -104,8 +104,8 @@ test('最大45枠・レジェンダリー上限の増幅連結も有限に終了
  const inventory=[],board=PUZZLE_9.map((row,r)=>row.map((digit,c)=>{const type=r===0?'emitter':'amplifier',rolls=Object.fromEntries(rollKeys(type).map(k=>[k,10500])),it=makeItem(`${r},${c}`,digit,type,{rarity:'legendary',rolls});inventory.push(it);return it.id;}));
  const s=compileBoard(board,inventory);assert.equal(s.traces.length,45);for(const x of Object.values(s.raw))assert.ok(Number.isFinite(x));for(const t of s.traces)assert.ok(Number.isFinite(t.ampFactor));
 });
-test('新実験用の9段増幅ビルドは合法で25種×10数字×5レア度を比較可能',()=>{
- const p=laboratory('amplify');assert.ok(validateBoard(p.board,p.inventory).valid);assert.equal(p.inventory.length,45+25*10*5);assert.equal(p.inventory.filter(it=>it.type==='amplifier').length,53);
+test('新実験用の9段増幅ビルドは合法で32種×10数字×5レア度を比較可能',()=>{
+ const p=laboratory('amplify');assert.ok(validateBoard(p.board,p.inventory).valid);assert.equal(p.inventory.length,45+32*10*5);assert.equal(p.inventory.filter(it=>it.type==='amplifier').length,53);
 });
 test('改ざんされた個体値では出発できない',()=>{
  const p=makeProfile();p.inventory.find(it=>it.id==='start-1').rolls.damage=100000;assert.equal(validateBoard(p.board,p.inventory).valid,false);assert.throws(()=>compileBoard(p.board,p.inventory));

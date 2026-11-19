@@ -1,4 +1,6 @@
+import {weaponForDigit} from './weapons.mjs';
 import {CORE_DEFS, CORE_BY_ID, STAT_KEYS, PUZZLE_9, RARITIES, RARITY_BY_ID, ROLL_MIN, ROLL_MAX} from './catalog.mjs';
+import {ensureRpgProfile,normalizeCargo,EQUIPMENT_DEFS,MATERIAL_DEFS,makeEquipment,MAX_EQUIPMENT} from './items.mjs';
 export function makeRng(seed=1) { let a=seed>>>0; return ()=>{a+=0x6D2B79F5;let t=a;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296;}; }
 export function paths(row,col) { let p=1;for(let k=1;k<=col;k++)p=p*(row-k+1)/k;return Math.round(p); }
 export function blankBoard(depth) { if(!Number.isInteger(depth)||depth<1||depth>9)throw Error('段数は1〜9');return Array.from({length:depth},(_,r)=>Array(r+1).fill(null)); }
@@ -52,7 +54,7 @@ export function validateBoard(board,inventory,{partial=false}={}) {
    try{normalizeItem(item);}catch{err(r,c,'コアデータが不正');return;}
    if(used.has(id))err(r,c,'同じ現物を二重に装着');used.add(id);
    if(digits.has(item.digit)){err(r,c,`${r+1}段目の数字${item.digit}が重複`);bad.add(`${r},${digits.get(item.digit)}`);}digits.set(item.digit,c);
-   if(r===0&&item.type!=='emitter')err(r,c,'頂点には弾丸生成コアが必要');
+   if(r===0&&item.type!=='emitter')err(r,c,'頂点には武装の核が必要');
    if(r+1<board.length){const a=inv.get(board[r+1]?.[c]),b=inv.get(board[r+1]?.[c+1]);if(a&&b&&item.digit!==(a.digit+b.digit)%10)err(r,c,`${r+1}段目: ${a.digit}+${b.digit} の1の位は ${(a.digit+b.digit)%10}`);}
   });
  });return {valid:!errors.length,errors:[...new Set(errors)],bad};
@@ -72,22 +74,42 @@ export function compileBoard(board,inventory) {
   const targets=[];if(rolled.ampGain&&r>0){if(c>0)targets.push([r-1,c-1]);if(c<r)targets.push([r-1,c]);}
   traces.push({id:item.id,row:r,col:c,paths:paths(r,c),type:item.type,rarity:item.rarity??'common',baseOwn:rolled.mods,own,multiplier,incoming,baseAmp:1+rolled.ampGain,ampFactor:1+amps[r][c],targets,output:{...sum}});
  }
- const v=sums[0][0];
+ const v=sums[0][0],weapon=weaponForDigit(inv.get(board[0][0]).digit);
+ const range=weapon.range*Math.max(.1,1+v.reach),innateHits=weapon.burst||1,comboMultiplier=weapon.combo?1+((weapon.comboDamage||1)-1)/weapon.combo:1;
  // Interpret the final additive vector once. Rare penalties improve; amplifier penalties grow.
- return {raw:v,traces,damage:12*Math.max(0.05,1+v.damage),rate:3*Math.max(0.05,1+v.rate),multi:Math.max(0,v.multi),pierce:Math.max(0,v.pierce),bounce:Math.max(0,v.bounce),split:Math.max(0,v.split),blast:Math.max(0,v.blast),chain:Math.max(0,v.chain),poison:Math.max(0,v.poison),slow:Math.max(0,v.slow),homing:Math.max(0,v.homing),crit:Math.min(1,Math.max(0,0.05+v.crit)),critMultiplier:2+Math.max(0,0.05+v.crit-1),drain:Math.max(0,v.drain),maxHp:100+v.hp,regen:v.regen,move:165+v.move,pickup:28+v.pickup,execute:v.execute,longshot:v.longshot,steady:v.steady,recovery:v.recovery};
+ return {raw:v,traces,weapon:{...weapon},range,vision:8+Math.max(0,v.vision),innateHits,comboMultiplier,damage:weapon.baseDamage*Math.max(0.05,1+v.damage),rate:weapon.baseRate*Math.max(0.05,1+v.rate),multi:Math.max(0,v.multi),pierce:Math.max(0,v.pierce),bounce:Math.max(0,v.bounce),split:Math.max(0,v.split),blast:Math.max(0,v.blast),chain:Math.max(0,v.chain),poison:Math.max(0,v.poison),slow:Math.max(0,v.slow),homing:Math.max(0,v.homing),crit:Math.min(1,Math.max(0,0.05+v.crit)),critMultiplier:2+Math.max(0,0.05+v.crit-1),drain:Math.max(0,v.drain),maxHp:100+v.hp,regen:v.regen,move:165+v.move,pickup:28+v.pickup,execute:v.execute,longshot:v.longshot,steady:v.steady,recovery:v.recovery};
 }
 export function makeProfile() {
  const types=['regen','power','haste','pierce','blast','drain','multi','chain','hull','emitter'];
  const inventory=types.map((t,d)=>makeItem(`start-${d}`,d,t));
- return {version:2,wallet:0,best:1,depth:3,inventory,board:[['start-9'],['start-3','start-6'],['start-1','start-2','start-4']],presets:[],runActive:false};
+ return ensureRpgProfile(ensureStarterWeapons({version:2,wallet:0,best:1,depth:3,inventory,board:[['start-9'],['start-3','start-6'],['start-1','start-2','start-4']],presets:[],runActive:false}));
 }
-export function laboratory(kind='storm',depth=9) {
- const nums=depth===3?[[9],[3,6],[1,2,4]]:PUZZLE_9.slice(0,depth);
+/** Grant only missing root digits, once. Existing identities and rolled values are untouched. */
+export function ensureStarterWeapons(profile) {
+ const ids=new Set(profile.inventory.map(it=>it.id));
+ for(let digit=0;digit<10;digit++){
+  if(profile.inventory.some(it=>it.type==='emitter'&&it.digit===digit))continue;
+  let id=`starter-weapon-${digit}`,i=0;while(ids.has(id))id=`starter-weapon-${digit}-${++i}`;
+  profile.inventory.push(makeItem(id,digit,'emitter'));ids.add(id);
+ }
+ return profile;
+}
+const WEAPON_PUZZLE_BOTTOMS=[[0,1,7,9,3,6,8,5,2],[0,1,6,8,2,4,5,3,9],[0,7,4,6,9,3,5,1,2],[0,3,8,4,6,2,5,9,7],[0,9,8,2,3,1,5,7,4],[1,0,5,3,9,7,6,8,2],[0,1,2,8,7,9,5,3,6],[0,4,6,5,3,9,7,2,1],[0,3,6,4,1,7,5,9,8],[0,8,2,5,1,3,9,4,7]];
+function weaponPuzzle(digit,depth) {
+ weaponForDigit(digit);const rows=[[...WEAPON_PUZZLE_BOTTOMS[digit]]];
+ while(rows[0].length>1)rows.unshift(rows[0].slice(1).map((n,i)=>(n+rows[0][i])%10));
+ return rows.slice(0,depth);
+}
+export function laboratory(kind='storm',depth=9,weaponDigit) {
+ if(!Number.isInteger(depth)||depth<3||depth>9)throw Error('実験室の段数は3〜9');
+ const nums=weaponDigit===undefined?(depth===3?[[9],[3,6],[1,2,4]]:PUZZLE_9.slice(0,depth)):weaponPuzzle(weaponDigit,depth);
  const patterns={storm:['haste','multi','chain','pierce','homing','blast','power'],siege:['overdrive','power','crit','pierce','longshot','steady'],sustain:['drain','haste','recovery','regen','hull','multi','power'],amplify:['power','haste','power','pierce','multi','crit','power']};
  const pattern=patterns[kind]||patterns.storm;let index=0;const inventory=[];
  const board=nums.map((row,r)=>row.map((digit,c)=>{const type=r===0?'emitter':kind==='amplify'&&r===8&&c>=3&&c<=5?'amplifier':pattern[(r*3+c)%pattern.length];const item=makeItem(`lab-${index++}`,digit,type,kind==='amplify'?{rarity:'rare'}:1);inventory.push(item);return item.id;}));
  CORE_DEFS.forEach(def=>{for(let d=0;d<10;d++)for(const rarity of RARITIES)inventory.push(makeItem(`spare-${def.id}-${d}-${rarity.id}`,d,def.id,{rarity:rarity.id}));});
- return {version:2,wallet:0,best:1,depth,inventory,board,presets:[],runActive:false};
+ return ensureRpgProfile({version:2,wallet:1000,best:1,depth,inventory,board,presets:[],runActive:false,
+  materials:Object.fromEntries(MATERIAL_DEFS.map(d=>[d.id,10])),equipment:EQUIPMENT_DEFS.map(d=>makeEquipment(`lab-equipment-${d.id}`,d.id)),
+  equipped:{armor:null,charm:null,boots:null},consumables:{healing_draught:10,ward_scroll:10}});
 }
 export function rarityWeights(floor) {
  if(!Number.isSafeInteger(floor)||floor<1)throw Error('階層が不正');
@@ -97,16 +119,23 @@ export function rarityWeights(floor) {
 }
 export function rollItem(rng,floor,id) {
  const weights=rarityWeights(floor);
- const type=rng()<0.10?'emitter':CORE_DEFS[1+Math.floor(rng()*(CORE_DEFS.length-1))].id;
+ const generic=CORE_DEFS.filter(def=>def.id!=='emitter'&&!def.exclusiveEnemyId);
+ const type=rng()<0.10?'emitter':generic[Math.floor(rng()*generic.length)].id;
  let draw=rng()*100,ri=0;for(;ri<weights.length-1&&draw>=weights[ri];ri++)draw-=weights[ri];
  const rolls=Object.fromEntries(rollKeys(type).map(k=>[k,ROLL_MIN+Math.floor(rng()*(ROLL_MAX-ROLL_MIN+1))]));
  return makeItem(id,Math.floor(rng()*10),type,{rarity:RARITIES[ri].id,rolls});
 }
-export function bankRun(profile,loot,gold,floor) {
- if(!Array.isArray(loot)||!Number.isSafeInteger(floor)||floor<1)throw Error('探索結果が不正');loot=loot.map(normalizeItem);
- const known=new Set(profile.inventory.map(x=>x.id));if(loot.some(x=>known.has(x.id))||new Set(loot.map(x=>x.id)).size!==loot.length)throw Error('戦利品IDの重複');
- if(!Number.isSafeInteger(gold)||gold<0||!Number.isSafeInteger(profile.wallet+gold))throw Error('通貨が不正');
- profile.inventory.push(...loot);profile.wallet+=gold;profile.best=Math.max(profile.best,floor);profile.runActive=false;
+export function bankRun(profile,loot,gold,floor,cargo={}) {
+ // Build and validate a complete transaction without mutating the caller, including old-save migrations.
+ if(!Array.isArray(loot)||!Number.isSafeInteger(floor)||floor<1)throw Error('探索結果が不正');
+ const next=checkProfile(structuredClone(profile)),cores=loot.map(normalizeItem),extra=normalizeCargo(cargo);
+ if(next.inventory.length+cores.length>20000||next.equipment.length+extra.equipment.length>MAX_EQUIPMENT)throw Error('所持品の上限を超えます');
+ const known=new Set([...next.inventory,...next.equipment].map(item=>item.id));
+ for(const item of [...cores,...extra.equipment]){if(known.has(item.id))throw Error('戦利品IDの重複');known.add(item.id);}
+ if(!Number.isSafeInteger(gold)||gold<0||!Number.isSafeInteger(next.wallet+gold))throw Error('通貨が不正');
+ for(const key of ['materials','consumables'])for(const [id,amount] of Object.entries(extra[key])){const total=(next[key][id]||0)+amount;if(!Number.isSafeInteger(total)||total<0)throw Error('戦利品数量が範囲外');next[key][id]=total;}
+ next.inventory.push(...cores);next.equipment.push(...extra.equipment);next.wallet+=gold;next.best=Math.max(next.best,floor);next.runActive=false;
+ Object.assign(profile,next);return profile;
 }
 export function loseRun(profile) {profile.runActive=false;}
 export function checkProfile(p) {
@@ -115,5 +144,6 @@ export function checkProfile(p) {
  const normalized=p.inventory.map(normalizeItem);const ids=new Set();for(const it of normalized){if(ids.has(it.id)||typeof it.id!=='string')throw Error('コアIDが不正');ids.add(it.id);}
  if(!Array.isArray(p.board)||p.board.length!==p.depth||p.board.some((row,r)=>!Array.isArray(row)||row.length!==r+1||row.some(id=>id!==null&&!ids.has(id))))throw Error('基盤データが不正');
  for(const pr of p.presets){if(typeof pr.name!=='string'||pr.name.length>40||!Array.isArray(pr.board)||pr.board.length<3||pr.board.length>9||pr.board.some((row,r)=>!Array.isArray(row)||row.length!==r+1||row.some(id=>id!==null&&!ids.has(id))))throw Error('プリセットデータが不正');}
- p.inventory=normalized;p.version=2;return p;
+ const next=ensureRpgProfile(ensureStarterWeapons({...p,inventory:normalized,version:2}));
+ Object.assign(p,next);return p;
 }

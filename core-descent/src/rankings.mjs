@@ -1,13 +1,17 @@
 /** Local record model. NOT an authenticated online leaderboard. */
-export const SCORE_RULES='0.4.0';
-export const CHALLENGE_ID='prototype-01';
-export const CHALLENGE_SEED=20261117;
+export const SCORE_RULES='0.7.0';
+export const CHALLENGE_ID='fantasy-worlds-01';
+export const CHALLENGE_SEED=20261119;
 export const BOSS_SECONDS=180;
 export const SCORE_SOURCES=['normal','lab'];
 export const SCORE_MODES=['depth','boss'];
 export function captureLoadout(profile){
  const byId=new Map(profile.inventory.map(i=>[i.id,i]));
  return profile.board.map(row=>row.map(id=>structuredClone(byId.get(id))));
+}
+export function captureEquipment(profile){
+ const items=new Map((profile.equipment??[]).map(item=>[item.id,item]));
+ return Object.fromEntries(Object.entries(profile.equipped??{}).map(([slot,id])=>[slot,id?structuredClone(items.get(id)):null]));
 }
 export function validateRecord(record){
  if(!record||typeof record!=='object'||typeof record.id!=='string'||record.id.length>100)throw new Error('記録IDが不正です');
@@ -24,7 +28,7 @@ export function validateRecord(record){
 export function makeRecord(engine,context){
  if(engine.status==='playing')throw new Error('終了前の記録は確定できません');
  const record={id:context.id,rules:SCORE_RULES,challenge:CHALLENGE_ID,seed:engine.seed,verified:false,
-  mode:context.mode,source:context.source,depth:context.depth,loadout:structuredClone(context.loadout),
+  mode:context.mode,source:context.source,depth:context.depth,loadout:structuredClone(context.loadout),equipment:structuredClone(context.equipment??{}),supplies:structuredClone(context.supplies??{}),
   clearedFloor:engine.clearedFloor||0,clearSeconds:engine.clearTime||0,seconds:engine.totalTime,
   damage:Math.round(engine.totalDamage*1000)/1000,damageBySource:structuredClone(engine.damageBySource),
   outcome:engine.status,createdAt:context.createdAt||new Date().toISOString()};

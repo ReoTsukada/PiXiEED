@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Y_SCALE, screenVectorToWorld, projectWorld, unprojectScreen, compareDepth, wallOccludesPlayer, makeCamera, makeBossCamera } from '../src/renderer.mjs';
+import { Y_SCALE, screenVectorToWorld, projectWorld, unprojectScreen, compareDepth, wallOccludesPlayer, makeCamera, makeBossCamera, DungeonRenderer, explorationLevel, resolveWeaponDigit } from '../src/renderer.mjs';
+
+import {createExploration,updateExploration} from '../src/fog.mjs';
+import {TestCanvas,withCanvas} from './render-test-canvas.mjs';
 
 const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} != ${b}`);
 test('2.5D projection and inverse retain world position at multiple heights', () => {
@@ -68,3 +71,81 @@ test('boss and player fit a short landscape viewport including the boss crown', 
     }
   }
 });
+
+function fogFixture(){
+  const w=7,h=5,tile=32,cells=Array.from({length:h},(_,y)=>Array.from({length:w},(_,x)=>x===0||y===0||x===w-1||y===h-1||x===3?1:0));
+  const map={w,h,tile,cells,width:w*tile,height:h*tile,seed:42,portal:{x:48,y:48},stairs:{x:176,y:80}};
+  const player={x:48,y:80,hp:100,still:0,invuln:0,facing:0,attackTime:0};
+  const exploration=createExploration(map);updateExploration(map,player,exploration,{radius:12});
+  return {map,player,exploration};
+}
+
+test('renderer knowledge distinguishes current view, explored memory and unseen cells',()=>{
+  const {map,player,exploration}=fogFixture();
+  assert.equal(explorationLevel(map,exploration,80,80),2);
+  assert.equal(explorationLevel(map,exploration,144,80),0);
+  assert.equal(explorationLevel(map,null,80,80),0);
+  updateExploration(map,{x:176,y:80},exploration,{radius:12});
+  assert.equal(explorationLevel(map,exploration,player.x,player.y),1);
+  assert.equal(explorationLevel(map,exploration,144,80),2);
+});
+
+test('drawing omits enemies, loot, unknown geometry and exit markers behind fog without changing engine state',()=>withCanvas(()=>{
+  const {map,player,exploration}=fogFixture();
+  const engine={map,player,exploration,spec:{weapon:{digit:8,id:'staff'}},status:'playing',totalTime:1,gates:true,
+    enemies:[{id:1,x:80,y:80,hp:8,maxHp:8,r:10,warm:0},{id:2,x:144,y:80,hp:8,maxHp:8,r:10,warm:0}],
+    pickups:[{x:80,y:48,core:{digit:3,rarity:'rare'}},{x:144,y:48,core:{digit:7,rarity:'epic'}}],bullets:[],fx:[]};
+  const before=JSON.stringify(engine),canvas=new TestCanvas(),renderer=new DungeonRenderer(canvas),actors=[],loot=[],walls=[];
+  renderer.drawActor=(actor,kind)=>actors.push({actor,kind});
+  renderer.drawPickup=drop=>loot.push(drop);renderer.drawWall=wall=>walls.push(wall);
+  renderer.render(engine,{width:800,height:600,dpr:1,quality:'low'});
+  assert.deepEqual(actors.filter(a=>a.kind!=='player').map(a=>a.actor.id),[1]);
+  assert.equal(loot.length,1);assert.equal(loot[0].core.digit,3);
+  assert.ok(walls.every(w=>isKnownWall(w,map,exploration)));
+  const labels=canvas.context.calls.filter(c=>c.method==='fillText').map(c=>c.args[0]);
+  assert.ok(labels.includes('帰還'));assert.ok(!labels.includes('次の階層'));
+  assert.ok(!canvas.context.calls.some(c=>c.method==='fillRect'&&c.fillStyle==='#d2b988'),'unknown stairs marker must not appear');
+  assert.equal(renderer.scene.levels[2*map.w+4],0);
+  const floorCalls=renderer.scene.observed.context.calls;
+  assert.equal(floorCalls.find(c=>c.method==='fillRect').alpha,1,'unexplored backing must be opaque');
+  const crops=floorCalls.filter(c=>c.method==='drawImage');
+  assert.ok(crops.every(c=>explorationLevel(map,exploration,c.args[1]+16,(c.args[2]/Y_SCALE)+16)>0));
+  assert.equal(JSON.stringify(engine),before);
+  assert.equal(renderer.weaponDigit,8);
+}));
+function isKnownWall(w,map,state){return explorationLevel(map,state,w.x+map.tile/2,w.y+map.tile/2)>0;}
+
+test('root weapon digits retain all ten visual variants without classes',()=>{
+  const names=['sword','dagger','greatsword','spear','axe','hammer','bow','chakram','staff','spellbook'];
+  names.forEach((id,digit)=>{assert.equal(resolveWeaponDigit({id,digit}),digit);assert.equal(resolveWeaponDigit(id),digit);});
+  assert.equal(resolveWeaponDigit(undefined),0);
+});
+
+test('world hostile bullets and telegraphs remain hidden behind exploration fog',()=>withCanvas(()=>{
+  const {map,player,exploration}=fogFixture();
+  map.biomeId='volcano';map.hazards=[{x:80,y:80,kind:'lava',radius:12},{x:144,y:80,kind:'lava',radius:12}];
+  const engine={map,player,exploration,spec:{weapon:{digit:2}},status:'playing',totalTime:1,gates:false,
+    enemies:[],pickups:[],bullets:[],fx:[],
+    hostileBullets:[{id:1,x:80,y:80,vx:40,vy:0,life:1,radius:3,kind:'arrow'},{id:2,x:144,y:80,vx:40,vy:0,life:1,radius:3,kind:'arrow'}],
+    telegraphs:[{type:'circle',x:80,y:80,radius:12,remaining:.3,total:1,color:'#123abc'},{type:'circle',x:144,y:80,radius:12,remaining:.3,total:1,color:'#abc123'}]};
+  const before=JSON.stringify(engine),canvas=new TestCanvas(),renderer=new DungeonRenderer(canvas),seen=[];
+  renderer.drawHostileBullet=b=>seen.push(b.id);renderer.drawActor=()=>{};
+  renderer.render(engine,{width:800,height:600,quality:'low'});
+  assert.deepEqual(seen,[1]);
+  assert.ok(canvas.context.calls.some(c=>c.fillStyle==='#123abc'));
+  assert.ok(!canvas.context.calls.some(c=>c.fillStyle==='#abc123'));
+  assert.equal(JSON.stringify(engine),before);
+}));
+
+test('five visible finite bosses retain their identities and get a world HP/name display',()=>withCanvas(()=>{
+  for(const monsterId of ['elder_treant','dune_scorpion','cinder_drake','mire_hydra','frost_giant']){
+    const {map,player,exploration}=fogFixture();
+    const boss={id:99,name:`Boss ${monsterId}`,monsterId,sprite:monsterId,isFloorBoss:true,phase:2,x:80,y:80,hp:50,maxHp:100,r:25,warm:0};
+    const engine={map,player,exploration,spec:{weapon:{digit:0}},status:'playing',totalTime:1,gates:false,enemies:[boss],floorBoss:boss,pickups:[],bullets:[],fx:[]};
+    const canvas=new TestCanvas(),renderer=new DungeonRenderer(canvas);
+    renderer.render(engine,{width:844,height:230,quality:'low'});
+    assert.ok(canvas.context.calls.some(c=>c.method==='fillText'&&c.args[0]===boss.name));
+    assert.ok(canvas.context.calls.some(c=>c.method==='fillText'&&c.args[0]==='激昂'));
+    const label=renderer.worldToScreen(boss.x,boss.y,129);assert.ok(label.y>=0&&label.y<230);
+  }
+}));

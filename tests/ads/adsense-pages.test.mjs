@@ -75,6 +75,8 @@ test('source HTML inventory has explicit loader decisions before route-scoped bu
     for (const entry of await readdir(new URL(directory || './', root), { withFileTypes: true })) {
       if (entry.name.startsWith('.') || ignored.has(entry.name)) continue;
       const path = `${directory}${entry.name}`;
+      // Local game build/viewport captures are not source pages or public routes.
+      if (path === 'core-descent/dist' || path === 'core-descent/qa') continue;
       if (entry.isDirectory()) found.push(...await entries(`${path}/`));
       else if (entry.name.endsWith('.html') && !path.startsWith('play/hidden-object/puzzles/') && !path.startsWith('play/spot-difference/puzzles/')) found.push(path);
     }
