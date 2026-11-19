@@ -65,7 +65,7 @@ function fakeSurface(search = '?drawAdPreview=filled', locationPatch = {}) {
   win.ResizeObserver = class { constructor(callback) { this.callback = callback; this.targets = []; resizeObservers.push(this); } observe(target) { this.targets.push(target); } disconnect() { this.disconnected = true; } };
   win.MutationObserver = class { constructor(callback) { this.callback = callback; mutationObservers.push(this); } observe(target) { this.target = target; } disconnect() { this.disconnected = true; } };
   const desktopUiStyle = new FakeElement(doc); desktopUiStyle.sheet = null; doc.desktopUiStyle = desktopUiStyle;
-  return { doc, win, root, shell, stage, canvas, body, dock, palette, layers, desktopUiStyle, timers, idles, frames,
+  return { config: { ...drawDisplayAdConfig, enabled: true }, doc, win, root, shell, stage, canvas, body, dock, palette, layers, desktopUiStyle, timers, idles, frames,
     resizeObservers, mutationObservers,
     resize() { for (const observer of resizeObservers) if (!observer.disconnected) observer.callback([]); },
     runTimer() { const entry = [...timers.entries()].sort((a, b) => a[1].delay - b[1].delay)[0]; assert.ok(entry); timers.delete(entry[0]); entry[1].callback(); },
@@ -98,7 +98,8 @@ function assertHint(surface, state = 'fallback') {
 }
 
 test('compact candidates fit only inside an existing dock with 112px left for layers', () => {
-  assert.deepEqual(resolveDrawDisplayAdUnit(), { client: 'ca-pub-9801602250480253', slot: '8825932060' });
+  assert.equal(resolveDrawDisplayAdUnit(), null);
+  assert.deepEqual(resolveDrawDisplayAdUnit({ ...drawDisplayAdConfig, enabled: true }), { client: 'ca-pub-9801602250480253', slot: '8825932060' });
   const base = { viewportWidth: 1600, viewportHeight: 900, dockWidth: 264, layersHeight: 300 };
   assert.deepEqual(getDrawDisplayAdLayout(base), { width: 234, height: 60, reserve: 108, minLayersHeight: 112, inset: 18 });
   assert.deepEqual(getDrawDisplayAdLayout({ ...base, dockWidth: 318 }), { width: 300, height: 50, reserve: 98, minLayersHeight: 112, inset: 18 });
@@ -109,7 +110,7 @@ test('compact candidates fit only inside an existing dock with 112px left for la
 });
 
 test('production gate rejects private URLs, embeds, fullscreen, non-Draw and non-desktop contexts', () => {
-  const base = { config: drawDisplayAdConfig, origin: 'https://pixieed.jp', protocol: 'https:',
+  const base = { config: { ...drawDisplayAdConfig, enabled: true }, origin: 'https://pixieed.jp', protocol: 'https:',
     pathname: '/draw/editor.html', topLevel: true, mode: 'draw', desktop: true,
     fullscreen: false, visualScale: 1, pointerFine: true, privateContext: false, pageVisible: true, viewportWidth: 1100 };
   assert.equal(isDrawDisplayAdEligible(base), true);

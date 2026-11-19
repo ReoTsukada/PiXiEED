@@ -4,11 +4,11 @@ import { readFile, readdir } from 'node:fs/promises';
 
 const root = new URL('../../', import.meta.url);
 export const MANUAL_PAGES = [
-  'welcome/index.html', 'tools/index.html', 'about/index.html', 'guide/index.html',
+  'welcome/index.html', 'about/index.html', 'guide/index.html',
   'stores/index.html', 'stores/ecowashcafe-nakanoshima.html', 'glossary/index.html'
 ];
 // The SNS home, feed, and explore screens are interactive; root-owned build logic no longer adds Auto Ads there.
-export const SOURCE_AUTO_AD_PAGES = [];
+export const SOURCE_AUTO_AD_PAGES = ['tools/index.html'];
 const SOCIAL_NO_AD_PAGES = ['index.html', 'feed/index.html', 'explore/index.html'];
 export const RESULT_PAGES = [
   'pixel-camera.html', 'draw/index.html', 'audio/index.html', 'draw/editor.html', 'audio/editor.html', 'jigsaw/index.html',
@@ -35,8 +35,7 @@ const EXCLUDED_PAGES = [
   '404.html', 'shops/index.html', 'game/index.html', 'camera-media-test.html', 'pixel-camera-studio.html',
   'home/index.html', 'works/index.html', 'pixfind/index.html', 'telescope/index.html', 'play/index.html',
   'output/index.html', 'output/text/index.html', 'camera/index.html', 'draw/about/index.html',
-  'ai/index.html', 'draw/library-private/index.html', 'draw/library-return/index.html',
-  'scripts/file-list-site/404.html', 'scripts/file-list-site/library-import/index.html', 'scripts/file-list-site/library/index.html',
+  'ai/index.html',
   'works/sea-cat.html', 'works/rainy-window.html', 'works/night-lantern.html', 'pass/index.html',
   'stores/cafe-hoshi.html', 'stores/kaze-machi.html', 'stores/yoru-akari.html',
   'spot-difference/index.html', 'hidden-object/index.html', 'globe-prototype.html', 'pixiee-lens/index.html'
@@ -83,9 +82,9 @@ test('source HTML inventory has explicit loader decisions before route-scoped bu
   const categorized = [...new Set([...established, ...SOURCE_AUTO_AD_PAGES])];
   const expected = [...new Set([...categorized, ...COMPATIBILITY_PAGES, ...EVENT_NO_AD_PAGES, ...REFERENCE_NO_AD_PAGES, ...ISOLATED_TEST_PAGES])].sort();
   assert.deepEqual((await entries()).sort(), expected, 'new pages must opt into manual/result loading or explicit no-loader coverage');
-  assert.equal(established.length, 57);
-  assert.equal(categorized.length, 57);
-  assert.equal(expected.length, 57 + COMPATIBILITY_PAGES.length + EVENT_NO_AD_PAGES.length + REFERENCE_NO_AD_PAGES.length + ISOLATED_TEST_PAGES.length);
+  assert.equal(established.length, 51);
+  assert.equal(categorized.length, 52);
+  assert.equal(expected.length, 52 + COMPATIBILITY_PAGES.length + EVENT_NO_AD_PAGES.length + REFERENCE_NO_AD_PAGES.length + ISOLATED_TEST_PAGES.length);
   for (const path of SOURCE_AUTO_AD_PAGES) {
     const source = await html(path);
     assert.doesNotMatch(source, /adsbygoogle|adsense-auto|display-ads|data-display-ad/, `${path}: source has no manual provider or slot`);

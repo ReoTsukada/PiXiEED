@@ -8,7 +8,8 @@ import {
 } from '../../js/ads/project-gallery-ad.mjs';
 import { hasCompleteProjectArtwork } from '../../js/creation/project-start-picker.mjs?rev=20261118-draw-display-ad-1';
 
-const base = { config: projectGalleryAdConfig, origin: 'https://pixieed.jp', protocol: 'https:',
+const enabledConfig = { ...projectGalleryAdConfig, enabled: true };
+const base = { config: enabledConfig, origin: 'https://pixieed.jp', protocol: 'https:',
   pathname: '/tools/start/draw/', search: '?workspace=1', hash: '', topLevel: true,
   chooserVisible: true, settled: true, hasVisibleItems: true, hasValidArtwork: true, searching: false, hasErrors: false,
   busy: false, editor: false, fullscreen: false, privateContext: false, pageVisible: true };
@@ -104,7 +105,7 @@ function fixture({ url = 'https://pixieed.jp/tools/start/draw/?workspace=1', wid
   const loader = { script, errors: new Set(), failed: false };
   return { doc, win, dialog, scroller, list, tile, tiles, fresh, host, slot, loader,
     get pushes() { return win.adsbygoogle?.length || 0; }, get loaderCalls() { return loaderCalls; },
-    mount(config = projectGalleryAdConfig, flags = {}) {
+    mount(config = enabledConfig, flags = {}) {
       return mountProjectGalleryAd({ doc, win, dialog, scroller, list, primaryAction: fresh, host, slot, config,
         galleryState: { settled: true, hasVisibleItems: true, hasValidArtwork: true, searching: false, hasErrors: false, busy: false, ...flags },
         loadAdsense() { loaderCalls++; return loader; } });
@@ -135,13 +136,13 @@ test('publisher-content gate requires valid RGB previews for every loaded projec
 });
 
 test('config is isolated and resolves only the known fixed display unit', () => {
-  assert.equal(projectGalleryAdConfig.enabled, true);
-  assert.deepEqual(resolveProjectGalleryAdUnit(projectGalleryAdConfig), { client: 'ca-pub-9801602250480253', slot: '8825932060' });
+  assert.equal(resolveProjectGalleryAdUnit(projectGalleryAdConfig), null);
+  assert.deepEqual(resolveProjectGalleryAdUnit(enabledConfig), { client: 'ca-pub-9801602250480253', slot: '8825932060' });
   for (const patch of [{ enabled: false }, { unit: { ...validUnit, verifiedActive: false } },
     { unit: { ...validUnit, format: 'rewarded' } }, { unit: { ...validUnit, placement: 'gutter' } },
     { unit: { ...validUnit, size: 'responsive' } }, { unit: { ...validUnit, client: 'bad' } },
     { unit: { ...validUnit, slot: 'project-id' } }]) {
-    assert.equal(resolveProjectGalleryAdUnit({ ...projectGalleryAdConfig, ...patch }), null);
+    assert.equal(resolveProjectGalleryAdUnit({ ...enabledConfig, ...patch }), null);
   }
 });
 
@@ -251,7 +252,7 @@ test('empty, loading, error, search, editor, and zero-size states fail before SD
     { settled: false }, { hasVisibleItems: false }, { hasErrors: true }, { searching: true },
     { busy: true },
   ]) {
-    const f = fixture(); assert.equal(f.mount(projectGalleryAdConfig, flags).mounted, false);
+    const f = fixture(); assert.equal(f.mount(enabledConfig, flags).mounted, false);
     assert.equal(f.loaderCalls, 0); assert.equal(f.pushes, 0);
   }
   const hidden = fixture({ hiddenDialog: true });

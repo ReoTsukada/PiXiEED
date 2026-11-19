@@ -118,7 +118,7 @@ function idle(win, callback) {
 export function mountDrawDisplayAd({ doc = globalThis.document, win = globalThis.window,
   root = doc, config = drawDisplayAdConfig, loadAdsense = getAdsenseLoader,
   onLayout = () => {}, onOutcome = () => {} } = {}) {
-  if (!doc || !win || !root) return () => {};
+  if (!config?.enabled || !doc || !win || !root) return () => {};
   const previous = records.get(doc);
   if (previous) return previous.cleanup;
   const shell = root.matches?.('.draw-desktop-shell') ? root : root.querySelector?.('.draw-desktop-shell');
@@ -426,7 +426,7 @@ export function mountDrawDisplayAd({ doc = globalThis.document, win = globalThis
 /** Mount only after Draw's desktop stylesheet has applied and before the first work input. */
 export function mountDrawDisplayAdWhenReady({ doc = globalThis.document, win = globalThis.window,
   root = doc, onLayout = () => {}, ...options } = {}) {
-  if (!doc || !win || !root) return () => {};
+  if (!(options.config ?? drawDisplayAdConfig).enabled || !doc || !win || !root) return () => {};
   let stopped = false;
   let timeout = 0;
   let mountedCleanup = null;

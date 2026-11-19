@@ -7,7 +7,6 @@
 .output-guide-page .landing-main > .landing-hero { grid-row:2; }
 .output-guide-page .landing-main > .output-purpose-nav { grid-row:3; }
 .output-guide-page .landing-main > .output-guide-context { grid-row:4; }
-.output-guide-page .landing-main > .output-guide-ad { grid-row:5; }
 .output-guide-page .landing-hero { display:block; padding:clamp(20px,3vw,32px); background:var(--white,#fffdf8); border-radius:20px; box-shadow:none; }
 .output-guide-page .landing-hero .eyebrow { font-size:.72rem; letter-spacing:.12em; color:var(--guide-accent); margin:0 0 12px; }
 .output-guide-page .landing-hero h1 { font-size:clamp(1.85rem,3.6vw,2.65rem); line-height:1.3; letter-spacing:-.025em; color:var(--guide-ink); }
@@ -57,20 +56,7 @@
 .output-guide-page .output-guide-return p { font-size:.86rem; line-height:1.8; }
 .output-guide-page [data-output-copy-status] { min-height:1.8em; margin-bottom:0; overflow-wrap:anywhere; }
 .output-guide-page .landing-main :is(a,button,summary,[role="tabpanel"]):focus-visible { outline:3px solid var(--guide-accent); outline-offset:4px; }
-.output-guide-page [data-guide-panel][hidden], .output-guide-page [data-guide-current][hidden], .output-guide-page [data-output-copy][hidden], .output-guide-page .output-guide-ad[hidden] { display:none!important; }
-/* One in-flow ad, outside the task region. No sticky/fixed ad or height clipping. */
-.output-guide-page .output-guide-ad { box-sizing:border-box; width:100%; margin:48px 0 0; padding:16px 0; border-block:1px solid var(--guide-border); align-self:start; }
-.output-guide-page .output-guide-ad__label { margin:0 auto 12px; font-size:.75rem; line-height:1.4; text-align:center; color:var(--ink-soft,#4f5964); }
-.output-guide-page .output-guide-ad__slot { width:100%; max-width:336px; min-height:250px; margin-inline:auto; }
-.output-guide-page .output-guide-ad__unit { display:block; width:100%; height:250px; }
-.output-guide-page .output-guide-ad[data-ad-layout="vertical"] .output-guide-ad__slot { max-width:300px; min-height:600px; }
-.output-guide-page .output-guide-ad[data-ad-layout="vertical"] .output-guide-ad__unit { height:600px; }
-@media (min-width:1120px) {
-  /* Reserve the rail before the SDK loads so the primary action never jumps sideways. */
-  .output-guide-page .landing-main { grid-template-columns:minmax(0,1fr) 300px; column-gap:40px; }
-  .output-guide-page .landing-main > :is(.landing-hero,.output-purpose-nav,.output-guide-context) { grid-column:1; }
-  .output-guide-page .landing-main > .output-guide-ad { grid-column:2; grid-row:2 / span 3; width:300px; margin:0; padding:16px 0; }
-}
+.output-guide-page [data-guide-panel][hidden], .output-guide-page [data-guide-current][hidden], .output-guide-page [data-output-copy][hidden] { display:none!important; }
 @media (max-width:600px) {
   .output-guide-page .landing-main { width:calc(100% - 32px); }
   .output-guide-page .landing-hero { padding:20px; }
@@ -89,4 +75,4 @@
   .output-guide-page .capability-table caption { display:block; }
 }
 @media (prefers-reduced-motion:reduce) { .output-guide-page .landing-main * { scroll-behavior:auto!important; transition:none!important; animation:none!important; } }
-@media print { .output-guide-page .output-guide-ad,.output-guide-page .hero-actions { display:none!important; } .output-guide-page .landing-main { display:block!important; } .output-guide-page [data-guide-panel][hidden] { display:block!important; } }
+@media print { .output-guide-page .hero-actions { display:none!important; } .output-guide-page .landing-main { display:block!important; } .output-guide-page [data-guide-panel][hidden] { display:block!important; } }

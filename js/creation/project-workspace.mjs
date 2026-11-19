@@ -1,4 +1,3 @@
-import { openPrivateList, privateListSource } from './private-list-handoff.mjs';
 import { createLazyGalleryData } from './project-gallery-data.mjs?rev=20261109-lazy-gallery-1';
 import { routeEditorFile } from './output-router.mjs?rev=20261111-output-offerwall-1';
 import { getToolStartRoute, isFreshToolStartRequest } from '../tool-start-routes.mjs?rev=20261110-output-result-1';
@@ -647,18 +646,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
       gallery.setSelection(false); libraryData.invalidate(); await refreshList(); say(`${items.length}件の作品を完全に削除しました。`);
     }, { close: false });
   }
-  async function showProjects({ pane, focusTransfer = false, localLibrary = false } = {}) {
-    if (!localLibrary && !locked && !initialRestoreError && !dialog.open && tool === 'draw'
-        && (!pane || pane === 'library') && session.persisted && privateListSource(window)) {
-      let navigating = false;
-      await transact(async () => {
-        const current = session.dirty ? await save() : session.currentProject;
-        if (session.dirty) return;
-        const { projects, errors } = await store.listProjects();
-        if (!errors.length && !session.dirty) navigating = await openPrivateList(current, projects);
-      }, { close: false });
-      if (navigating) return;
-    }
+  async function showProjects({ pane, focusTransfer = false } = {}) {
     if (locked) return; for (const el of main.querySelectorAll('details[open]')) el.open = false;
     if (!dialog.open) { selectPane(pane || 'library'); dialog.showModal(); }
     else if (pane) selectPane(pane);
@@ -750,14 +738,6 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     finally {
       initialSelectionPending = false;
       locked = false; initialized = true; syncInputLock(); update();
-    }
-    if (tool === 'draw' && privateListSource(window)) {
-      try {
-        if (sessionStorage.getItem('pixieed:private-list:manage:v1') === '1') {
-          sessionStorage.removeItem('pixieed:private-list:manage:v1');
-          void showProjects({ pane: 'library', localLibrary: true });
-        }
-      } catch { /* Storage can be disabled. The local file panel stays available. */ }
     }
     initialEntryFresh = isInitialProjectEntryFresh({ initialProject, pointer, hasQuery: !entryRequestClean && (params.size > 0 || Boolean(newStartRoute)), hash: location.hash, restoreError: initialRestoreError, operationError, failed });
     return session.persisted;

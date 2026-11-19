@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { conversionAdEligible, conversionAdLayout, conversionAdDeliveryState } from '../../js/ads/conversion-display-ad.mjs';
+import { mountConversionDisplayAd, conversionAdEligible, conversionAdLayout, conversionAdDeliveryState } from '../../js/ads/conversion-display-ad.mjs';
 const base={origin:'https://pixieed.jp',pathname:'/tools/start/convert/',topLevel:true};
 
 test('known public modes remain eligible',()=>{
@@ -86,4 +86,8 @@ test('work screen has no companion guide and requests only with a safe rail',asy
  assert.match(code,/dialog:modal/);
  assert.doesNotMatch(code,/dialog\[open\]/);
 
+});
+
+test('the shipped conversion workspace does not prepare a manual unit', () => {
+  assert.equal(mountConversionDisplayAd({ doc: {}, win: {} }), null);
 });

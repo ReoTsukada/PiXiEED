@@ -66,35 +66,8 @@ async function verifyResult(page, configured) {
   const source = await page.evaluate(()=>window.__sourceCanvas?.toDataURL());
   const before = await page.locator('.px-tool-result__preview').first().evaluate((c)=>c.toDataURL());
   if(source) { await page.evaluate(()=>window.__sourceCanvas.getContext('2d').clearRect(0,0,24,24));assert.equal(await page.locator('.px-tool-result__preview').first().evaluate((c)=>c.toDataURL()),before); }
-  // Result placeholders exist before the optional runtime registers a display unit.
-  const ad=page.locator('.px-display-ad').first();
-  if(configured) {
-    if(await page.locator('.px-tool-result__ad-row[data-reserved="true"]').count()) {
-      await page.waitForFunction(()=>document.querySelector('.px-tool-result__ad-row ins.px-display-ad__unit'));
-    }
-    const mounted=await page.locator('ins.px-display-ad__unit').count();
-    if(mounted) await page.waitForFunction(()=>document.querySelector('[data-display-ad]')?.dataset.adState==='filled');
-    const layout=await ad.evaluate((el)=>{
-      const a=el.getBoundingClientRect(),u=el.querySelector('ins')?.getBoundingClientRect()||{width:0},p=el.parentElement.getBoundingClientRect();
-      const overlaps=[...document.querySelectorAll('a,button,input,summary')].filter((n)=>!el.contains(n)&&n.checkVisibility({visibilityProperty:true})).filter((n)=>{const r=n.getBoundingClientRect();return r.width&&r.height&&r.left<a.right&&r.right>a.left&&r.top<a.bottom&&r.bottom>a.top;}).map((n)=>({id:n.id,text:n.textContent,class:n.className,rect:n.getBoundingClientRect().toJSON()}));
-      const lastControl=[...document.querySelectorAll('.px-tool-result__content button,.px-tool-result__content a')].at(-1)?.getBoundingClientRect();
-      return {mounted:Boolean(u.width),visible:!el.hidden,overlaps,overflow:document.documentElement.scrollWidth>innerWidth+1,center:Math.abs((p.left+p.right)/2-document.documentElement.clientWidth/2),fits:u.width===0||u.left>=a.left-1&&u.right<=a.right+1,gap:lastControl? a.top-lastControl.bottom:Infinity,withinViewport:a.bottom<=innerHeight+1};
-    });
-    assert.equal(layout.overflow,false);assert.equal(layout.withinViewport,true);
-    if(mounted) {
-      assert.deepEqual(layout.overlaps,[],page.url());assert.ok(layout.center<=1,JSON.stringify({url:page.url(),layout}));assert.equal(layout.fits,true);assert.ok(layout.gap>=24,JSON.stringify({url:page.url(),layout}));
-      const requests=await page.evaluate(()=>__resultAdRequests);assert.ok(requests>=1&&requests<=mounted);
-      for (const unit of await page.locator('ins.px-display-ad__unit').all()) {
-        // A previously requested secondary unit can be hidden after resizing to mobile.
-        if(!await unit.isVisible()) continue;
-        assert.equal(await unit.evaluate((node)=>{
-          const r=node.getBoundingClientRect(),p=node.closest('aside').getBoundingClientRect();
-          return r.width>0&&r.left>=p.left-1&&r.right<=p.right+1&&p.bottom<=innerHeight+1;
-        }),true,'each requested result unit fits its own column');
-      }
-    }
-    else {assert.equal(layout.visible,false);assert.equal(await page.evaluate(()=>__resultAdRequests),0);}
-  } else {assert.equal(await ad.isVisible(),false);assert.equal(await page.locator('ins.px-display-ad__unit').count(),0);assert.equal(await page.evaluate(()=>__resultAdRequests),0);}
+  assert.equal(await page.locator('.px-tool-result__ad-row,.px-tool-result ins.adsbygoogle').count(),0);
+  assert.equal(await page.evaluate(()=>__resultAdRequests),0);
   checks++;
 }
 async function seedPuzzle(page, mode) {
@@ -118,11 +91,6 @@ try {
         await page.waitForFunction(()=>typeof __resultAdRequests==='number');
         assert.equal(await page.locator('[data-display-ad],ins.px-display-ad__unit').count(),0,'working screen has no manual slot');
         await syntheticResult(page,key);await verifyResult(page,configured);
-        if(configured&&[390,1280].includes(viewport.width)&&await page.locator('ins.px-display-ad__unit').count()) {
-          await page.locator('[data-display-ad]').first().screenshot({path:`/tmp/pixieed-result-unit-${engine}-${viewport.width}-${name}.png`});await frames(page);
-          await page.evaluate(()=>scrollTo({top:0,behavior:'instant'}));await frames(page);
-          await page.screenshot({path:`/tmp/pixieed-tool-result-${engine}-${viewport.width}-${name}.png`,fullPage:true});
-        }
         await page.locator('.app-tabs button').click();assert.equal(await page.locator('.px-tool-result').isVisible(),false);
         assert.equal(await page.locator('[data-tool-result-suspended]').count(),0);assert.equal(await page.locator('[data-tool-result-return]').count(),0);
         await syntheticResult(page,key);await verifyResult(page,configured);await page.keyboard.press('Escape');assert.equal(await page.locator('.px-tool-result').isVisible(),false);checks++;

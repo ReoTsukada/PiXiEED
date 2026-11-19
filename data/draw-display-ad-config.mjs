@@ -1,6 +1,6 @@
 /** One compact ordinary display unit inside the existing desktop Draw lane. */
 export const drawDisplayAdConfig = Object.freeze({
-  enabled: true,
+  enabled: false,
   productionOrigins: Object.freeze(['https://pixieed.jp', 'https://www.pixieed.jp']),
   unit: Object.freeze({
     client: 'ca-pub-9801602250480253',

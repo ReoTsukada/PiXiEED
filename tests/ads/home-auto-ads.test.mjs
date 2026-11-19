@@ -19,7 +19,7 @@ function context(path = '/', overrides = {}) {
 }
 
 test('public home loads the official async SDK once, after message policy', () => {
-  for (const path of ['/', '/index.html']) {
+  for (const path of ['/', '/index.html', '/tools/', '/tools/index.html']) {
     const ctx = context(path);
     runInNewContext(loader,ctx);
     assert.equal(ctx.scripts.length,0,'policy required before provider');
@@ -48,7 +48,7 @@ test('private URLs, non-production pages and frames never request a provider', (
     assert.equal(ctx.scripts.length,0,`${path} ${JSON.stringify(override)} frame=${framed}`);
   }
 });
-test('only the public portal includes the guarded deferred entry after the policy',async()=>{
+test('the public portal includes the guarded deferred entry after the policy',async()=>{
   const html=await readFile(new URL('index.html',root),'utf8');
   const head=html.match(/<head>[\s\S]*?<\/head>/)[0];
   assert.equal((head.match(/name="google-adsense-account"/g)||[]).length,1);

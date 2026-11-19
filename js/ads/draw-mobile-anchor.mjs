@@ -69,7 +69,7 @@ export function isDrawMobileAnchorEligible({ config = drawDisplayAdConfig, origi
 /** Google owns the anchor, including overlap and its close control. No app layout changes. */
 export function mountDrawMobileAnchor({ doc = globalThis.document, win = globalThis.window,
   root = doc, config = drawDisplayAdConfig, onOutcome = () => {} } = {}) {
-  if (!doc?.body || !doc.head || !win || !root) return () => {};
+  if (!config?.enabled || !doc?.body || !doc.head || !win || !root) return () => {};
   if (records.has(doc)) return records.get(doc).cleanup;
   const preview = localPreview(win);
   const eligible = () => {
@@ -169,7 +169,7 @@ export function mountDrawMobileAnchor({ doc = globalThis.document, win = globalT
 /** Wait for startup to settle; work input cancels an ad that has not started. */
 export function mountDrawMobileAnchorWhenReady({ doc = globalThis.document, win = globalThis.window,
   root = doc, ...options } = {}) {
-  if (!doc || !win || !root) return () => {};
+  if (!(options.config ?? drawDisplayAdConfig).enabled || !doc || !win || !root) return () => {};
   let stopped = false, started = false, timer = 0, mountedCleanup = null;
   const frames = new Set(), releases = [];
   const clearWaiting = () => {

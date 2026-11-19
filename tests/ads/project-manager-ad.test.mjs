@@ -4,10 +4,12 @@ import { readFile } from 'node:fs/promises';
 import { projectManagerAdConfig } from '../../data/project-gallery-ad-config.mjs';
 import { isProjectManagerAdEligible, hasManagerArtwork, projectGalleryAdPositions, getInlineGalleryAdLayout } from '../../js/ads/project-manager-ad.mjs';
 import { claimProjectGalleryAdRequest, hasProjectGalleryAdRequest } from '../../js/ads/project-gallery-ad.mjs';
-const eligible = { config: projectManagerAdConfig, origin: 'https://pixieed.jp', protocol: 'https:', pathname: '/tools/start/draw/',
+const enabledConfig = { ...projectManagerAdConfig, enabled: true };
+const eligible = { config: enabledConfig, origin: 'https://pixieed.jp', protocol: 'https:', pathname: '/tools/start/draw/',
   search: '?workspace=1&runtime=direct', topLevel: true, pageVisible: true, libraryVisible: true, settled: true, enoughArtwork: true };
 
 test('manager gate admits only settled gallery content on clean production URLs', () => {
+  assert.equal(isProjectManagerAdEligible({ ...eligible, config: projectManagerAdConfig }), false);
   assert.equal(isProjectManagerAdEligible(eligible), true);
   assert.equal(isProjectManagerAdEligible({ ...eligible, search: '?workspace=1&runtime=direct&mode=audio' }), true);
   for (const search of ['?pxd=secret', '?pxdRevision=r1', '?modePxd=work', '?workspace=1&workspace=1', '?runtime=unknown', '?title=private', '?mode=unknown', '?constructor=1', '?__proto__=1', '?toString=1'])
@@ -15,7 +17,7 @@ test('manager gate admits only settled gallery content on clean production URLs'
   for (const patch of [{ origin: 'http://localhost:4188' }, { origin: 'https://preview.pixieed.jp' }, { pathname: '/profile/' }, { hash: '#work' },
     { topLevel: false }, { pageVisible: false }, { libraryVisible: false }, { settled: false }, { enoughArtwork: false },
     { searching: true }, { selecting: true }, { importing: true }, { hasErrors: true }, { busy: true }, { restoring: true }, { dirty: true }, { fullscreen: true }, { privateContext: true },
-    { config: { ...projectManagerAdConfig, enabled: false } }, { config: { ...projectManagerAdConfig, minimumArtwork: 6 } }])
+    { config: { ...projectManagerAdConfig, enabled: false } }, { config: { ...enabledConfig, minimumArtwork: 6 } }])
     assert.equal(isProjectManagerAdEligible({ ...eligible, ...patch }), false, JSON.stringify(patch));
 });
 

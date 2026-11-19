@@ -96,7 +96,7 @@ test('HTML retains fallback links, privacy boundary and important limitations', 
   const html = await readFile(new URL('../../output/index.html', import.meta.url), 'utf8');
   assert.equal((html.match(/data-guide-panel="/g) || []).length, 3);
   assert.equal((html.match(/data-output-start/g) || []).length, 2);
-  assert.match(html, /data-output-guide-ad aria-label="広告" hidden/);
+  assert.doesNotMatch(html, /data-output-guide-ad\b/);
   assert.doesNotMatch(html, /<input[^>]*type="file"/);
   for (const text of ['120秒以内', '800万画素', 'MP3・FLAC出力は未対応', '元動画の音声は含みません']) assert.ok(html.includes(text));
   assert.match(html, /<details id="guide-format-details"/);
