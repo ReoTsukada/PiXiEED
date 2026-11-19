@@ -36,6 +36,13 @@ export function privateListSource(win) {
 
 export async function openPrivateList(current, projects, win = window, doc = document) {
   if (!privateListSource(win) || !projects.length || projects.length > 1200) return false;
+  try {
+    const response = await win.fetch('https://draw.pixieed.jp/library/ready.txt', {
+      credentials: 'omit', referrerPolicy: 'no-referrer', redirect: 'error',
+      cache: 'no-store', signal: AbortSignal.timeout(2500)
+    });
+    if (response.status !== 200 || (await response.text()).trim() !== 'pixieed-library-v1') return false;
+  } catch { return false; }
   const original = drawUrl(current);
   const choices = Object.create(null);
   const rows = projects.map(project => {

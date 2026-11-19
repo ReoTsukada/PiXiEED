@@ -5,6 +5,15 @@ import { openPrivateList } from '../../js/creation/private-list-handoff.mjs';
 function fixture() {
   let stored, href;
   const win = { location: new URL('https://pixieed.jp/draw/?pxd=private-id&connectionId=private-connection'),
+    async fetch(url, options) {
+      assert.equal(url, 'https://draw.pixieed.jp/library/ready.txt');
+      assert.equal(options.credentials, 'omit');
+      assert.equal(options.referrerPolicy, 'no-referrer');
+      assert.equal(options.redirect, 'error');
+      assert.equal(options.cache, 'no-store');
+      assert.ok(options.signal instanceof AbortSignal);
+      return new Response('pixieed-library-v1');
+    },
     sessionStorage: { setItem(_, value) { stored = JSON.parse(value); } } };
   win.self = win.top = win;
   const doc = { cookie: '', createElement() { return { click() { href = this.href; assert.equal(this.referrerPolicy, 'no-referrer'); } }; } };
@@ -43,4 +52,16 @@ test('large lists keep every selectable item without previews, or stay local on 
   const g = fixture();
   assert.equal(await openPrivateList(original, Array(1201).fill(item), g.win, g.doc), false);
   assert.equal(g.href, undefined);
+});
+
+test('unavailable, unexpected and failed hosts keep the local list without staging secrets', async () => {
+  for (const probe of [async () => { throw Error('DNS'); }, async () => new Response('unexpected'),
+    async () => new Response('pixieed-library-v1', { status: 503 })]) {
+    const f = fixture();
+    f.win.fetch = probe;
+    assert.equal(await openPrivateList(original, [item], f.win, f.doc), false);
+    assert.equal(f.doc.cookie, '');
+    assert.equal(f.href, undefined);
+    assert.equal(f.stored, undefined);
+  }
 });
