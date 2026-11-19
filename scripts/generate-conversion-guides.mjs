@@ -80,7 +80,6 @@ function shell({title,description,path,items,date,content,index=false}) {
   <main id="main" class="format-main">
     ${breadcrumbs(items)}
     <div class="format-content">${content}</div>
-    <aside class="output-guide-ad" data-output-guide-ad aria-label="広告" hidden><p class="output-guide-ad__label">広告</p><div class="output-guide-ad__slot" data-output-guide-ad-slot></div></aside>
     <p class="format-updated">対応内容の確認日：<time datetime="${e(date)}">${e(date)}</time> · 登録不要・無料保存。元のファイルは変更しません。</p>
   </main>
   <footer class="format-footer"><a href="/output/">ファイル変換</a><a href="/tools/">ツール一覧</a><a href="/privacy/">プライバシー</a><a href="/terms/">利用規約</a><span>© PiXiEED</span></footer>

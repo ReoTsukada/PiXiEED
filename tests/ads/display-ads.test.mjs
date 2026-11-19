@@ -5,7 +5,7 @@ import { displayAdConfig } from '../../data/site-config.js';
 import { getAdsenseLoader, mountDisplayAds, resolveDisplayAd } from '../../js/display-ads.mjs';
 
 const pages = [
-  ['welcome/index.html', 'home', '/welcome/'], ['tools/index.html', 'tools', '/tools/'],
+  ['welcome/index.html', 'home', '/welcome/'],
   ['about/index.html', 'info', '/about/'], ['guide/index.html', 'info', '/guide/'],
   ['stores/index.html', 'stores', '/stores/'],
   ['stores/ecowashcafe-nakanoshima.html', 'store-detail', '/stores/ecowashcafe-nakanoshima.html']
@@ -323,13 +323,13 @@ function mobileChooserFixture({ path = '/tools/start/draw/', search = '', width 
   win.top = win.self = win;
   return { doc, win, script, inserted, attributes };
 }
-test('first mobile Draw chooser SDK carries approved anchor options before insertion and is reused', () => {
+test('shared SDK does not enable mobile Draw anchors when tool ads are off', () => {
   for (const search of ['', '?workspace=1', '?workspace=1&runtime=direct&mode=draw']) {
     const f = mobileChooserFixture({ search });
     const loader = getAdsenseLoader(f.doc, f.win, config.client);
     assert.equal(f.inserted.length, 1);
-    assert.equal(f.inserted[0].attributes.get('data-overlays'), 'collapsed-bottom');
-    assert.equal(f.inserted[0].attributes.get('data-draw-mobile-anchor'), 'true');
+    assert.equal(f.inserted[0].attributes.get('data-overlays'), undefined);
+    assert.equal(f.inserted[0].attributes.get('data-draw-mobile-anchor'), undefined);
     assert.equal(getAdsenseLoader(f.doc, f.win, config.client), loader);
     assert.equal(f.inserted.length, 1);
     assert.equal(f.win.adsbygoogle, undefined, 'the loader never requests another manual unit');

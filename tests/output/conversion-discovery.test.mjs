@@ -34,7 +34,7 @@ for (const guide of catalog.guides) test(`${guide.slug}: specific, indexable gui
   assert.match(html, /<meta name="robots" content="index,follow">/);
   assert.ok(html.includes(`<link rel="canonical" href="${url}">`));
   assert.equal((html.match(/<h1>/g) || []).length, 1);
-  assert.equal((html.match(/data-output-guide-ad aria/g) || []).length, 1);
+  assert.doesNotMatch(html, /data-output-guide-ad\b/);
   assert.doesNotMatch(html, /<input[^>]+type="file"|data-tx-source|adsbygoogle\.push|meta http-equiv="refresh"/);
   for (const route of guide.routes) assert.ok(html.includes(conversionHref(route.to.toLowerCase()).replaceAll('&','&amp;')));
   assert.ok(html.includes(guide.input)); assert.ok(html.includes(guide.loss));

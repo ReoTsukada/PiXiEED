@@ -43,10 +43,9 @@ test('only the configured active responsive display unit resolves', () => {
 test('canonical share link never includes a private workspace ID', () => {
   assert.equal(OUTPUT_GUIDE_CANONICAL, 'https://pixieed.jp/output/');
 });
-test('HTML has one labelled ad, no inline vendor request, and all existing limit disclosures', async () => {
+test('HTML omits the manual ad and retains all existing limit disclosures', async () => {
   const html = await readFile(new URL('../../output/index.html', import.meta.url), 'utf8');
-  assert.equal((html.match(/\sdata-output-guide-ad\s/g) || []).length, 1);
-  assert.match(html, /data-output-guide-ad aria-label="広告" hidden/);
+  assert.doesNotMatch(html, /data-output-guide-ad|<ins\b[^>]*adsbygoogle/);
   assert.match(html, /rel="canonical" href="https:\/\/pixieed.jp\/output\/"/);
   assert.doesNotMatch(html, /<script[^>]*src="https:\/\/pagead2/);
   for (const text of ['120秒以内', 'MP3・FLAC出力は未対応', '800万画素', '元動画の音声は含みません']) {

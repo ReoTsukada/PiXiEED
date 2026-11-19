@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { drawDisplayAdConfig } from '../../data/draw-display-ad-config.mjs';
 import assert from 'node:assert/strict';
 import { isDrawMobileAnchorEligible, mountDrawMobileAnchor,
   mountDrawMobileAnchorWhenReady } from '../../js/ads/draw-mobile-anchor.mjs';
@@ -45,7 +46,7 @@ function fixture(location = production) {
   win.cancelAnimationFrame = id => frames.delete(id);
   win.getComputedStyle = () => { throw Error('must not inspect Google units'); };
   win.MutationObserver = win.ResizeObserver = class { constructor() { throw Error('no ad geometry observers'); } };
-  return { doc, win, root, link, timers, idles, frames,
+  return { config: { ...drawDisplayAdConfig, enabled: true }, doc, win, root, link, timers, idles, frames,
     idle() { const entry = idles.entries().next().value; assert.ok(entry); idles.delete(entry[0]); entry[1](); },
     timer(delay) { const entry = [...timers].find(([, value]) => value.delay === delay); assert.ok(entry, `timer ${delay}`); timers.delete(entry[0]); entry[1].callback(); },
     frame() { const [id, callback] = frames.entries().next().value; frames.delete(id); callback(); } };
@@ -54,6 +55,8 @@ const script = s => s.doc.head.children.find(node => node.tagName === 'SCRIPT');
 
 test('mobile gate allows only fresh, sufficiently tall, visible top-level Draw', () => {
   const base = { ...production, topLevel: true, mode: 'draw', viewportWidth: 390, viewportHeight: 844 };
+  assert.equal(isDrawMobileAnchorEligible(base), false);
+  base.config = { ...drawDisplayAdConfig, enabled: true };
   assert.equal(isDrawMobileAnchorEligible(base), true);
   for (const patch of [{ viewportWidth: 319 }, { viewportWidth: 1001 }, { viewportHeight: 619 },
     { search: '?pxd=private' }, { search: '?workspace=1&runtime=direct' }, { hash: '#private' },

@@ -457,7 +457,6 @@ for (const viewport of viewports) {
           const r = node.getBoundingClientRect();
           return { top:r.top, right:r.right, bottom:r.bottom, left:r.left, height:r.height, width:r.width };
         };
-        const attrs = node => node ? [...node.attributes].map(attr => [attr.name, attr.value]).sort(([a],[b]) => a.localeCompare(b)) : null;
         const actionItems = group ? [...group.querySelectorAll('button,a')].map(node => ({
           id:node.id, text:node.textContent.trim(), hidden:node.hidden, disabled:node.disabled,
           box:box(node), parent:node.parentElement?.className || ''
@@ -466,13 +465,12 @@ for (const viewport of viewports) {
         const groupStyle = group ? getComputedStyle(group) : null;
         const scroll = group ? { top:group.scrollTop, height:group.scrollHeight, clientHeight:group.clientHeight,
           overflowY:groupStyle.overflowY } : null;
-        const adBefore = attrs(adRow);
         retake?.focus();
         retake?.scrollIntoView({ block:'nearest', inline:'nearest' });
         const retakeBox = box(retake), focused = document.activeElement === retake;
         const scrollAfterFocus = group ? group.scrollTop : null;
         return { headerBox, footerBox, groupBox, applyBox, actionItems, scroll, retakeBox, focused, scrollAfterFocus,
-          adBefore, adAfter:attrs(adRow), resultVisible:!!result && getComputedStyle(result).display !== 'none' };
+          hasManualAdRow:Boolean(adRow), resultVisible:!!result && getComputedStyle(result).display !== 'none' };
       });
       checks.push({ name:'short-landscape geometry evidence', ...landscapeGeometry });
       assert.ok(landscapeGeometry.resultVisible, `${name}: captured camera result is visible in short landscape`);
@@ -489,8 +487,8 @@ for (const viewport of viewports) {
       assert.ok(landscapeGeometry.retakeBox.top >= landscapeGeometry.headerBox.bottom - 1
         && landscapeGeometry.retakeBox.bottom <= landscapeGeometry.footerBox.top + 1,
         `${name}: focusing Retake reveals it between the fixed header and footer`);
-      assert.deepEqual(landscapeGeometry.adAfter, landscapeGeometry.adBefore,
-        `${name}: the landscape result geometry check leaves ad-row attributes unchanged`);
+      assert.equal(landscapeGeometry.hasManualAdRow, false,
+        `${name}: the landscape result does not reserve a manual ad row`);
       checks.at(-1).name = 'short-landscape result actions scroll and remain clear of fixed UI';
     }
     await applyCaptured();

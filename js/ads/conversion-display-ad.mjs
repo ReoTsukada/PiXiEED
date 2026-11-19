@@ -1,4 +1,7 @@
 import { displayAdConfig } from '../../data/site-config.js?rev=20261008-map-detail-1';
+
+// This workspace has its own switch. The same publisher unit is active on public pages.
+export const conversionWorkspaceAdConfig = Object.freeze({ ...displayAdConfig, enabled: false });
 import { getAdsenseLoader } from '../display-ads.mjs?rev=20261118-draw-display-ad-1';
 import { hasConversionRecoveryHistory } from '../tool-start-routes.mjs?rev=20261110-output-result-1';
 
@@ -60,8 +63,8 @@ const criticalLayout = `
  */
 export function mountConversionDisplayAd({ doc = globalThis.document, win = globalThis.window,
   entryHistoryState,
-  config = displayAdConfig, load = getAdsenseLoader } = {}) {
-  if (!doc || !win) return null;
+  config = conversionWorkspaceAdConfig, load = getAdsenseLoader } = {}) {
+  if (config?.enabled === false || !doc || !win) return null;
   const historyAtEntry = entryHistoryState === undefined ? win.history?.state : entryHistoryState;
   const eligible = () => conversionAdEligible({ origin: win.location.origin,
     pathname: win.location.pathname, search: win.location.search, hash: win.location.hash,
@@ -71,7 +74,7 @@ export function mountConversionDisplayAd({ doc = globalThis.document, win = glob
     && !main.querySelector('#output-start,#output-layout,[data-editor]');
   if (!eligible() || !main || errorOnly() || mounted.has(doc)) return mounted.get(doc) || null;
   const client = config?.client, slot = String(config?.slots?.tools || '').trim();
-  if (config?.enabled === false || !/^ca-pub-\d{16}$/.test(client || '') || !/^\d{6,20}$/.test(slot)) return null;
+  if (!/^ca-pub-\d{16}$/.test(client || '') || !/^\d{6,20}$/.test(slot)) return null;
   const fallback = doc.createElement('style'); fallback.dataset.conversionAdLayout = '';
   fallback.textContent = criticalLayout; doc.head.append(fallback);
   const sheet = doc.createElement('link'); sheet.rel = 'stylesheet';

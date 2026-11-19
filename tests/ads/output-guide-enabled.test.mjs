@@ -41,11 +41,11 @@ function fixture({ url = 'https://pixieed.jp/output/', top = 100, existingSdk = 
   win.top = win.self = win;
   return { doc, win, host, rect, scripts, units, get requests() { return requests; } };
 }
-const mount = f => mountOutputGuideAd({ doc: f.doc, win: f.win, config: outputGuideAdConfig });
+const mount = f => mountOutputGuideAd({ doc: f.doc, win: f.win, config: { ...outputGuideAdConfig, enabled: true } });
 
 test('public guide uses the same publisher and ordinary unit as the tools page', () => {
-  assert.equal(outputGuideAdConfig.enabled, true);
-  assert.deepEqual(resolveOutputGuideAd(outputGuideAdConfig), {
+  assert.equal(resolveOutputGuideAd(outputGuideAdConfig), null);
+  assert.deepEqual(resolveOutputGuideAd({ ...outputGuideAdConfig, enabled: true }), {
     client: displayAdConfig.client, slot: displayAdConfig.slots.tools,
   });
 });

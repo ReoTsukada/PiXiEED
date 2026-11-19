@@ -6,7 +6,7 @@ import { displayAdConfig } from './site-config.js?rev=20261008-map-detail-1';
  * Set enabled to false to stop this placement without affecting free tools.
  */
 export const outputGuideAdConfig = Object.freeze({
-  enabled: true,
+  enabled: false,
   unit: Object.freeze({
     client: displayAdConfig.client,
     slot: displayAdConfig.slots.tools,
