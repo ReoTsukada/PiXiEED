@@ -6,6 +6,10 @@
 
 視界は主人公から離れるほど滑らかに暗くなる。基本の7武器は移動中も攻撃し、大剣・槌・杖は足を止めて高威力の一撃を放つ。杖は0.35秒の静止詠唱、魔導書は移動詠唱の3連追尾魔弾。全32種のコアを全10武器で使用できる。
 
+## Codex / Astraで引き継ぐ
+
+[CODEX_HANDOFF.md](CODEX_HANDOFF.md) に、現行仕様、ソースの入口、起動手順、保存互換、検証実績、未実装部分とCodexに渡す開始文をまとめている。GitHubの `main` を取得し、最初に [AGENTS.md](AGENTS.md) と併せて読む。
+
 ## 開発
 
 Node.js 22以降、実行時依存なし。npm run build / npm test / npm run balance。

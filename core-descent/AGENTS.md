@@ -17,6 +17,7 @@ CORE DESCENT: 数字パズルで武器と魔法を構築する、職業制限の
 - 特殊効果の端数を黙って捨てない。強化は計算式・画面表示・テストを一致させる。
 
 ## Files to consult by task
+- 新しいセッションでの引き継ぎ: CODEX_HANDOFF.md。現行仕様、起動、検証実績、保存互換、未実装範囲を確認する。
 - ルール/新機能: docs/GAME_DESIGN.md
 - 能力/合成: docs/CORE_SYSTEM.md、docs/ABILITIES.md、docs/RARITY_AMPLIFIERS.md
 - オンライン/取引: docs/ONLINE_DESIGN.md
