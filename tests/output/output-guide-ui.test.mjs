@@ -98,7 +98,7 @@ test('HTML retains fallback links, privacy boundary and important limitations', 
   assert.equal((html.match(/data-output-start/g) || []).length, 2);
   assert.doesNotMatch(html, /data-output-guide-ad\b/);
   assert.doesNotMatch(html, /<input[^>]*type="file"/);
-  for (const text of ['120秒以内', '800万画素', 'MP3・FLAC出力は未対応', '元動画の音声は含みません']) assert.ok(html.includes(text));
+  for (const text of ['120秒以内', '800万画素', 'FLACは16bit固定', '元動画の音声は含みません']) assert.ok(html.includes(text));
   assert.match(html, /<details id="guide-format-details"/);
 });
 test('guidance adds no network, storage or advertising API', async () => {
