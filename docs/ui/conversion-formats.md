@@ -12,7 +12,7 @@ Raster input/output: BMP, TIFF, TGA, QOI, ICO, PBM/PGM/PPM/PAM. Static SVG input
 
 Limits: 4096px edges, 8 million pixels including frames, 64MB file; SVG 2MB/5000 nodes; ICO output one size <=256px. TIFF: first page, unsigned 8bit chunky RGB/gray, uncompressed/PackBits/LZW. No CMYK, tiled, 16bit, Deflate/JPEG TIFF. BMP: uncompressed 24/32bit; reserved BMP channel is not interpreted as alpha. TGA: raw/RLE RGB24/32 or gray8. PNM16 input is normalized to 8bit RGBA. Images do not preserve layers, EXIF or ICC profiles.
 
-Audio: AIFF/AIFC PCM input; AU PCM, float, mu-law/A-law input; WAV/AIFF/AU output at signed 16/24/32bit PCM. Native compressed outputs only when MediaRecorder supports them. PCM codecs use Float64 internally to preserve 32bit integer PCM values; browser-decoded or compressed audio remains subject to Web Audio precision/resampling. Limits: 120 seconds, 1–2 channels, 8–48kHz; 64MB file (some browser-dependent input paths retain the existing 4MB preflight bound). No MP3/FLAC encoding or HEIC/PSD/RAW input is claimed.
+Audio: AIFF/AIFC PCM input; AU PCM, float, mu-law/A-law input; WAV/AIFF/AU output at signed 16/24/32bit PCM. Native compressed outputs only when MediaRecorder supports them. PCM codecs use Float64 internally to preserve 32bit integer PCM values; browser-decoded or compressed audio remains subject to Web Audio precision/resampling. Limits: 120 seconds, 1–2 channels, 8–48kHz; 64MB file (some browser-dependent input paths retain the existing 4MB preflight bound). FLAC export uses verbatim 16-bit frames. No MP3 encoding or HEIC/PSD/RAW input is claimed.
 
 ## Safety
 
