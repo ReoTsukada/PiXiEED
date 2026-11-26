@@ -76,7 +76,7 @@ try {
     await open('/');
     await page.locator('.portal-actions .portal-action').first().waitFor({ state: 'visible' });
     assert.equal(await page.locator('h1').count(), 1);
-    assert.deepEqual(await page.locator('.portal-action').evaluateAll(nodes => nodes.map(node => node.getAttribute('href'))), ['/tools/start/draw/', '/explore/', '/play/']);
+    assert.deepEqual(await page.locator('.portal-action').evaluateAll(nodes => nodes.map(node => node.getAttribute('href'))), ['/tools/start/draw/', '/tools/start/audio/', '/tools/start/camera/', '/globe/?view=events', '/explore/#works']);
     assert.equal(await page.locator('#portal-create .tool-feature').count(), 1);
     assert.equal(await page.locator('#portal-create .tool-preview-card').count(), 3);
     assert.equal(await page.locator('#portal-create .tool-open').count(), 4);
