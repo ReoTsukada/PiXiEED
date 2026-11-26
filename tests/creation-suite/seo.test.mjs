@@ -29,7 +29,7 @@ sitemapPages.splice(sitemapPages.findIndex(([, path]) => path === '/privacy/') +
 sitemapPages.push(
   ['help/index.html', '/help/'], ['glossary/index.html', '/glossary/'],
   ['learn/index.html', '/learn/'], ['learn/pixel-circle/index.html', '/learn/pixel-circle/'],
-  ['learn/pixel-art-blurry/index.html', '/learn/pixel-art-blurry/'], ['projects/pixfind/index.html', '/projects/pixfind/']
+  ['learn/pixel-art-blurry/index.html', '/learn/pixel-art-blurry/'], ['learn/mug-thickness/index.html', '/learn/mug-thickness/'], ['projects/pixfind/index.html', '/projects/pixfind/']
 );
 sitemapPages.push(['events/index.html', '/events/'], ...eventIds.map(id => [`events/${id}/index.html`, `/events/${id}/`]));
 const artworkLabels = {
