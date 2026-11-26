@@ -15,7 +15,7 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <title>みんなの作品・SNS｜PiXiEED</title>
   <link rel="stylesheet" href="/css/social-feed.css?rev=20261024-side-ad-layout-1">
-  <link rel="stylesheet" href="/css/social-explore.css?rev=20261029-explore-1">
+  <link rel="stylesheet" href="/css/social-explore.css?rev=20261126-work-grid-1">
   <script type="module" src="/js/social/app.mjs?rev=20261116-normal-release-2"></script>
 <link rel="stylesheet" href="/css/posting-consent.css?rev=20261022-posting-live-1">
 </head>
@@ -36,7 +36,13 @@
         <p><strong>ローカルプレビュー</strong><span>投稿の表示・保存状態はこの環境で確認できます</span></p>
       </aside>
 
-      <section class="explore-hero" aria-label="PiXiEEDの作品コミュニティ">
+      <section class="event-card" aria-labelledby="explore-events-title">
+        <h2 id="explore-events-title">イベントを探す</h2>
+        <a class="event-link" href="/events/"><img src="/assets/icons/pixieed/globe.svg" alt=""><span>開催予定・過去のイベントを見る</span><b aria-hidden="true">↗</b></a>
+        <a class="map-link" href="/globe/?view=events"><img src="/assets/icons/pixieed/globe.svg" alt=""><span>イベントを地図で見る</span><b aria-hidden="true">↗</b></a>
+      </section>
+
+      <section id="works" class="explore-hero" aria-label="PiXiEEDの作品コミュニティ">
         <div class="explore-hero-copy">
           <p class="explore-eyebrow">COMMUNITY / PIXIEED</p>
           <section class="feed-heading" aria-labelledby="pageTitle">
@@ -71,14 +77,14 @@
         <button type="button" id="minePosts" data-action="mine" data-view="mine" aria-label="自分の投稿" aria-pressed="false" disabled data-boot-disabled><span aria-hidden="true">◉</span> 自分</button>
       </nav>
       <div class="filter-wrap" id="feedFilterWrap">
-        <details class="filter-disclosure"><summary>種類で絞る</summary><nav class="feed-filters" id="feedFilters" aria-label="投稿の種類">
+        <nav class="feed-filters" id="feedFilters" aria-label="投稿の種類">
           <button type="button" data-action="filter" data-type="all" aria-pressed="true" disabled data-boot-disabled>すべて</button>
           <button type="button" data-action="filter" data-type="art" aria-pressed="false" disabled data-boot-disabled>ドット絵</button>
           <button type="button" data-action="filter" data-type="photo" aria-pressed="false" disabled data-boot-disabled>写真加工</button>
           <button type="button" data-action="filter" data-type="puzzle" aria-pressed="false" disabled data-boot-disabled>パズル</button>
           <button type="button" data-action="filter" data-type="text" aria-pressed="false" disabled data-boot-disabled>ことば</button>
           <button type="button" data-action="filter" data-type="music" aria-pressed="false" disabled data-boot-disabled>音楽</button>
-        </nav></details>
+        </nav>
       </div>
       <div class="mine-controls"><span id="mineStatus" role="status" aria-live="polite"></span></div>
 
@@ -131,9 +137,8 @@
           <span class="explore-world-orb" aria-hidden="true"></span>
         </a>
         <details class="explore-tools-more explore-discovery-more">
-          <summary>イベント・お店 <span aria-hidden="true">＋</span></summary>
+          <summary>お店 <span aria-hidden="true">＋</span></summary>
           <div class="explore-tools-list">
-            <a class="event-link" href="/events/"><img src="/assets/icons/pixieed/globe.svg" alt=""><span>イベント一覧をひらく</span><b aria-hidden="true">↗</b></a>
             <a class="map-link" href="/stores/"><img src="/assets/icons/pixieed/artwork.svg" alt=""><span>お店を探す</span><b aria-hidden="true">↗</b></a>
           </div>
         </details>
