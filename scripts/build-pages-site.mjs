@@ -295,7 +295,11 @@ export async function buildPagesSite({ root = sourceRoot, output, esbuildPath } 
     for (const route of TOOL_START_ROUTES) {
       if (!files.includes(route.sourcePath)) continue;
       const name = `${route.startPath.slice(1)}index.html`;
-      if (route.id !== 'draw') toolStartSources.set(name, route);
+      const standaloneDraw = route.id === 'draw' && await lstat(join(root, name)).catch(error => {
+        if (error.code === 'ENOENT') return null;
+        throw error;
+      });
+      if (!standaloneDraw) toolStartSources.set(name, route);
       files.push(name);
     }
     const unique = [...new Set(files)].filter(name => !isLocalReviewSource(name)).sort();
