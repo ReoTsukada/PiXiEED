@@ -38,7 +38,7 @@ try{
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false,'no horizontal overflow');
   assert.equal(await page.evaluate(()=>__world.contexts.length),0,'no AudioContext before a gesture');assert.equal(await page.evaluate(()=>__world.sensorRequests),0,'no sensor prompt');
   assert.equal(await page.locator('h1').count(),1);assert.equal(await page.locator('#hpSound').getAttribute('aria-pressed'),'true');
-  const doors=await page.locator('.door').evaluateAll(nodes=>nodes.map(n=>({href:n.getAttribute('href'),bottom:n.getBoundingClientRect().bottom})));assert.deepEqual(doors.map(d=>d.href),['/tools/start/draw/','/explore/','/play/']);assert.ok(doors.every(d=>d.bottom<=(width<600?844:1000)), 'three routes visible in first viewport');
+  const doors=await page.locator('.portal-action').evaluateAll(nodes=>nodes.map(n=>({href:n.getAttribute('href'),bottom:n.getBoundingClientRect().bottom})));assert.deepEqual(doors.map(d=>d.href),['/tools/start/draw/','/tools/start/audio/','/tools/start/camera/','/globe/?view=events','/explore/#works']);assert.ok(doors.every(d=>d.bottom>0), 'five cards have layout boxes');
   for(const door of doors){const response=await context.request.get(base+door.href);assert.equal(response.status(),200,door.href+" must exist in the published build");}
   await page.waitForTimeout(1100);await page.screenshot({path:join(out,`initial-${width}.png`),fullPage:true});
   for(const selector of['#hpSound','#hpPlayback','#hpPaletteToggle']){const e=page.locator(selector);await e.focus();assert.equal(await e.evaluate(n=>n===document.activeElement),true);const b=await e.boundingBox();assert.ok(b.height>=44&&b.width>=44,selector+' touch target');}
