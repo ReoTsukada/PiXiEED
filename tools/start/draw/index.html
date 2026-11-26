@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>ドット絵を描く｜PiXiEED Draw</title>
+  <style>
+    body { margin: 0; color: #edf1f3; background: #151d24; font: 1rem/1.6 system-ui, sans-serif; }
+    main { box-sizing: border-box; max-width: 78rem; margin: auto; padding: 24px 8px; }
+    .intro { padding-inline: 12px; }
+    h1 { line-height: 1.2; }
+    .open { display: inline-block; padding: 12px 20px; border-radius: 10px; background: #ffd45d; color: #241c0b; font-weight: 700; }
+    #draw-start-ad { margin: 32px auto 0; text-align: center; max-width: 728px; }
+    #draw-start-ad > small { display: block; margin-bottom: 8px; }
+    #draw-start-ad > ins { display: block; margin: auto; }
+    @media (min-width: 1120px) {
+      main { display: grid; align-items: start; grid-template-columns: minmax(300px, 1fr) 728px; gap: 40px; padding-top: 48px; }
+      #draw-start-ad { margin-block-start: 16px; }
+    }
+  </style>
+  <script type="module" src="/js/ads/draw-start-banner.mjs"></script>
+</head>
+<body>
+  <main>
+    <section class="intro">
+      <h1>PiXiEED Draw</h1>
+      <p>ドット絵やコマアニメを描き、PNGやGIFで書き出せます。</p>
+      <a class="open" href="/draw/?workspace=1&amp;runtime=direct">Drawを開く</a>
+    </section>
+    <aside id="draw-start-ad" aria-label="広告" hidden><small>広告</small></aside>
+  </main>
+</body>
+</html>
