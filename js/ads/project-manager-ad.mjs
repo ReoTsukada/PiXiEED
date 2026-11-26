@@ -11,9 +11,15 @@ export function isProjectManagerAdEligible({ config, origin, protocol, pathname,
   hasErrors = false, busy = false, restoring = false, dirty = false, fullscreen = false,
   privateContext = false, editor = false } = {}) {
   if (!resolveProjectGalleryAdUnit(config) || config.minimumArtwork !== 1 || !['manager', 'chooser'].includes(surface)) return false;
+  const drawPanel = config.drawPanelOnly === true;
+  if (drawPanel && (surface !== 'manager' || !['/draw/', '/tools/start/draw/'].includes(pathname))) return false;
   const query = new URLSearchParams(search);
+  const acceptedPointer = (key, value) => drawPanel
+    && (key === 'modeProjectTool' && value === 'draw'
+      || ['pxd', 'pxdRevision', 'modePxd', 'modePxdRevision'].includes(key)
+        && /^(?:project|revision)-[0-9a-f-]+$/i.test(value));
   // Never remove pointers or rewrite history merely to make advertising eligible.
-  if ([...query.keys()].some(key => !Object.hasOwn(allowedQuery, key) || !allowedQuery[key].includes(query.get(key)) || query.getAll(key).length !== 1)) return false;
+  if ([...query.keys()].some(key => query.getAll(key).length !== 1 || !(Object.hasOwn(allowedQuery, key) && allowedQuery[key].includes(query.get(key)) || acceptedPointer(key, query.get(key))))) return false;
   if (surface === 'chooser' && (editor || [...query.keys()].some(key => !['workspace', 'social'].includes(key)))) return false;
   return origins.has(origin) && protocol === 'https:' && PROJECT_GALLERY_AD_PATHS.includes(pathname) && hash === ''
     && topLevel === true && pageVisible === true && libraryVisible === true && settled === true
@@ -57,7 +63,7 @@ function galleryEnvironmentEligible({ doc, win, dialog, pane, galleryState, conf
     const location = win.location, history = win.history?.state;
     let topLevel = false; try { topLevel = win.top === win.self; } catch {}
     const privateContext = Boolean(doc.querySelector('[data-private-view]')
-      || history && ['privateView', 'projectWorkspaceSelection', 'pxd', 'pxdRevision', 'pxdImage', 'modePxd', 'modePxdRevision', 'modePxdImage', 'modeProjectTool', 'toolStartActive'].some(key => Boolean(history[key])));
+      || history?.privateView || (!config?.drawPanelOnly && history && ['privateView', 'projectWorkspaceSelection', 'pxd', 'pxdRevision', 'pxdImage', 'modePxd', 'modePxdRevision', 'modePxdImage', 'modeProjectTool', 'toolStartActive'].some(key => Boolean(history[key]))));
     return isProjectManagerAdEligible({ ...galleryState, config, surface, origin: location?.origin, protocol: location?.protocol,
       pathname: location?.pathname, search: location?.search || '', hash: location?.hash || '', topLevel,
       libraryVisible: dialog?.open === true && pane?.hidden === false && galleryState.libraryVisible === true,
