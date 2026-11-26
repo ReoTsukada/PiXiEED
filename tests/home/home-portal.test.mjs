@@ -82,7 +82,8 @@ test('five home actions use equal desktop cards and responsive, accessible contr
   assert.equal((actions.match(/class="portal-action"/g) || []).length, 5);
   for (const label of ['描く', '音楽を作る', '写真を撮る', 'イベントを調べる', '投稿を見る']) assert.ok(actions.includes(`<strong>${label}</strong>`));
   for (const href of ['/tools/start/draw/', '/tools/start/audio/', '/tools/start/camera/', '/globe/?view=events', '/explore/#works']) assert.ok(actions.includes(`href="${href}"`));
-  for (const name of ['draw-pc-maou-480.webp','audio-pc-maou-480.webp','camera-pc-maou-480.webp','home-events-screen-480.png','home-explore-screen-480.png']) assert.ok(actions.includes(name), name);
+  for (const name of ['draw-pc-maou-480.webp','home-audio-composing-desktop.png','home-camera-live-desktop.png','home-events-screen-480.png','home-explore-screen-480.png']) assert.ok(actions.includes(name), name);
+  assert.equal((actions.match(/<picture><source media="\(max-width: 760px\)"/g) || []).length, 5);
   assert.ok(home.indexOf('class="portal-actions"') < home.indexOf('class="portal-work-entry"'));
 });
 
@@ -166,15 +167,16 @@ test('real-screen tool showcase replaces decorative tool illustrations without d
   assert.ok(home.indexOf('class="section tool-showcase"') < home.indexOf('class="trips"'));
   assert.equal((home.match(/id="portal-create"/g) || []).length, 1);
   assert.match(showcase, /<picture><source media="\(max-width:760px\)" srcset="\/assets\/home\/tool-screens\/draw-mobile\.png" width="780" height="1688">/);
-  const images = [...showcase.matchAll(/<img[^>]+src="([^"]+tool-screens[^"]+)"[^>]*>/g)].map(match => match[0]);
+  const images = [...showcase.matchAll(/<picture>.*?<img[^>]+>/g)].map(match => match[0]);
   assert.equal(images.length, 4);
   for (const img of images) {
     assert.match(img, /width="2560" height="1600"/);
     assert.match(img, /loading="lazy" decoding="async"/);
     assert.match(img, /alt="[^"]+"/);
   }
-  for (const name of ['camera','audio','convert']) {
-    assert.match(showcase, new RegExp(`href="/assets/home/tool-screens/${name}-desktop.png" aria-label="[^"]+実画面を大きく見る"`));
+  for (const [name, preview] of [['camera', 'camera-live'], ['audio', 'audio-composing'], ['convert', 'convert']]) {
+    assert.ok(showcase.includes(`href="/assets/screenshots/previews/home-${preview}-desktop.png"`));
+    assert.ok(showcase.includes(`srcset="/assets/screenshots/previews/home-${preview}-phone.png"`));
     assert.match(showcase, new RegExp(`href="/tools/start/${name}/">この道具を開く`));
   }
   assert.equal((showcase.match(/作例を使った実際の操作画面/g) || []).length, 4);
