@@ -9,11 +9,12 @@ const explore = readFileSync(new URL('../../explore/index.html', import.meta.url
 const homeCss = readFileSync(new URL('../../css/home-portal.css', import.meta.url), 'utf8');
 
 test('every primary home entrance has a real source document', () => {
-  const doors = home.match(/<div class="doors">([\s\S]*?)<div class="return">/)?.[1];
-  const hrefs = [...doors.matchAll(/href="([^"]+)"/g)].map(match => match[1]);
-  assert.equal(hrefs.length, 3);
+  const actions = home.match(/<div class="portal-actions"[\s\S]*?<\/div>/)?.[0];
+  const hrefs = [...actions.matchAll(/href="([^"]+)"/g)].map(match => match[1]);
+  assert.equal(hrefs.length, 5);
   for (const href of hrefs) {
-    const path = getToolStartRoute(href)?.sourcePath || href.slice(1) + 'index.html';
+    const pathname = new URL(href, 'https://pixieed.jp').pathname;
+    const path = getToolStartRoute(href)?.sourcePath || pathname.slice(1) + 'index.html';
     assert.ok(existsSync(new URL('../../' + path, import.meta.url)), `${href} has a publishable source`);
   }
 });
@@ -70,18 +71,19 @@ test('intent search is local, ranked, handles width and Japanese inputs', () => 
     assert.ok(!/^https?:/.test(entry.href));
   }
 });
-test('whole-home layout retains three equal routes, responsive controls and keyboard focus', () => {
-  assert.match(homeCss, /grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
+test('five home actions use equal desktop cards and responsive, accessible controls', () => {
+  assert.match(homeCss, /grid-template-columns:repeat\(5,minmax\(0,1fr\)\)/);
   assert.match(homeCss, /@media\(max-width:359px\)/);
   assert.match(homeCss, /@media\(prefers-reduced-motion:reduce\)/);
   assert.match(homeCss, /:focus-visible/);
   assert.match(homeCss, /public-navigation\.css/);
-  const doors = home.match(/<div class="doors">([\s\S]*?)<div class="return">/)?.[1];
-  assert.ok(doors);
-  assert.equal((doors.match(/class="door"/g) || []).length, 3);
-  for (const label of ['描く', '作品を見る', '遊ぶ']) assert.ok(doors.includes(`<strong>${label}</strong>`));
-  for (const href of ['/tools/start/draw/', '/explore/', '/play/']) assert.ok(doors.includes(`href="${href}"`));
-  assert.ok(home.indexOf('class="doors"') < home.indexOf('class="portal-work-entry"'));
+  const actions = home.match(/<div class="portal-actions"[\s\S]*?<\/div>/)?.[0];
+  assert.ok(actions);
+  assert.equal((actions.match(/class="portal-action"/g) || []).length, 5);
+  for (const label of ['描く', '音楽を作る', '写真を撮る', 'イベントを調べる', '投稿を見る']) assert.ok(actions.includes(`<strong>${label}</strong>`));
+  for (const href of ['/tools/start/draw/', '/tools/start/audio/', '/tools/start/camera/', '/globe/?view=events', '/explore/#works']) assert.ok(actions.includes(`href="${href}"`));
+  for (const name of ['draw-pc-maou-480.webp','audio-pc-maou-480.webp','camera-pc-maou-480.webp','home-events-screen-480.png','home-explore-screen-480.png']) assert.ok(actions.includes(name), name);
+  assert.ok(home.indexOf('class="portal-actions"') < home.indexOf('class="portal-work-entry"'));
 });
 
 test('shop destination makes the external catalog and item categories clear', () => {
