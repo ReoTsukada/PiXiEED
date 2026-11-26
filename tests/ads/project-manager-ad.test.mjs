@@ -9,10 +9,13 @@ const eligible = { config: enabledConfig, origin: 'https://pixieed.jp', protocol
   search: '?workspace=1&runtime=direct', topLevel: true, pageVisible: true, libraryVisible: true, settled: true, enoughArtwork: true };
 
 test('manager gate admits only settled gallery content on clean production URLs', () => {
-  assert.equal(isProjectManagerAdEligible({ ...eligible, config: projectManagerAdConfig }), false);
+  assert.equal(isProjectManagerAdEligible({ ...eligible, config: projectManagerAdConfig }), true);
   assert.equal(isProjectManagerAdEligible(eligible), true);
   assert.equal(isProjectManagerAdEligible({ ...eligible, search: '?workspace=1&runtime=direct&mode=audio' }), true);
-  for (const search of ['?pxd=secret', '?pxdRevision=r1', '?modePxd=work', '?workspace=1&workspace=1', '?runtime=unknown', '?title=private', '?mode=unknown', '?constructor=1', '?__proto__=1', '?toString=1'])
+  assert.equal(isProjectManagerAdEligible({ ...eligible, search: '?pxd=project-ab12&pxdRevision=revision-cd34' }), true);
+  assert.equal(isProjectManagerAdEligible({ ...eligible, surface: 'chooser' }), false);
+  assert.equal(isProjectManagerAdEligible({ ...eligible, pathname: '/tools/start/audio/' }), false);
+  for (const search of ['?token=example', '?pxd=secret', '?pxdRevision=r1', '?modePxd=work', '?workspace=1&workspace=1', '?runtime=unknown', '?title=private', '?mode=unknown', '?constructor=1', '?__proto__=1', '?toString=1'])
     assert.equal(isProjectManagerAdEligible({ ...eligible, search }), false, search);
   for (const patch of [{ origin: 'http://localhost:4188' }, { origin: 'https://preview.pixieed.jp' }, { pathname: '/profile/' }, { hash: '#work' },
     { topLevel: false }, { pageVisible: false }, { libraryVisible: false }, { settled: false }, { enoughArtwork: false },
@@ -66,7 +69,7 @@ test('ad positions follow complete six-artwork groups, with small galleries left
   assert.deepEqual(getInlineGalleryAdLayout(286), {width:250,height:50});
   assert.deepEqual(getInlineGalleryAdLayout(722), {width:468,height:60});
   assert.equal(getInlineGalleryAdLayout(249),null);
-  assert.equal(isProjectManagerAdEligible({...eligible,surface:'chooser',search:'?workspace=1'}),true);
+  assert.equal(isProjectManagerAdEligible({...eligible,surface:'chooser',search:'?workspace=1'}),false);
   assert.equal(isProjectManagerAdEligible({...eligible,surface:'chooser'}),false);
   assert.equal(isProjectManagerAdEligible({...eligible,surface:'chooser',search:'?workspace=1',editor:true}),false);
 });

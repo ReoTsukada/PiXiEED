@@ -74,9 +74,9 @@ try {
   for (const width of [320, 390, 768, 1440]) {
     await page.setViewportSize({ width, height: 920 });
     await open('/');
-    await page.locator('.doors .door').first().waitFor({ state: 'visible' });
+    await page.locator('.portal-actions .portal-action').first().waitFor({ state: 'visible' });
     assert.equal(await page.locator('h1').count(), 1);
-    assert.deepEqual(await page.locator('.door').evaluateAll(nodes => nodes.map(node => node.getAttribute('href'))), ['/tools/start/draw/', '/explore/', '/play/']);
+    assert.deepEqual(await page.locator('.portal-action').evaluateAll(nodes => nodes.map(node => node.getAttribute('href'))), ['/tools/start/draw/', '/tools/start/audio/', '/tools/start/camera/', '/globe/?view=events', '/explore/#works']);
     assert.equal(await page.locator('#portal-create .tool-feature').count(), 1);
     assert.equal(await page.locator('#portal-create .tool-preview-card').count(), 3);
     assert.equal(await page.locator('#portal-create .tool-open').count(), 4);
@@ -86,8 +86,8 @@ try {
     assert.equal(await page.locator('.endline a[href="/books/"]').count(), 1);
     assert.ok((await page.locator('.endline').innerText()).includes('価格・在庫・購入は販売先で'));
     // Decode real-screen previews and navigation icons; reviewed artwork is covered separately with consent-aware fixtures.
-    const homeImages = page.locator('.brand img, .door img, #portal-create img');
-    assert.equal(await homeImages.count(), 11);
+    const homeImages = page.locator('.brand img, .portal-action img, #portal-create img');
+    assert.equal(await homeImages.count(), 13);
     for (const image of await homeImages.all()) {
       await image.scrollIntoViewIfNeeded();
       await image.evaluate(element => element.decode());

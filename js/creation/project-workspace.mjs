@@ -395,13 +395,13 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   dialog.addEventListener('keydown', retireBeforeManagerControl, { capture: true, signal: lifecycle.signal });
   search.addEventListener('focus', () => retireManagerAd('search'), { signal: lifecycle.signal });
   function prepareManagerAd() {
-    if (managerAdPrepared || !dialog.open || libraryPane.hidden) return;
+    if (tool !== 'draw' || managerAdPrepared || !dialog.open || libraryPane.hidden) return;
     managerAdPrepared = true;
     managerAdFrame = requestAnimationFrame(() => {
       managerAdFrame = 0;
       if (!dialog.open || libraryPane.hidden) return;
       try { managerAd = mountProjectGalleryAdSeries({ doc: document, win: window, dialog, pane: libraryPane, list, gallery,
-        artworkCount: managerArtworkCount, galleryState: managerAdState, config: projectManagerAdConfig }); }
+        artworkCount: Math.min(managerArtworkCount, 6), galleryState: managerAdState, config: projectManagerAdConfig }); }
       catch { managerAd?.dispose(); gallery.clearBreaks(); }
     });
   }

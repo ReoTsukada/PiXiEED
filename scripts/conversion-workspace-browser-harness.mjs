@@ -74,7 +74,8 @@ if(server.listening){
   const openResultAux=async()=>{
     const auxiliary=page.locator('.sc-result-aux');await auxiliary.waitFor({state:'attached'});
     if(!await auxiliary.evaluate(node=>node.open))await auxiliary.locator(':scope > summary').click();
-    assert.equal(await auxiliary.evaluate(node=>node.open),true,'result controls open through their visible disclosure');return auxiliary;
+    await page.locator('.sc-result-aux[open]').waitFor({state:'visible'});
+    return auxiliary;
   };
   const installAudioImportDiagnostics=(targetPage=page)=>targetPage.evaluate(()=>{
     const button=document.querySelector('.sc-unified-empty-add'),picker=document.querySelector('[data-sc-file]');

@@ -48,7 +48,7 @@ test('HTML omits the manual ad and retains all existing limit disclosures', asyn
   assert.doesNotMatch(html, /data-output-guide-ad|<ins\b[^>]*adsbygoogle/);
   assert.match(html, /rel="canonical" href="https:\/\/pixieed.jp\/output\/"/);
   assert.doesNotMatch(html, /<script[^>]*src="https:\/\/pagead2/);
-  for (const text of ['120秒以内', 'MP3・FLAC出力は未対応', '800万画素', '元動画の音声は含みません']) {
+  for (const text of ['120秒以内', 'FLACは16bit固定', '800万画素', '元動画の音声は含みません']) {
     assert.ok(html.includes(text), `preserve: ${text}`);
   }
   assert.match(html, /location\.replace\(`\/output\/work\/\?id=/);

@@ -12,7 +12,7 @@ import { lookupCell, projectGeoCopiesToScreen, mercatorY, inverseMercatorY } fro
 import { formatCoordinates, googleMapsUrl, parseLocationInput } from './geo-input.mjs?v=20260921-post-1';
 import { fitPixelImage, inspectPixelImage, PIXEL_LIMITS } from './post-image.mjs?v=20261004-post-size-256-1';
 import { createDemoAuth, createPostStore } from './post-store.mjs?v=20260921-post-1';
-import { PUZZLE_HANDOFF_META_KEY } from '../creation/puzzle-handoff.mjs?rev=20261116-normal-release-2&v=20260928-puzzle-handoff-1';
+import { PUZZLE_HANDOFF_META_KEY } from '../creation/puzzle-handoff.mjs?v=20260928-puzzle-handoff-1&rev=20261116-normal-release-2';
 
 const TITLE_MAX = 60;
 const CAPTION_MAX = 140;
@@ -321,6 +321,7 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
     if (name !== 'composer') invalidateLocationRequest();
     for (const [key, node] of Object.entries(sheets)) node.hidden = key !== name;
     stage.classList.toggle('has-sheet', Boolean(name));
+    stage.classList.toggle('has-region-gallery', name === 'gallery' && Boolean(galleryRegionId));
     stage.classList.toggle('is-composing', name === 'composer');
     hint.hidden = !(name === 'composer' && !state.done);
     if (name !== 'composer') setPeek(false);
@@ -900,6 +901,7 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
     const list = scopedPosts();
     state.tab = list.some(post => post.postKind !== 'pixel_camera') ? 'art' : list.some(post => post.postKind === 'pixel_camera') ? 'camera' : 'art';
     renderGallery(); showSheet('gallery');
+    gallery.scrollTop = 0;
   }
   function renderGallery() {
     const regionScope = galleryRegionId && regionGroupingEnabled();

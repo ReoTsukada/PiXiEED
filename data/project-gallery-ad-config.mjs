@@ -15,7 +15,8 @@ export const projectGalleryAdConfig = Object.freeze({
 
 /** Independent manager toggle. These content/spacing guards are not Google approval. */
 export const projectManagerAdConfig = Object.freeze({
-  enabled: false,
+  enabled: true,
+  drawPanelOnly: true,
   minimumArtwork: 1,
-  unit: projectGalleryAdConfig.unit,
+  unit: Object.freeze({ ...projectGalleryAdConfig.unit, slot: '5782937881' }),
 });
