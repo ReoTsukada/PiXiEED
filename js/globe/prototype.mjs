@@ -13,10 +13,14 @@ const astronomy = telescopeTool ? await Promise.all([import('./astro-ui.mjs?v=20
 const telescopePostModules = telescopePostModulesPromise ? await telescopePostModulesPromise : null;
 const embedMode = new URLSearchParams(location.search).get('embed') === '1';
 // Explicit artwork/post arrivals take precedence over a previous browsing position.
-let navigationState = null, navigationRestorationCancelled = false;
+let navigationState = null, navigationRestorationCancelled = false, openEvents = false;
 try {
   const arrival = new URL(embedMode ? parent.location.href : location.href).searchParams;
-  if (!telescopeTool && !['art', 'post', 'from', 'compose'].some(key => arrival.has(key))) navigationState = readMapNavigationState(sessionStorage);
+  if (!telescopeTool && !['art', 'post', 'from', 'compose'].some(key => arrival.has(key))) {
+    openEvents = arrival.getAll('view').length === 1 && arrival.get('view') === 'events';
+    const saved = readMapNavigationState(sessionStorage);
+    navigationState = openEvents ? { view: saved?.view } : saved;
+  }
 } catch { /* Unavailable storage must not prevent startup. */ }
 
 const canvas = document.querySelector('#globeCanvas');
@@ -92,9 +96,9 @@ retryMapLoad.addEventListener('click', () => {
 
 function loadPostUiModules() {
   return Promise.all([
-    importPostingModule('post-ui', './post-ui.mjs?rev=20261116-normal-release-2&v=20261024-posting-policy-1'),
+    importPostingModule('post-ui', './post-ui.mjs?v=20261126-map-region-list-1&rev=20261116-normal-release-2'),
     importPostingModule('post-supabase', './post-supabase.mjs?rev=20261116-normal-release-2'),
-    importPostingModule('post-handoff', './post-handoff.mjs?rev=20261116-normal-release-2&v=20261004-camera-location-1')
+    importPostingModule('post-handoff', './post-handoff.mjs?v=20261004-camera-location-1&rev=20261116-normal-release-2')
   ]).then(([postUiModule, supabaseModule, handoffModule]) => ({
     initPostUi: postUiModule.initPostUi,
     createSupabaseGlobeAuth: supabaseModule.createSupabaseGlobeAuth,
@@ -200,6 +204,20 @@ function showSelection(selection) {
   placeHere.setAttribute('aria-label', `${selectedOwner.textContent}に作品を置く`);
 }
 
+async function showPickedMapContent(selection) {
+  if (telescopeTool) return;
+  if (mapContentLayer === 'events') { eventUi?.selectRegion(selection); return; }
+  if (!selection) {
+    if (postUi?.getState().sheet === 'gallery') postUi.close();
+    return;
+  }
+  if (selection.mapRegionKind !== 'prefecture' && !selection.prefectureId
+      && selection.mapRegionKind !== 'admin1') return;
+  if (!postUi && !await initializeNormalPostUiAfterPaint()) return;
+  if (currentSelection === selection && mapContentLayer === 'posts'
+      && postUi?.getState().sheet !== 'composer') postUi?.openCellGallery(selection);
+}
+
 function cellLocationLabel(selection) {
   const record = selection?.displayCell || selection;
   const country = record?.countryLabel || selection?.countryLabel || selection?.countryId;
@@ -247,7 +265,7 @@ function createPrototypeRenderer(options = {}) {
       if (postUi?.handlePick(selection)) { showSelection(null); return; }
       showCellHover(null);
       showSelection(selection);
-      if (mapContentLayer === 'events') eventUi?.selectRegion(selection);
+      void showPickedMapContent(selection);
       if (selection && renderer.getSnapshot().camera.projection !== 'mercator') renderer.focusSelection(selection);
     },
     onHover: showCellHover,
@@ -293,7 +311,7 @@ function createPrototypeRenderer(options = {}) {
     globalThis.__PIXIEED_MAP_EVENTS__ = eventUi;
     updateMapContent();
     if (navigationState?.view) renderer.setView(navigationState.view);
-    setMapContentLayer(navigationState?.layer || 'posts');
+    setMapContentLayer(openEvents ? 'events' : navigationState?.layer || 'posts');
     if (navigationState?.events) {
       const saved = navigationState.events;
       void eventUi.ready.then(() => { if (!navigationRestorationCancelled) eventUi.restoreNavigationState(saved); });
@@ -403,6 +421,7 @@ viewSwitch?.addEventListener('click', event => {
   if (!button || button.getAttribute('aria-pressed') === 'true') return;
   postUi?.close(); eventUi?.close();
   setMapContentLayer(button.dataset.mapContent);
+  if (currentSelection) void showPickedMapContent(currentSelection);
 });
 primaryAction?.addEventListener('click', () => {
   if (document.documentElement.classList.contains('is-tool-telescope')) globalThis.__PIXIEED_ASTRO__?.toggleTelescopeSolarSystem();

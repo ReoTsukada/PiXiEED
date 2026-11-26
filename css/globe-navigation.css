@@ -1,18 +1,22 @@
 /* Page navigation and map purpose, scoped to the globe route and iframe. */
 body.app-page--tool-globe { --px-header-height: 56px; --header-h: 56px; }
 body.app-page--tool-globe:not(:has(.map-event-detail-host:not([hidden]))) {
-  height: auto;
-  min-height: 100dvh;
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior-y: auto;
-  padding-bottom: calc(5.3rem + env(safe-area-inset-bottom));
+  display: grid;
+  grid-template-rows: var(--px-header-height) minmax(0, 1fr);
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+  padding-bottom: 0;
 }
 
 body.app-page--tool-globe:not(:has(.map-event-detail-host:not([hidden]))) #main {
-  display: block;
-  height: auto;
-  min-height: calc(100dvh - var(--px-header-height) - 44px);
+  display: grid;
+  grid-template-rows: 44px minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .map-page-directory-link {
@@ -31,7 +35,7 @@ body.app-page--tool-globe:not(:has(.map-event-detail-host:not([hidden]))) #main 
 .map-page-directory-link a:focus-visible { outline: 2px solid #9bcfff; outline-offset: 2px; }
 
 body.app-page--tool-globe:not(:has(.map-event-detail-host:not([hidden]))) .map-hero--field {
-  height: auto;
+  height: 100%;
   min-height: 0;
 }
 
@@ -39,6 +43,8 @@ body.app-page--tool-globe:not(:has(.map-event-detail-host:not([hidden]))) .map-h
   height: calc(100dvh - var(--map-page-chrome-height, calc(var(--px-header-height) + 44px)));
   min-height: 0;
 }
+
+body.app-page--tool-globe .map-event-directory { display: none; }
 
 .is-embedded:not(.is-tool-telescope) #globeStage:not(.has-sheet):not(.is-composing) .map-layers:not([hidden]) {
   display: grid;
@@ -101,5 +107,25 @@ body.app-page--tool-globe:has(.map-event-detail-host:not([hidden])) .map-page-di
   .is-embedded:not(.is-tool-telescope) .map-events-panel[data-view="list"] {
     top: auto;
     max-height: min(65%, calc(100% - 162px - env(safe-area-inset-bottom)));
+  }
+}
+
+/* A regional list leaves the map and its content switch available. */
+.is-embedded:not(.is-tool-telescope) #globeStage.has-region-gallery .map-layers:not([hidden]) {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  z-index: 7;
+}
+.is-embedded:not(.is-tool-telescope) #globeStage.has-region-gallery .gallery {
+  top: 78px;
+  overscroll-behavior: contain;
+}
+@media (max-width: 680px) {
+  .is-embedded:not(.is-tool-telescope) #globeStage.has-region-gallery .gallery {
+    top: auto;
+    max-height: min(35%, calc(100% - 132px));
+  }
+  .is-embedded:not(.is-tool-telescope) .map-events-panel[data-view="list"] {
+    max-height: min(35%, calc(100% - 132px));
   }
 }
