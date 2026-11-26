@@ -1,0 +1,31 @@
+/* 2026-11-21: article.css に重ねるマグ記事の専用表示 */
+:root{--mug-dark:#183141;--mug-light:#f6e4c7;--mug-muted:#665575;--mug-shared:#999}
+main{max-width:1040px}.article-head{padding-bottom:20px}h1{max-width:940px}.lead{max-width:850px}
+.mug-views{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin:26px 0 6px}
+.mug-view{margin:0;min-width:0;text-align:center}.art-stage{display:grid;place-items:center;min-height:288px;background:var(--mug-light);border:1px solid #e2d5bf;border-radius:10px}
+.mug-image{display:block;image-rendering:pixelated;object-fit:contain;opacity:1;filter:none}
+.original-view .mug-image{width:64px;height:64px;max-width:none}
+.enlarged-view .mug-image,.background-stage .mug-image{width:256px;height:256px;max-width:none}
+.mug-view figcaption,.detail-figure figcaption{margin-top:12px;font-size:15px;font-weight:650;line-height:1.7}
+.mug-view figcaption span,.detail-figure figcaption span{display:block;font-size:13px;font-weight:400;color:var(--muted)}
+.detail-layout{display:grid;grid-template-columns:minmax(0,1fr) 272px;gap:24px;align-items:start}
+.detail-layout>div{min-width:0}.detail-figure{margin:0;min-width:0;text-align:center}
+.detail-stage{display:grid;place-items:center;padding:8px;background:var(--mug-light);border-radius:10px;min-height:160px}
+.detail-stage img{display:block;width:256px;height:auto;max-width:none;image-rendering:pixelated}
+.detail-figure figcaption span{padding:0 4px}.source-note{font-size:13px;line-height:1.8;color:var(--muted);overflow-wrap:anywhere}
+.try-note{margin:24px 0 0;border-left:4px solid #b8d3c5;background:#f3f8f3;padding:18px 20px}
+.try-note h3{font-size:16px;margin-bottom:10px}.try-note p{margin:0}
+.background-control{display:flex;align-items:center;gap:12px;padding:12px 14px;margin:24px 0 20px;border:1px solid #cbd7ce;border-radius:10px;background:#f3f7f2;cursor:pointer;font-weight:600}
+.background-control input{width:20px;height:20px;flex:none;accent-color:var(--accent)}
+.background-trio{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.background-card{margin:0;min-width:0;text-align:center}.background-stage{display:grid;place-items:center;min-height:280px;border-radius:8px;background:var(--mug-dark)}
+.light-card .background-stage{background:var(--mug-light)}.muted-card .background-stage{background:var(--mug-muted)}
+.background-card figcaption{margin-top:10px;font-size:14px;font-weight:650;line-height:1.7}
+.shared-label{display:none}.background-demo:has(#shared-bg:checked) .background-stage{background:var(--mug-shared)}
+.background-demo:has(#shared-bg:checked) .original-label{display:none}.background-demo:has(#shared-bg:checked) .shared-label{display:inline}
+.comparison-note{font-size:13px;color:var(--muted);margin:18px 0 24px}.links a{max-width:100%;min-width:0}.materials{font-size:15px}.materials summary{font-size:16px;line-height:1.7}
+@media(max-width:959px){.background-trio{grid-template-columns:1fr;gap:24px}.background-card{max-width:440px;width:100%;margin:auto}}
+@media(max-width:800px){.detail-layout{grid-template-columns:1fr;gap:16px}.detail-figure{max-width:360px;width:100%;margin:auto}.detail-stage{padding:8px 0}}
+@media(max-width:680px){.mug-views{grid-template-columns:1fr;gap:24px}.original-view .art-stage{min-height:150px}.enlarged-view .art-stage{min-height:280px}}
+@media(max-width:540px){.hero-section,.detail-section,.background-demo{padding:22px 10px}.background-control{font-size:14px;padding:11px 10px;gap:9px}.detail-stage{min-height:140px}.try-note{padding:16px 12px}.links{gap:10px}.links a{font-size:15px;padding:9px 12px}}
+@media(prefers-contrast:more){.art-stage,.background-control{border:2px solid currentColor}}
