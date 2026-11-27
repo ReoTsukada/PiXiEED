@@ -99,15 +99,15 @@ body.home-portal .public-destination-nav>a[data-public-nav]:is(:hover,:focus-vis
 footer{flex-wrap:wrap}.footerbrand{white-space:nowrap}
 @media(max-width:760px){.scene-tools{min-width:0}.hp-tools{min-width:0}.return>span{max-width:none}.return a{font-size:inherit}.section-head{gap:4px}.section-head>a{padding-top:0;min-height:36px}}
 
-/* Five equally weighted entry points use real PiXiEED screens as previews. */
-.portal-actions{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin:12px 0 0}
+/* Equally weighted entry points use real PiXiEED screens as previews. */
+.portal-actions{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin:12px 0 0}
 .portal-action{display:flex;flex-direction:column;min-width:0;gap:7px;padding:10px;border:1px solid var(--line);border-radius:14px;background:#fff;transition:transform .18s,border-color .18s,box-shadow .18s}
 .portal-action:hover{transform:translateY(-2px);border-color:#94b69d;box-shadow:0 5px 15px #1b40200d}
-.portal-action img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;border:1px solid #dce4d9;border-radius:8px;background:#182129}
+.portal-action img{display:block;width:100%;height:auto;aspect-ratio:16/9;object-fit:contain;border:1px solid #dce4d9;border-radius:8px;background:#182129}
 .portal-action strong{font-size:14px;line-height:1.4}.portal-action span{color:var(--muted);font-size:11px;line-height:1.5}
 .portal-action:focus-visible{outline:3px solid #3b7955;outline-offset:3px}
-@media(max-width:850px){.portal-actions{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.portal-action{padding:9px}.portal-action strong{font-size:13px}}
-@media(max-width:370px){.portal-actions{gap:8px}.portal-action{padding:7px;gap:5px}.portal-action strong{font-size:12px}.portal-action span{font-size:10px}}
+@media(max-width:960px){.portal-actions{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.portal-action{padding:9px}.portal-action strong{font-size:.875rem}.portal-action span{font-size:.8125rem}}
+@media(max-width:370px){.portal-actions{gap:8px}.portal-action{padding:7px;gap:5px}}
 @media(prefers-reduced-motion:reduce){.portal-action{transition:none}.portal-action:hover{transform:none}}
 
 /* Real current tool screens, kept separate from decorative icons and public artwork. */
