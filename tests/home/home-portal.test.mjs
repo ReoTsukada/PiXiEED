@@ -11,7 +11,7 @@ const homeCss = readFileSync(new URL('../../css/home-portal.css', import.meta.ur
 test('every primary home entrance has a real source document', () => {
   const actions = home.match(/<div class="portal-actions"[\s\S]*?<\/div>/)?.[0];
   const hrefs = [...actions.matchAll(/href="([^"]+)"/g)].map(match => match[1]);
-  assert.equal(hrefs.length, 5);
+  assert.equal(hrefs.length, 6);
   for (const href of hrefs) {
     const pathname = new URL(href, 'https://pixieed.jp').pathname;
     const path = getToolStartRoute(href)?.sourcePath || pathname.slice(1) + 'index.html';
@@ -71,18 +71,18 @@ test('intent search is local, ranked, handles width and Japanese inputs', () => 
     assert.ok(!/^https?:/.test(entry.href));
   }
 });
-test('five home actions use equal desktop cards and responsive, accessible controls', () => {
-  assert.match(homeCss, /grid-template-columns:repeat\(5,minmax\(0,1fr\)\)/);
+test('six home actions use equal desktop cards and responsive, accessible controls', () => {
+  assert.match(homeCss, /grid-template-columns:repeat\(6,minmax\(0,1fr\)\)/);
   assert.match(homeCss, /@media\(max-width:359px\)/);
   assert.match(homeCss, /@media\(prefers-reduced-motion:reduce\)/);
   assert.match(homeCss, /:focus-visible/);
   assert.match(homeCss, /public-navigation\.css/);
   const actions = home.match(/<div class="portal-actions"[\s\S]*?<\/div>/)?.[0];
   assert.ok(actions);
-  assert.equal((actions.match(/class="portal-action"/g) || []).length, 5);
-  for (const label of ['描く', '音楽を作る', '写真を撮る', 'イベントを調べる', '投稿を見る']) assert.ok(actions.includes(`<strong>${label}</strong>`));
-  for (const href of ['/tools/start/draw/', '/tools/start/audio/', '/tools/start/camera/', '/globe/?view=events', '/explore/#works']) assert.ok(actions.includes(`href="${href}"`));
-  for (const name of ['draw-pc-maou-480.webp','audio-pc-maou-480.webp','camera-pc-maou-480.webp','home-events-screen-480.png','home-explore-screen-480.png']) assert.ok(actions.includes(name), name);
+  assert.equal((actions.match(/class="portal-action"/g) || []).length, 6);
+  for (const label of ['描く', '音楽を作る', '写真をドット絵に', 'イベントを調べる', '投稿を見る', '画像出力']) assert.ok(actions.includes(`<strong>${label}</strong>`));
+  for (const href of ['/tools/start/draw/', '/tools/start/audio/', '/tools/start/camera/', '/globe/?view=events', '/explore/#works', '/output/text/']) assert.ok(actions.includes(`href="${href}"`));
+  for (const name of ['draw-pc-maou-480.webp','home-audio-editor-480.webp','home-camera-workspace-480.webp','home-events-screen-480.png','home-explore-screen-480.png','home-ascii-preview-480.webp']) assert.ok(actions.includes(name), name);
   assert.ok(home.indexOf('class="portal-actions"') < home.indexOf('class="portal-work-entry"'));
 });
 
@@ -166,18 +166,22 @@ test('real-screen tool showcase replaces decorative tool illustrations without d
   assert.ok(home.indexOf('class="section tool-showcase"') < home.indexOf('class="trips"'));
   assert.equal((home.match(/id="portal-create"/g) || []).length, 1);
   assert.match(showcase, /<picture><source media="\(max-width:760px\)" srcset="\/assets\/home\/tool-screens\/draw-mobile\.png" width="780" height="1688">/);
-  const images = [...showcase.matchAll(/<img[^>]+src="([^"]+tool-screens[^"]+)"[^>]*>/g)].map(match => match[0]);
+  const images = [...showcase.matchAll(/<img[^>]+src="([^"]+(?:tool-screens|screenshots\/previews)[^"]+)"[^>]*>/g)];
   assert.equal(images.length, 4);
-  for (const img of images) {
-    assert.match(img, /width="2560" height="1600"/);
+  for (const [img, src] of images) {
+    assert.ok(existsSync(new URL('../..' + src, import.meta.url)), src);
+    assert.match(img, src.includes('/tool-screens/') ? /width="2560" height="1600"/ : /width="480" height="270"/);
     assert.match(img, /loading="lazy" decoding="async"/);
     assert.match(img, /alt="[^"]+"/);
   }
-  for (const name of ['camera','audio','convert']) {
-    assert.match(showcase, new RegExp(`href="/assets/home/tool-screens/${name}-desktop.png" aria-label="[^"]+実画面を大きく見る"`));
-    assert.match(showcase, new RegExp(`href="/tools/start/${name}/">この道具を開く`));
+  for (const name of ['home-camera-workspace-720.webp', 'home-audio-editor-480.webp', 'home-ascii-preview-480.webp']) {
+    const src = '/assets/screenshots/previews/' + name;
+    assert.ok(showcase.includes(`href="${src}"`), src);
+    assert.ok(existsSync(new URL('../..' + src, import.meta.url)), src);
   }
-  assert.equal((showcase.match(/作例を使った実際の操作画面/g) || []).length, 4);
+  for (const name of ['camera', 'audio', 'convert']) {
+    assert.ok(showcase.includes(`href="/tools/start/${name}/">この道具を開く`));
+  }
   assert.doesNotMatch(home, /class="tool-list"|class="trip-art"|assets\/icons\/pixieed\/(?:camera|telescope)\.svg/);
   assert.match(homeCss, /image-rendering:auto/);
   assert.doesNotMatch(showcase, /<iframe|<canvas|autoplay|target=/);
