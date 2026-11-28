@@ -21,7 +21,7 @@
   <link rel="stylesheet" href="/css/display-ads.css?rev=20261007-lazy-ads-1">
   <link rel="stylesheet" href="/css/tool-result-view.css?rev=20261002-ux-polish-1">
   <script src="/js/adsense-offerwall-policy.js?rev=20261118-draw-display-ad-1"></script>
-  <link rel="stylesheet" href="/css/creation-puzzle-player.css?rev=20261128-pixfind-results-1">
+  <link rel="stylesheet" href="/css/creation-puzzle-player.css?rev=20261128-puzzle-catalog-1">
 </head>
 <body data-tool-name="ドット絵もの探し" data-tool-short="もの探し" data-page="find-game" data-puzzle-mode="hidden-object" class="app-page app-page--tool-pixfind pixfind-tool-body">
   <a class="skip-link" href="#main">本文へ移動</a>
@@ -39,9 +39,12 @@
       <div class="pixfind-images"><figure class="pixfind-image"><figcaption><span id="pixfind-image-label">絵をタップ</span><button id="pixfind-compare" data-tool-operation class="pixfind-compare" type="button" aria-pressed="false" hidden>変化後を見る</button><button id="pixfind-hint" data-tool-operation class="pixfind-hint" type="button" aria-label="ヒント" title="ヒント" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg></button></figcaption><div id="pixfind-play-area" class="pixfind-play-area" role="application" aria-label="絵を調べる場所" tabindex="0"><img id="pixfind-original" alt="問題の絵" draggable="false"><img id="pixfind-changed" alt="変化後の絵" draggable="false" hidden><canvas id="pixfind-overlay" aria-hidden="true"></canvas></div></figure></div>
       <ol id="pixfind-found-list" class="pixfind-found-list" aria-label="見つけた場所"></ol>
     </section>
+    <section class="puzzle-lobby-tips" aria-label="もの探しのコツ"><h2>もの探しのコツ</h2><p>「探すもの」の名前を見て、絵の中で見つけた場所をタップします。分かりにくいときはヒントを使えます。</p></section>
+    <aside class="px-display-ad puzzle-lobby-ad" aria-label="広告" data-puzzle-lobby-ad hidden><p class="px-display-ad__label">広告</p><div class="px-display-ad__inner"></div></aside>
   </main>
   <footer class="site-footer"><div class="container"><p>PiXiEED</p></div></footer>
   <nav class="app-tabs" aria-label="ツールの操作"><div class="tool-operation-slot" data-operation-slot="0" role="group" aria-label="ツール操作"></div><div class="tool-operation-slot" data-operation-slot="1" role="group" aria-label="ツール操作"></div><button id="pixfind-primary" type="button" aria-label="選択した問題を遊ぶ"><span aria-hidden="true">▶</span></button><div class="tool-operation-slot" data-operation-slot="3" role="group" aria-label="ツール操作"></div><div class="tool-operation-slot" data-operation-slot="4" role="group" aria-label="ツール操作"></div></nav>
+  <script type="module" src="/js/ads/puzzle-lobby-ad.mjs?rev=20261128-puzzle-lobby-ad-1"></script>
   <script type="module" src="/js/creation/pixfind-play.mjs?rev=20261128-pixfind-results-1"></script>
   <script type="module" src="/js/arcade-dress.mjs?rev=20261128-pixfind-results-1"></script>
   <script type="module" src="/js/site-header.mjs?rev=20261111-output-offerwall-1"></script>

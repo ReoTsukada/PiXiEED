@@ -453,3 +453,19 @@ html[data-pixieed-motion="reduced"] .books-page .product-card:hover { transform:
   .product-card__illustration-label { font-size: .62rem; }
   .product-detail__content .product-card__illustration { width: min(100%, 240px); }
 }
+
+.catalog-filters > .catalog-category-filter { margin: 0; padding: 0; border: 0; min-width: 0; }
+.catalog-filters > .catalog-category-filter legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.catalog-filters > .catalog-category-filter .catalog-chips { flex-wrap: nowrap !important; overflow-x: auto; padding-block: 3px; }
+.catalog-enhanced .product-grid .product-card__image { cursor: pointer; }
+.catalog-enhanced .product-grid .product-card__description {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.catalog-enhanced .product-grid .product-card__actions {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 5px;
+}
+.shop-ad { margin-block: 8px; padding: 14px 0; background: #f1f4ef; border: 1px solid var(--catalog-line); border-radius: 14px; }

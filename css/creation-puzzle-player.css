@@ -50,3 +50,9 @@ body.pixfind-tool-body .px-tool-result__title::before {
   content: "✦";
   font-size: .85em;
 }
+
+.puzzle-lobby-tips { max-width: 42rem; margin: 20px auto 16px; padding: 12px 16px; border-radius: 12px; background: #f0f4ea; color: #304337; }
+.puzzle-lobby-tips h2 { margin: 0 0 4px; font-size: .95rem; }
+.puzzle-lobby-tips p { margin: 0; font-size: .82rem; }
+body.pixfind-is-playing .puzzle-lobby-tips,
+body.pixfind-is-playing .puzzle-lobby-ad { display: none !important; }

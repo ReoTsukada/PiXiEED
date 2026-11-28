@@ -205,3 +205,16 @@ body[data-social-page="explore"] .explore-search-panel .explore-search { max-wid
 body[data-social-page="explore"] .explore-search-actions :is(.refresh-button,.account-transfer-button) { width: 44px; height: 44px; min-width: 44px; min-height: 44px; }
 body[data-social-page="explore"] .feed-status:empty { display: none; }
 .explore-search-toggle[data-filtered]:not([aria-expanded="true"]) { background: #dceee2; border-color: #83b196; }
+
+body[data-social-page="explore"] .feed-list > .ordinary-ad--inline {
+  grid-column: 1 / -1;
+  margin-block: 4px;
+  padding: 12px 0;
+  border: 0;
+  border-block: 1px solid #d4dfd7;
+  border-radius: 0;
+  background: #f3f6f1;
+  box-shadow: none;
+}
+body[data-social-page="explore"] .ordinary-ad__label { text-align: center; }
+body[data-social-page="explore"] .ordinary-ad__slot { width: min(100%, 680px); margin-inline: auto; }

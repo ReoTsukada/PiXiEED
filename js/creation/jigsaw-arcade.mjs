@@ -5,12 +5,12 @@
  *  - big tiles for where the picture comes from, and a row of thumbnails to pick it
  *  - difficulty cards (かんたん / ふつう / むずかしい / げきむず) that show how the picture will be cut
  *  - a heads-up bar while playing (difficulty, timer, how much is joined), a click for every join
- *  - a celebration with time, best time and "もういちど / むずかしくする"
+ *  - a completion sound and the best time for the results screen
  */
 import { createIndexedDbDraftAdapter } from './local-drafts.mjs';
 import { documentRgba } from './draw-core.mjs?rev=20261116-normal-release-2';
 import { normalizeJigsawFile } from './jigsaw-file.mjs?rev=20260929-claude-integration-1';
-import { ICON, pixelIcon, sfx, createTimer, formatTime, assembleTitle, winOverlay, floatText } from '../arcade.mjs?rev=20260928-arcade-1';
+import { ICON, pixelIcon, sfx, createTimer, formatTime, assembleTitle, floatText } from '../arcade.mjs?rev=20260928-arcade-1';
 
 const $ = (s) => document.querySelector(s);
 const setup = $('#jigsaw-setup'); const play = $('#jigsaw-play');
@@ -276,42 +276,38 @@ function build() {
   const timerEl = hud.querySelector('.arc-timer'); const progressLabel = hud.querySelector('.arc-progress-label b'); const bar = hud.querySelector('.arc-bar span');
   const timer = createTimer((ms) => { timerEl.textContent = formatTime(ms); }, 'pixieed:jigsaw:time:');
   const levelOf = (n) => (n <= 20 ? 0 : n <= 60 ? 1 : n <= 173 ? 2 : 3);
-  let last = null; let combo = 0; let comboAt = 0; let won = null;
+  let last = null; let combo = 0; let comboAt = 0;
 
   document.addEventListener('jigsaw:state', (event) => {
-    const s = event.detail; const joins = s.pieces - s.groups; const need = Math.max(1, s.pieces - 1);
+    const s = event.detail; const need = Math.max(1, s.pieces - 1);
+    const joins = s.complete ? need : s.pieces - s.groups;
     const level = LEVELS[levelOf(s.pieces)];
     badgeStars.textContent = '★'.repeat(level.stars); badgeName.textContent = level.name;
     progressLabel.textContent = `${joins} / ${need}`; bar.style.width = `${Math.round((joins / need) * 100)}%`;
     const fresh = !last || last.gameId !== s.gameId;
+    if (fresh) { timer.stop(); combo = 0; comboAt = 0; delete play.dataset.jigsawBestTime; }
     timer.use(s.gameId);
-    if (fresh) { won?.close(); won = null; combo = 0; }
     if (!fresh && s.groups < last.groups) {
       const now = performance.now(); combo = now - comboAt < 2500 ? combo + 1 : 0; comboAt = now;
-      sfx.snap(combo); hud.classList.remove('is-bump'); requestAnimationFrame(() => hud.classList.add('is-bump'));
+      if (s.complete) sfx.fanfare(); else sfx.snap(combo); hud.classList.remove('is-bump'); requestAnimationFrame(() => hud.classList.add('is-bump'));
       const r = workspace.getBoundingClientRect(); const host = play.getBoundingClientRect();
       floatText(play, r.left - host.left + r.width / 2, r.top - host.top + r.height * 0.4, combo > 0 ? `+${last.groups - s.groups}  ×${combo + 1}` : `+${last.groups - s.groups}`);
     }
     if (s.complete) {
       timer.stop();
-      if (!last?.complete || fresh) celebrate(s, level);
-    } else if (!play.hidden) timer.start();
+      if (!last?.complete || fresh) {
+        const key = `pixieed:jigsaw:best:${s.pieces}:${s.width}x${s.height}`;
+        const previous = Number(store.get(key)) || 0;
+        const elapsed = timer.elapsed();
+        const best = previous ? Math.min(previous, elapsed) : elapsed;
+        if (!previous || elapsed < previous) store.set(key, String(Math.round(elapsed)));
+        play.dataset.jigsawBestTime = `ベスト ${formatTime(best)}`;
+      }
+    }
+    else if (!play.hidden) timer.start();
     last = s;
   });
-  $('#jigsaw-new')?.addEventListener('click', () => { timer.stop(); won?.close(); won = null; last = null; });
-
-  function celebrate(s, level) {
-    const ms = timer.elapsed(); const key = `pixieed:jigsaw:best:${s.pieces}:${s.width}x${s.height}`;
-    const best = Number(store.get(key)) || 0; const record = !best || ms < best; if (record) store.set(key, String(Math.round(ms)));
-    const next = levelOf(s.pieces) + 1; const harder = plan[next] && next < LEVELS.length;
-    won = winOverlay(play, {
-      title: record && best ? 'しんきろく！' : 'かんせい！', stars: level.stars,
-      stats: [['タイム', formatTime(ms)], ['ベスト', formatTime(record ? ms : best)], ['ピース', s.pieces.toLocaleString('ja-JP')], ['むずかしさ', level.name]],
-      actions: [
-        { label: 'もういちど', primary: true, onClick: () => { won?.close(); start.click(); } },
-        ...(harder ? [{ label: `${LEVELS[next].name}にする`, onClick: () => { won?.close(); chosen = next; store.set(LEVEL_KEY, String(next)); applyLevel(); start.click(); } }] : []),
-        { label: 'べつの絵をえらぶ', onClick: () => { won?.close(); $('#jigsaw-new')?.click(); } }
-      ]
-    });
-  }
+  new MutationObserver(() => {
+    if (play.hidden) timer.stop();
+  }).observe(play, { attributes: true, attributeFilter: ['hidden'] });
 }

@@ -24,7 +24,7 @@ test('jigsaw: playing has a HUD, a click for every join and a celebration with b
   const page = read('js/creation/jigsaw-page.mjs'); const source = read('js/creation/jigsaw-arcade.mjs'); const arcade = read('js/arcade.mjs');
   assert.match(page, /new CustomEvent\('jigsaw:state'/);
   assert.match(source, /addEventListener\('jigsaw:state'/);
-  assert.match(source, /sfx\.snap\(combo\)/); assert.match(source, /winOverlay\(play,/); assert.match(source, /pixieed:jigsaw:best:/);
+  assert.match(source, /sfx\.snap\(combo\)/); assert.match(page, /jigsawResult\.show\(/); assert.match(source, /pixieed:jigsaw:best:/);
   for (const fn of ['pixelIcon', 'createTimer', 'confetti', 'assembleTitle', 'winOverlay', 'floatText']) assert.match(arcade, new RegExp(`export function ${fn}\\(`), fn);
   assert.match(arcade, /prefers-reduced-motion/);
 });

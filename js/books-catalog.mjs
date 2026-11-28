@@ -94,7 +94,6 @@ if (form && grid) {
     const summary = document.querySelector('[data-filter-summary]');
     const reset = document.querySelector('[data-reset-filters]');
     const extraParts = [];
-    if (selectedCategory !== 'all') extraParts.push(categoryButtons.find(button => button.dataset.categoryFilter === selectedCategory)?.dataset.categoryLabel || selectedCategory);
     if (format.value !== 'all') extraParts.push(format.value);
     if (sort.value !== 'listed') extraParts.push('名前順');
     if (!extraParts.length && query.value.trim()) extraParts.push('検索中');
@@ -234,7 +233,9 @@ if (form && grid) {
   updateFormats();
   applyFilters({ updateUrl: false });
   document.addEventListener('click', event => {
-    const trigger = event.target.closest('[data-product-details]');
+    const image = event.target.closest('.product-grid .product-card__image');
+    const trigger = event.target.closest('[data-product-details]')
+      || image?.closest('[data-product-id]')?.querySelector('[data-product-details]:not([hidden])');
     if (!trigger || !detailDialog || !detailBody || !manifestReady) return;
     const id = trigger.dataset.productDetails;
     const card = detailCards.get(id);

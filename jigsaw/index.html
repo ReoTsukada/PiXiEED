@@ -14,7 +14,7 @@
   <meta name="theme-color" content="#f4f2ec">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261012-nav-polish-1">
   <link rel="stylesheet" href="/css/site.css?rev=20261019-site-gothic-1">
-  <link rel="stylesheet" href="/css/creation-jigsaw.css?rev=20261006-jigsaw-preview-2">
+  <link rel="stylesheet" href="/css/creation-jigsaw.css?rev=20261128-puzzle-catalog-1">
   <link rel="stylesheet" href="/css/arcade.css?rev=20260929-claude-integration-1">
   <link rel="stylesheet" href="/css/jigsaw-arcade.css?rev=20260930-ux-fix-4">
   <link rel="stylesheet" href="/css/site-header.css?rev=20261012-nav-polish-1">
@@ -40,6 +40,8 @@
       <p id="jigsaw-piece-count" class="jigsaw-piece-count" aria-live="polite">画像を選ぶとピース数の目安が表示されます。</p>
       <div class="jigsaw-setup__actions"><button id="jigsaw-start" data-tool-operation type="button" disabled>パズルをはじめる</button><button id="jigsaw-resume" data-tool-operation type="button" hidden>前回のパズルを再開</button><button id="jigsaw-current" data-tool-operation type="button" hidden>直前のパズルを開く</button></div>
       <p class="jigsaw-help">プレイと保存はこの端末内で行います。自分の保存版から作ったジグソーは「投稿する」から内容を準備できます。フィードで確認して最後に送信するまで公開されません。端末ファイルや公開作品、PXDから開いたジグソーは投稿できません。</p>
+      <section class="puzzle-lobby-tips" aria-label="ジグソーの遊び方"><h2>ジグソーの遊び方</h2><p>下のトレイからピースを選び、盤面へ置きます。合う辺を近づけるとつながります。回転ボタンと完成図も使えます。</p></section>
+      <aside class="px-display-ad puzzle-lobby-ad" aria-label="広告" data-puzzle-lobby-ad hidden><p class="px-display-ad__label">広告</p><div class="px-display-ad__inner"></div></aside>
     </section>
     <section id="jigsaw-play" class="jigsaw-play" aria-label="ジグソーパズル" hidden>
       <p id="jigsaw-source-label" class="jigsaw-source-label"></p>
@@ -82,8 +84,9 @@
     <div class="tool-operation-slot" data-operation-slot="3" role="group" aria-label="ツール操作"></div>
     <div class="tool-operation-slot" data-operation-slot="4" role="group" aria-label="ツール操作"></div>
   </nav>
-  <script type="module" src="/js/creation/jigsaw-page.mjs?rev=20261118-draw-button-label-1"></script>
-  <script type="module" src="/js/creation/jigsaw-arcade.mjs?rev=20261116-normal-release-2"></script>
+  <script type="module" src="/js/ads/puzzle-lobby-ad.mjs?rev=20261128-puzzle-lobby-ad-1"></script>
+  <script type="module" src="/js/creation/jigsaw-page.mjs?rev=20261128-puzzle-catalog-1"></script>
+  <script type="module" src="/js/creation/jigsaw-arcade.mjs?rev=20261128-puzzle-catalog-1"></script>
   <script type="module" src="/js/site-header.mjs?rev=20261111-output-offerwall-1"></script>
   <script type="module" src="/js/tool-help-bootstrap.mjs?rev=20261116-normal-release-2"></script>
   <script type="module" src="/js/tool-operation-bar.mjs?rev=20261017-game-editor-1"></script>

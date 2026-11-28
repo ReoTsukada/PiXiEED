@@ -193,8 +193,11 @@ export function mountShopAd({ doc = globalThis.document, win = globalThis.window
   const positionBeforeRequest = () => {
     const cards = visibleCards(grid);
     if (cards.length < SHOP_AD_MIN_PRODUCTS) { host.hidden = true; return; }
-    const ninth = cards[SHOP_AD_MIN_PRODUCTS - 1];
-    if (ninth && ninth !== host) grid.insertBefore(host, ninth);
+    const columns = win.getComputedStyle?.(grid)?.gridTemplateColumns?.trim().split(/\s+/).filter(Boolean).length || 1;
+    const after = Math.ceil((SHOP_AD_MIN_PRODUCTS - 1) / columns) * columns;
+    const next = cards[after];
+    if (next) grid.insertBefore(host, next);
+    else grid.append(host);
   };
   const eligible = () => readEligibility(doc, win, config, grid);
   const retireAfterRequest = () => {

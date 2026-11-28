@@ -1,3 +1,4 @@
+import { confetti } from '../arcade.mjs?rev=20260928-arcade-1';
 import { isFreshStartSearch } from '../tool-start-routes.mjs?rev=20261110-output-result-1';
 import { notifyToolEntryReady } from '../tool-offerwall-entry.mjs?rev=20261111-output-offerwall-1';
 import { listOwnVersions, mountPictureShelf, pictureDraftId } from './picture-shelf.mjs?rev=20261116-normal-release-2';
@@ -71,7 +72,22 @@ function scheduleJigsawResult() {
     resultTimer = 0;
     if (scheduledRun !== resultRun || !game || game.gameId !== scheduledGameId || playSection.hidden || !isJigsawWorkspaceComplete(game) || resultShownRun === scheduledRun) return;
     resultShownRun = scheduledRun;
-    jigsawResult.show({ title: '完成しました', detail: sourceLabel.textContent, preview: previewCanvas });
+    const timer = playSection.querySelector('.arc-timer')?.textContent;
+    const shown = jigsawResult.show({
+      title: '完成しました',
+      detail: [sourceLabel.textContent, `${layoutData.pieces.length}ピース`, timer, playSection.dataset.jigsawBestTime].filter(Boolean).join(' · '),
+      preview: previewCanvas,
+      actions: [{ label: '次の問題を選ぶ', onClick: () => { showJigsawList(); setupSection.querySelector('.arc-tile[aria-checked="true"]')?.focus(); } }],
+    });
+    const result = shown && document.querySelector('[data-tool-result-view="jigsaw-result"]');
+    if (result && !reduceJigsawHintMotion()) {
+      const canvas = document.createElement('canvas');
+      canvas.className = 'arc-burst';
+      canvas.setAttribute('aria-hidden', 'true');
+      result.append(canvas);
+      requestAnimationFrame(() => { if (!result.hidden) confetti(canvas, { duration: 1700 }); });
+      setTimeout(() => canvas.remove(), 1800);
+    }
   }, 350);
 }
 const reduceJigsawHintMotion = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
@@ -364,6 +380,12 @@ function paintWorkspace() {
   context.setTransform(1, 0, 0, 1, 0, 0); context.clearRect(0, 0, metrics.width, metrics.height); context.imageSmoothingEnabled = false;
   const transform = worldScreenTransform(metrics); context.setTransform(transform.scale, 0, 0, transform.scale, transform.x, transform.y);
   const frameLiftAmount = liftAmount();
+  if (!completionMessage.hidden && previewCanvas?.width) {
+    const group = game.groups[0];
+    context.save(); context.translate(group.x, group.y); context.rotate(group.rotation * Math.PI / 2);
+    context.drawImage(previewCanvas, 0, 0); context.restore();
+    return;
+  }
   const draggingId = activePointer?.type === 'group' ? activePointer.groupId : null;
   const topId = draggingId || liftEffect?.groupId || null;
   for (const group of game.groups) if (!group.inTray && group.groupId !== topId) drawGroup(context, group, transform, metrics, 0);
@@ -500,10 +522,12 @@ function onPointerMove(event) {
     const dx = event.clientX - pointer.start.x; const dy = event.clientY - pointer.start.y;
     if (!pointer.moved && Math.hypot(dx, dy) >= 6) pointer.moved = true;
     if (pointer.moved && pointer.type === 'tray' && pointInsideWorkspace(event.clientX, event.clientY)) {
-      const world = screenToWorld(event.clientX, event.clientY); const group = findGroup(pointer.groupId);
+      const workspaceTop = workspaceElement.getBoundingClientRect().top;
+      const offset = event.pointerType === 'touch' ? Math.min(24, Math.max(0, event.clientY - workspaceTop)) : 0;
+      const world = screenToWorld(event.clientX, event.clientY - offset); const group = findGroup(pointer.groupId);
       if (group) {
         game = moveJigsawGroup(game, group.groupId, poseCenteredAt(group, world));
-        pointer.type = 'group'; pointer.startWorld = world; pointer.start = { x: event.clientX, y: event.clientY };
+        pointer.type = 'group'; pointer.startWorld = screenToWorld(event.clientX, event.clientY); pointer.start = { x: event.clientX, y: event.clientY };
         workspaceElement.dataset.jigsawDragging = 'true'; animateLift(group.groupId, 1, 120);
         try { workspaceElement.setPointerCapture(event.pointerId); } catch { /* The document listeners still track the drag. */ }
         renderGame();
@@ -1009,7 +1033,10 @@ sourceSelect.addEventListener('change', sourceChoiceStatus);
 publicSelect.addEventListener('change', sourceChoiceStatus);
 fileInput.addEventListener('change', sourceChoiceStatus);
 resumeButton.addEventListener('click', () => { void resumeGame(); });
-saveButton.addEventListener('click', saveGame);
+saveButton.addEventListener('click', () => {
+  if (document.body.dataset.toolResultOpen === 'jigsaw-result') showJigsawList();
+  else void saveGame();
+});
 trayElement.addEventListener('click', (event) => {
   const button = event.target.closest('button[data-group-id]'); if (!button || !game) return;
   const id = button.dataset.groupId;

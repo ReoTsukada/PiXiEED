@@ -146,7 +146,7 @@ test('catalog generator is deterministic and emits all twenty-five static cards 
     assert.doesNotMatch(html, /product-card__placeholder|product-card__image--empty/);
     assert.match(html, /catalog-filters[^>]* hidden/);
     assert.match(html, /class="catalog-more-filters" id="catalog-more-filters"/);
-    assert.match(html, /class="catalog-more-filters__panel"[\s\S]*?class="catalog-category-filter"/);
+    assert.match(html, /class="catalog-category-filter"[\s\S]*?class="catalog-more-filters__panel"/);
     assert.match(html, /class="catalog-search"[\s\S]*?id="catalog-more-filters"/);
     assert.match(html, /class="catalog-filter-status" hidden/);
     assert.match(html, /data-product-count aria-live="polite">\d+件<\/p>\s*<div class="catalog-filter-status" hidden>[\s\S]*?<\/form>\s*<div class="product-grid"/);

@@ -102,7 +102,7 @@ function render(route) {
   const shopAdMarkup = preview ? '' : '<aside class="shop-ad" data-shop-display-ad aria-label="広告" hidden><p class="shop-ad__label">広告</p><div class="shop-ad__slot" data-shop-ad-slot></div></aside>';
   const catalogItems = listedProducts.map(card);
   if (!preview) catalogItems.splice(8, 0, shopAdMarkup);
-  const shopAdScripts = preview ? '' : `${OFFERWALL_ENTRY_POLICY_SCRIPT}\n  <script type="module" src="/js/ads/shop-ad.mjs?rev=20261118-draw-display-ad-1"></script>`;
+  const shopAdScripts = preview ? '' : `${OFFERWALL_ENTRY_POLICY_SCRIPT}\n  <script type="module" src="/js/ads/shop-ad.mjs?rev=20261128-puzzle-catalog-1"></script>`;
   const intro = `<!doctype html>
 <html lang="ja">
 <head>
@@ -134,7 +134,7 @@ function render(route) {
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="stylesheet" href="/css/site.css?rev=20261019-site-gothic-1">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261012-nav-polish-1">
-  <link rel="stylesheet" href="/css/books.css?rev=20261108-smooth-illustrations-shop-ad-1">
+  <link rel="stylesheet" href="/css/books.css?rev=20261128-puzzle-catalog-1">
   <link rel="stylesheet" href="/css/site-draw-cta.css?rev=20261014-route-cta-1">
   <title>ドット絵の本と道具｜PiXiEED</title>
 <link rel="stylesheet" href="/css/site-header.css?rev=20261012-nav-polish-1">
@@ -153,12 +153,12 @@ function render(route) {
       <form class="catalog-filters" id="catalog-filters" role="search" hidden>
         <label class="catalog-search-label sr-only" for="catalog-query">商品名・説明・著者・出版社で検索</label>
         <div class="catalog-search"><input id="catalog-query" name="q" type="search" autocomplete="off" placeholder="本・道具を検索" aria-label="商品名・説明・著者・出版社で検索"><button type="button" data-clear-search aria-label="検索文字をクリア">クリア</button></div>
-        <details class="catalog-more-filters" id="catalog-more-filters">
-          <summary aria-label="カテゴリ・種別・並び替えを選ぶ"><span>絞り込み</span><span class="catalog-more-filters__selection" data-extra-filter-summary>指定なし</span></summary>
-          <div class="catalog-more-filters__panel">
-          <fieldset class="catalog-category-filter"><legend>カテゴリ</legend><div class="catalog-chips" role="group" aria-label="カテゴリ">
+        <fieldset class="catalog-category-filter"><legend>カテゴリ</legend><div class="catalog-chips" role="group" aria-label="カテゴリ">
             <button type="button" data-category-filter="all" data-category-label="すべて" aria-label="すべて ${products.length}件" aria-pressed="true"><span>すべて</span><span class="catalog-chip-count" data-category-count>${products.length}</span></button><button type="button" data-category-filter="books" data-category-label="本" aria-label="本 ${categoryCounts.books}件" aria-pressed="false"><span>本</span><span class="catalog-chip-count" data-category-count>${categoryCounts.books}</span></button><button type="button" data-category-filter="toys" data-category-label="おもちゃ" aria-label="おもちゃ ${categoryCounts.toys}件" aria-pressed="false"><span>おもちゃ</span><span class="catalog-chip-count" data-category-count>${categoryCounts.toys}</span></button><button type="button" data-category-filter="tools" data-category-label="制作道具" aria-label="制作道具 ${categoryCounts.tools}件" aria-pressed="false"><span>制作道具</span><span class="catalog-chip-count" data-category-count>${categoryCounts.tools}</span></button><button type="button" data-category-filter="gadgets" data-category-label="ガジェット" aria-label="ガジェット ${categoryCounts.gadgets}件" aria-pressed="false"><span>ガジェット</span><span class="catalog-chip-count" data-category-count>${categoryCounts.gadgets}</span></button>
           </div></fieldset>
+        <details class="catalog-more-filters" id="catalog-more-filters">
+          <summary aria-label="種別・並び替えを選ぶ"><span>種別・並び順</span><span class="catalog-more-filters__selection" data-extra-filter-summary>指定なし</span></summary>
+          <div class="catalog-more-filters__panel">
           <div class="catalog-filter-row">
             <label for="catalog-format">種別・仕様<select id="catalog-format" name="format"><option value="all">すべて</option></select></label>
             <label for="catalog-sort">並び順<select id="catalog-sort" name="sort"><option value="listed">掲載順</option><option value="name">名前順</option></select></label>
@@ -183,7 +183,7 @@ ${catalogItems.join('\n')}
     <p class="product-detail__notice">購入手続きは外部販売先で行います。販売先のリンクは新しいタブで開きます。</p>
     <p class="product-detail__gate">商品リンクを確認できないため、購入リンクは利用できません。</p>
   </dialog>
-  <script type="module" src="/js/books-catalog.mjs?rev=20261108-shop-display-ad-1"></script>
+  <script type="module" src="/js/books-catalog.mjs?rev=20261128-puzzle-catalog-1"></script>
   <script type="module" src="/js/books-commerce.mjs?rev=20261020-yahoo-related-offers-1"></script>
 <script type="module" src="/js/site-header.mjs?rev=20261111-output-offerwall-1"></script>
 ${shopAdScripts}

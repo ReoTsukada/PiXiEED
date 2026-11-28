@@ -91,3 +91,47 @@ body.app-page--tool-jigsaw .jigsaw-more__menu #jigsaw-fit{display:flex;align-ite
 #jigsaw-view-scale{font-variant-numeric:tabular-nums;font-size:11px}
 .jigsaw-more__pages{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;gap:6px;align-items:center;text-align:center;color:#fff;font-size:13px;font-variant-numeric:tabular-nums}
 body.app-page--tool-jigsaw .jigsaw-more__menu #jigsaw-new{width:100%}
+
+body.app-page--tool-jigsaw[data-jigsaw-playing="true"] .jigsaw-play {
+  grid-template-rows: auto minmax(0, 1fr) 74px !important;
+  grid-template-areas: "progress" "work" "tray" !important;
+}
+body.app-page--tool-jigsaw .jigsaw-play > .arc-hud {
+  display: grid !important;
+  grid-area: progress;
+  width: auto !important;
+  position: static;
+  min-height: 24px;
+  padding-block: 1px;
+  margin: 0;
+}
+body.app-page--tool-jigsaw .jigsaw-play > .jigsaw-workspace { grid-area: work; }
+body.app-page--tool-jigsaw .jigsaw-play > .jigsaw-tray { grid-area: tray; }
+@media (max-height: 420px) {
+  body.app-page--tool-jigsaw[data-jigsaw-playing="true"] .jigsaw-play { grid-template-rows: auto minmax(0, 1fr) 48px !important; }
+}
+@media (orientation: landscape) and (max-height: 520px) and (min-width: 540px) {
+  body.app-page--tool-jigsaw[data-jigsaw-playing="true"] .jigsaw-play {
+    grid-template-rows: auto minmax(0, 1fr) !important;
+    grid-template-areas: "progress progress" "work tray" !important;
+  }
+}
+.puzzle-lobby-tips { margin: 16px auto; max-width: 42rem; padding: 12px 16px; border-radius: 12px; background: #f0f4ea; color: #304337; }
+.puzzle-lobby-tips h2 { margin: 0 0 4px; font-size: .95rem; }
+.puzzle-lobby-tips p { margin: 0; font-size: .82rem; }
+
+body.app-page--tool-jigsaw .arc-hud .arc-badge { padding-block: 1px; }
+body.app-page--tool-jigsaw .jigsaw-play > .arc-hud {
+  box-sizing: border-box;
+  height: 24px;
+}
+body.app-page--tool-jigsaw .arc-hud .arc-progress {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+body.app-page--tool-jigsaw .arc-hud .arc-bar { grid-column: 1; grid-row: 1; height: 6px; }
+body.app-page--tool-jigsaw .arc-hud .arc-progress-label { grid-column: 2; grid-row: 1; }
+.jigsaw-setup .puzzle-lobby-ad { width: 100%; }
+@media (orientation: landscape) and (max-height: 520px) {
+  body.app-page--tool-jigsaw[data-jigsaw-playing="true"] .jigsaw-play { padding-bottom: 8px; }
+}
