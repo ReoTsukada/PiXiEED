@@ -15,7 +15,7 @@ const excludedDirectories = new Set(['.git', '.agents', '.codex', 'assets', 'doc
 // Declare canonical cache revisions here; derive no versions from file contents.
 // Keep runtime-specific query values intact while normalizing module references.
 const targets = new Map([
-  ['home-play.mjs', 'rev=20261113-home-world-1'],
+  ['home-play.mjs', 'rev=20261128-home-play-motion-1'],
   ['home-artworks.mjs', 'rev=20261112-posted-random-1'],
   ['home-artwork-settings.mjs', 'rev=20261112-home-review-1'],
   ['home-artwork-settings.css', 'rev=20261112-profile-workspace-1'],
@@ -146,7 +146,7 @@ function normalize(source, file) {
     if (/^[a-z][a-z\d+.-]*:/i.test(path)) return whole;
     const target = path.startsWith('/') ? path.slice(1) : posix.normalize(posix.join(posix.dirname(relative(root, file)), path));
     if (!outputOfferwallTargets.has(target)) return whole;
-    const revision = target === 'js/home-startup.mjs' ? '20261113-home-world-1' : '20261111-output-offerwall-1';
+    const revision = target === 'js/home-startup.mjs' ? '20261128-home-play-motion-1' : '20261111-output-offerwall-1';
     const next = /[?&]rev=/.test(query) ? query.replace(/([?&])rev=[^&]*/, '$1rev=' + revision) : query + (query ? '&' : '?') + 'rev=' + revision;
     return `${quote}${path}${next}${quote}`;
   });

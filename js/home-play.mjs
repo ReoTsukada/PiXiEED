@@ -3,7 +3,7 @@
  *
  * The contained mini canvas lets visitors draw and hear notes (a taste of the editor and sound tool).
  * Other tool cards run a tiny live version of that tool. Toys animate only
- * while on screen. Reduced motion renders a static hero until the visitor explicitly enables movement.
+ * while on screen. The play area has its own motion and pause controls.
  */
 import { createVisibleAnimationScheduler } from './home-animation.mjs?rev=20261001-hero-rates-2';
 import { createToolToys, TOOL_TOY_SIZE } from './tool-toys.mjs?rev=20261015-real-screens-1';
@@ -197,7 +197,7 @@ function hero() {
   let preferences = {};
   try { const saved = JSON.parse(localStorage.getItem(preferenceKey) || '{}'); if (saved && typeof saved === 'object' && !Array.isArray(saved)) preferences = saved; } catch { /* private mode */ }
   let soundEnabled = !soundButton || preferences.sound !== false;
-  let motionEnabled = !reduced && preferences.motion !== false;
+  let motionEnabled = preferences.motion !== false;
   let playbackPaused = false;
   const savePreferences = () => {
     try { localStorage.setItem(preferenceKey, JSON.stringify({ sound: soundEnabled, ...(typeof preferences.motion === 'boolean' ? { motion: preferences.motion } : {}) })); } catch { /* optional */ }
@@ -625,14 +625,6 @@ function hero() {
     if (stopHeroAnimation) animationScheduler.redraw(stage);
     else if (document.visibilityState !== 'hidden') draw(performance.now());
   };
-  const settleReducedIntro = () => {
-    motionEnabled = !reduced && preferences.motion !== false;
-    syncHeroPlayback();
-  };
-  if (motionPreference.addEventListener) motionPreference.addEventListener('change', settleReducedIntro);
-  else motionPreference.addListener?.(settleReducedIntro);
-  new MutationObserver(settleReducedIntro).observe(document.documentElement, { attributes: true, attributeFilter: ['data-pixieed-motion'] });
-
   function drawingSnapshot() {
     return captureHomePlayState({ width: W, height: H, floor: F, sand, pieces, ink, color });
   }

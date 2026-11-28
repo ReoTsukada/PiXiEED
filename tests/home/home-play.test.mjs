@@ -123,10 +123,9 @@ test('home hero: a finer grid (letters about 4 dots thick), shooting star and pi
   assert.match(html, /id="hpPlayback"[^>]*>一時停止<\/button>/, 'hero motion has a visible play/pause control');
   assert.match(html, /id="hpPlaybackStatus" aria-live="polite"/);
   assert.match(source, /let playbackPaused = false;/, 'playback and reduced motion are independent');
-  assert.match(source, /let motionEnabled = !reduced && preferences.motion !== false;/, 'system reduced motion is respected on load');
+  assert.match(source, /let motionEnabled = preferences.motion !== false;/, 'the play area starts unless the visitor turned off its own motion');
   assert.match(source, /const heroMotionEnabled = \(\) => !playbackPaused && motionEnabled;/, 'both user controls govern motion');
   assert.match(source, /createHomeAudio\(\{ resumeOnVisible: true, initialOn: soundEnabled, onChange:/, 'audio resumes after visibility changes once activated by the visitor');
-  assert.match(source, /motionEnabled = !reduced && preferences.motion !== false;/, 'preference changes update hero movement');
   assert.match(html, /class="hp-gyro-status" id="hpGyroStatus" aria-live="polite"/, 'sensor status is visible below the controls');
   assert.match(source, /createHomeMotion\(\{ button: document.getElementById\('hpMotion'\), status: gyroStatus,/);
   assert.doesNotMatch(source, /gyroButton/);
@@ -172,7 +171,7 @@ test('home hero controls keep gesture-gated sound, guarded clear and undo with s
   assert.match(html, /id="hpAudioState"/);
   assert.doesNotMatch(html, /id="hpFreeze"|id="hpSound"/);
   assert.match(source, /if \(heroReducedMotion\(\)\) finishIntroDots\(\)/);
-  assert.match(source, /motionPreference\.addEventListener\('change', settleReducedIntro\)/);
+  assert.match(source, /motionPreference\.addEventListener\('change', updateMotionPreference\)/);
   assert.match(source, /window\.addEventListener\('pagehide', \(\) => \{ persist\(\); homeAudio\.setVisible\(false\); \}\)/);
   assert.match(source, /window\.addEventListener\('pageshow', \(\) => \{ lastT = performance\.now\(\); sandTick = 0; sandBudget = 0; homeAudio\.setVisible\(/);
   assert.match(source, /document\.addEventListener\('visibilitychange', \(\) => \{ homeAudio\.setVisible\(/);

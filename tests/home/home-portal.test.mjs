@@ -103,7 +103,7 @@ test('one connected playground keeps complete accessible controls, not separate 
   assert.match(home, /Spaceで描く／離す、Enterでタップ/);
   assert.match(home, /<dialog id="hpClearDialog"/);
   assert.match(home, /id="hpClearCancel" autofocus/);
-  assert.match(home, /src="\/js\/home-play\.mjs\?rev=20261113-home-world-1"/);
+  assert.match(home, /src="\/js\/home-play\.mjs\?rev=20261128-home-play-motion-1"/);
   assert.doesNotMatch(home, /hpToys|data-toy=|home-gallery\.mjs|assets\/home\/community\.svg/);
   assert.equal((home.match(/class="trip"/g) || []).length, 3);
   assert.equal((home.match(/class="tool-preview-card"/g) || []).length, 3);
