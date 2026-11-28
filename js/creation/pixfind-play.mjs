@@ -1,3 +1,4 @@
+import { confetti, floatText, sfx } from '../arcade.mjs?rev=20261006-play-reset-1';
 import { detectPixelScale, wholePixelFit } from '../pixel-scale.mjs?rev=20260929-claude-integration-1';
 import { supabaseConfig } from '../../data/site-config.js?rev=20261004-puzzle-share-1';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
@@ -448,9 +449,19 @@ function mount() {
           if (scheduledRun !== resultRun || selected !== scheduledPuzzle || game.hidden || !original || readOnly || !regions.length || found.size !== regions.length || resultShownRun === scheduledRun) return;
           resultShownRun = scheduledRun;
           const title = authoritativeAnswers ? 'すべて見つけました' : '候補をすべて確認しました';
-          resultView.show({ title, detail: `${selected.label} · ${found.size} / ${regions.length}件`, preview: originalNode,
-            controls: isPublicPuzzleShareable(selected, pageMode) ? sharePanel : undefined,
-            actions: isPublicPuzzleShareable(selected, pageMode) ? [{ label: '共有する', onClick: () => sharePuzzle(true) }] : [] });
+          const shareable = isPublicPuzzleShareable(selected, pageMode);
+          const elapsed = game.querySelector('.arc-timer')?.textContent;
+          const shown = resultView.show({ title, detail: [selected.label, `${found.size} / ${regions.length}件`, elapsed].filter(Boolean).join(' · '), preview: originalNode,
+            controls: shareable ? sharePanel : undefined,
+            actions: shareable ? [{ label: '共有する', onClick: () => sharePuzzle(true) }] : [] });
+          const result = shown && document.querySelector('.px-tool-result:not([hidden])');
+          if (result && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            const canvas = el('canvas', 'arc-burst');
+            canvas.setAttribute('aria-hidden', 'true');
+            result.append(canvas);
+            requestAnimationFrame(() => { if (!result.hidden) confetti(canvas, { duration: 1700 }); });
+            setTimeout(() => canvas.remove(), 1800);
+          }
         }, 350);
       }
     }
@@ -663,7 +674,10 @@ function mount() {
     }
     found.add(selection.index); updateProgress();
     const complete = found.size === regions.length;
-    showTapFeedback('correct', complete ? statusGame.textContent : '見つけました！', area, clientX, clientY, complete ? 1900 : 1450);
+    showTapFeedback('correct', complete ? statusGame.textContent : `見つけました！ ${found.size} / ${regions.length}`, area, clientX, clientY, complete ? 1900 : 1450);
+    const rect = area.getBoundingClientRect();
+    floatText(area, Math.max(4, Math.min(rect.width - 34, clientX - rect.left + 10)), Math.max(4, clientY - rect.top - 20));
+    try { if (complete) sfx.fanfare(); else sfx.snap(found.size); } catch { /* Audio availability does not affect play. */ }
   };
   const locate = (clientX, clientY, area = playArea, pointerType = 'mouse') => {
     if (!original || !regions.length || readOnly) return;

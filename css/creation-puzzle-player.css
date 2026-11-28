@@ -36,3 +36,17 @@ body[data-puzzle-mode="hidden-object"].pixfind-is-playing .pixfind-image>figcapt
   body[data-puzzle-mode="hidden-object"].pixfind-is-playing #pixfind-game>.pixfind-found-list{min-height:36px;max-height:36px;flex-wrap:nowrap;padding:2px 6px}
   body[data-puzzle-mode="hidden-object"].pixfind-is-playing #pixfind-game>.pixfind-found-list li{height:30px;font-size:.8rem}
 }
+
+body.pixfind-tool-body .pixfind-play-area > .arc-float {
+  color: #fff1a7;
+  background: #15202b;
+  border-radius: 6px;
+  padding: 2px 5px;
+  line-height: 1;
+}
+body.pixfind-tool-body .px-tool-result__title::before {
+  display: block;
+  color: #eebd47;
+  content: "✦";
+  font-size: .85em;
+}

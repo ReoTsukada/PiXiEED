@@ -65,7 +65,7 @@ function hud(t) {
     const got = Number(m[1]); total = Number(m[2]);
     label.innerHTML = `${t.win ? '星' : '見つけた'} <b>${got} / ${total}</b>`; fill.style.width = `${total ? Math.round((got / total) * 100) : 0}%`;
     badge.textContent = t.win ? 'ゲーム' : `${total}か所`;
-    if (last >= 0 && got > last) {
+    if (!freshPuzzlePlay && last >= 0 && got > last) {
       sfx.snap(got); bar.classList.remove('is-bump'); requestAnimationFrame(() => bar.classList.add('is-bump'));
       const r = bar.getBoundingClientRect(); const host = play.getBoundingClientRect(); floatText(play, r.right - host.left - 40, r.bottom - host.top + 6, '+1');
     }
@@ -73,7 +73,7 @@ function hud(t) {
     const finished = t.win ? !$(t.win)?.hidden : total > 0 && got >= total;
     if (finished && !won) {
       timer.stop();
-      won = winOverlay(play, {
+      if (!freshPuzzlePlay) won = winOverlay(play, {
         title: t.win ? 'ゴール！' : 'ぜんぶ見つけた！', stars: 3, maxStars: 3,
         stats: [['タイム', formatTime(timer.elapsed())], t.win ? ['移動', `${moves}回`] : ['見つけた', `${got}か所`]],
         actions: [
