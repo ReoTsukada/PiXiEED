@@ -108,14 +108,14 @@ async function launchChrome(executable) {
       async close() {
         try { await socket.send('Browser.close', {}, undefined, 2000); } catch {}
         try { await socket.close(); } finally {
-          try { await stopChild(child); } finally { await rm(profile, { recursive: true, force: true }); }
+          try { await stopChild(child); } finally { await rm(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); }
         }
       },
     };
   } catch (error) {
     await socket?.close().catch(() => {});
     if (child) await stopChild(child);
-    await rm(profile, { recursive: true, force: true }).catch(() => {});
+    await rm(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }).catch(() => {});
     throw error;
   }
 }
