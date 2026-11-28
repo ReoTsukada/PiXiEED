@@ -336,10 +336,12 @@ export function initHomeRecentProjects({
   doc = globalThis.document,
   win = globalThis.window,
   max = DESKTOP_LIMIT,
+  emptyMessage = '続きから表示できる絵はありません。＋で新しくつくるか、作品一覧で確認できます。',
   readProjects = readHomeRecentProjects
 } = {}) {
   const list = doc?.getElementById?.('portal-recent-list');
   const status = doc?.getElementById?.('portal-recent-status');
+  const resume = list?.closest?.('[data-home-resume]');
   let disposed = false;
   let paused = false;
   let generation = 0;
@@ -429,10 +431,11 @@ export function initHomeRecentProjects({
         if (projects.length >= limit) break;
       }
     }
+    if (resume) resume.hidden = projects.length === 0;
     if (!projects.length) {
       list.replaceChildren();
       list.hidden = true;
-      setStatus('続きから表示できる絵はありません。＋で新しくつくるか、作品一覧で確認できます。');
+      setStatus(emptyMessage);
       return projects;
     }
 
@@ -460,13 +463,14 @@ export function initHomeRecentProjects({
       title.textContent = project.name;
       const meta = doc.createElement('small');
       meta.className = 'portal-recent-meta';
-      meta.textContent = '続きを開く';
+      meta.textContent = '端末内';
       anchor.append(preview, title, meta);
       list.append(anchor);
       watchCanvas(anchor, preview, fallback, project, run);
     }
     if (!list.childNodes?.length && !list.children?.length) {
       list.hidden = true;
+      if (resume) resume.hidden = true;
       setStatus('保存した作品を表示できません。作品一覧から開いてください。');
     }
     return projects;
@@ -484,7 +488,7 @@ export function initHomeRecentProjects({
     if (!limit) {
       list.replaceChildren();
       list.hidden = true;
-      setStatus('続きから表示できる絵はありません。＋で新しくつくるか、作品一覧で確認できます。');
+      setStatus(emptyMessage);
       return [];
     }
     setStatus('保存した作品を確認しています…');
@@ -501,6 +505,7 @@ export function initHomeRecentProjects({
       if (disposed || paused || run !== generation || error?.name === 'AbortError') return [];
       list.replaceChildren();
       list.hidden = true;
+      if (resume) resume.hidden = true;
       setStatus('保存した作品を表示できません。作品一覧から開いてください。');
       return [];
     }

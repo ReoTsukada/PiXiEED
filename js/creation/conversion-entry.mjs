@@ -40,7 +40,7 @@ try {
     },
     loadText: () => import('./text-tools.mjs?rev=20261117-normal-apply-1'),
     loadIntent: () => import('./conversion-intent.mjs?rev=20261028-discovery-1'),
-    loadUI: () => import('./conversion-smart-ui.mjs?rev=20261128-output-compact-rails-1'),
+    loadUI: () => import('./conversion-smart-ui.mjs?rev=20261128-output-post-draft-1'),
     onWarning(error) { console.warn('Optional conversion module unavailable; media conversion remains available.', error); },
   });
 } catch (error) { view.fail(error); }

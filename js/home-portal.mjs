@@ -126,7 +126,7 @@ export function initHomeWorkShelf(doc=globalThis.document,win=globalThis.window)
     if(loading||controller)return;
     loading=true;observer?.disconnect();
     try{
-      const {initHomeRecentProjects}=await import('./home-recent-projects.mjs?rev=20261117-home-pageshow-1');
+      const {initHomeRecentProjects}=await import('./home-recent-projects.mjs?rev=20261128-work-shelf-1');
       controller=initHomeRecentProjects({doc,win,max:4});
     }catch{
       const status=doc.getElementById('portal-recent-status');
@@ -135,7 +135,7 @@ export function initHomeWorkShelf(doc=globalThis.document,win=globalThis.window)
   };
   if(typeof win.IntersectionObserver==='function'){
     observer=new win.IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting))void start();},{rootMargin:'0px'});
-    observer.observe(shelf);
+    observer.observe(shelf.closest?.('[data-home-resume]') ? doc.getElementById('main') || shelf : shelf);
   }else void start();
   return {dispose(){observer?.disconnect();controller?.dispose?.();}};
 }

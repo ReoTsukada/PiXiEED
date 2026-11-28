@@ -78,6 +78,16 @@ export function createConversionRecoveryController({ store, id, adoptId = () => 
     describe('paused','自動保存を停止しています。前回保存版はこの端末に残ります。');return true;
   }
   function resume(){if(mustFork)return flush({fork:true});blocked=false;paused=false;return flush();}
+  async function flushForReturn() {
+    while (!disposed) {
+      if (writing) { await writing; continue; }
+      if (loading || restoring || blocked) return false;
+      // A paused workspace still uses the existing browser leave confirmation.
+      if (paused || !state().dirty) return true;
+      if (!await flush()) return false;
+    }
+    return false;
+  }
   function dispose(){disposed=true;loadEpoch++;clear();aborter?.abort();}
-  return {start,changed,flush,cancel,resume,fork:()=>flush({fork:true}),dispose,snapshot:state,get restoring(){return restoring;},get dirty(){return generation!==savedGeneration;}};
+  return {start,changed,flush,flushForReturn,cancel,resume,fork:()=>flush({fork:true}),dispose,snapshot:state,get restoring(){return restoring;},get dirty(){return generation!==savedGeneration;}};
 }

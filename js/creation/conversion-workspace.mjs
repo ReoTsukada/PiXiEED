@@ -18,7 +18,7 @@ export function conversionWorkspaceMinimumHeight({ unified = false, compactRails
 }
 
 /** Layout only: move existing controls, retaining their values, nodes and listeners. */
-export function mountConversionWorkspace(main, toolbar, doc = document, win = window) {
+export function mountConversionWorkspace(main, toolbar, doc = document, win = window, { beforeReturn = () => true, reportReturnFailure = () => {} } = {}) {
   const panel = doc.createElement('dialog'); panel.id = 'sc-settings-panel'; panel.className = 'sc-settings-panel';
   panel.setAttribute('aria-labelledby', 'sc-settings-title');
   panel.innerHTML = '<header class="sc-panel-heading"><h2 id="sc-settings-title">保存の設定</h2><button type="button" data-sc-settings-close aria-label="設定を閉じる">完了</button></header><div class="sc-panel-body"></div>';
@@ -51,7 +51,25 @@ export function mountConversionWorkspace(main, toolbar, doc = document, win = wi
   open.setAttribute('aria-controls', panel.id); open.setAttribute('aria-haspopup', 'dialog'); open.textContent = '設定';
   toolbar.querySelector('.sc-input-actions').append(open);
   const back = doc.createElement('a'); back.dataset.scBack = ''; back.className = 'sc-back';
-  const returnController = createConversionReturnController(createNativeReturnBridge(() => main.querySelector('#output-return,[data-conversion-return]')));
+  const returnBridge = createNativeReturnBridge(() => main.querySelector('#output-return,[data-conversion-return]'));
+  let leaving = false;
+  const returnController = createConversionReturnController({
+    read: returnBridge.read,
+    async activate() {
+      if (leaving) return;
+      leaving = true;
+      back.setAttribute('aria-busy', 'true');
+      try {
+        if (await beforeReturn()) returnBridge.activate();
+        else reportReturnFailure('出力設定を保存できませんでした。設定を確認して、もう一度お試しください。');
+      } catch (error) {
+        reportReturnFailure(error?.message || '出力設定を保存できませんでした。');
+      } finally {
+        leaving = false;
+        back.removeAttribute('aria-busy');
+      }
+    },
+  });
   const initialReturn = returnController.snapshot();
   back.href = initialReturn.href; back.textContent = initialReturn.label;
   back.addEventListener('click', event => {

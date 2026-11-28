@@ -24,7 +24,7 @@ test('search is mounted outside the filter disclosure and results have contextua
   for (const action of ['clear-search', "'data-view': 'feed'", "'data-type': 'all'", "'data-compose': ''"]) assert.ok(app.includes(action), action);
   assert.match(app, /searchLabel\.hidden = view !== 'feed'/);
   assert.match(app, /aria-pressed/);
-  assert.match(app, /if \(!posts\.length && !pending\) feed\.append\(renderEmptyState\(\)\)/);
+  assert.match(app, /if \(!posts\.length && !pending[^\n]*\) feed\.append\(renderEmptyState\(\)\)/);
   assert.match(app, /updateReadWarningDetails\(false\); statusText\('下書きはこの端末に保存されています。'\)/);
   assert.match(app, /const showReadWarnings = state\.filter !== 'saved'/);
   assert.match(app, /取得できた作品に一致するものはありません/);

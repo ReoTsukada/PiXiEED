@@ -266,7 +266,7 @@ export function createFeedDraftStore({ adapter, indexedDBRef = globalThis.indexe
       const value = await store.get('preferences') || {};
       return {
         filter: ['all', 'art', 'photo', 'puzzle', 'local', 'saved'].includes(value.filter) ? value.filter : 'all',
-        bookmarks: Array.isArray(value.bookmarks) ? value.bookmarks.filter(id => /^(?:map|showcase):[a-f\d-]{36}$/i.test(id)).slice(0, 200) : [],
+        bookmarks: Array.isArray(value.bookmarks) ? value.bookmarks.filter(id => /^(?:map|showcase|sns|pixfind):[a-f\d-]{36}$/i.test(id)).slice(0, 200) : [],
         scroll: Number.isFinite(value.scroll) ? Math.max(0, value.scroll) : 0,
       };
     },

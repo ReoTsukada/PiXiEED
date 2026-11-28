@@ -22,14 +22,14 @@ test('settings use native closed disclosures without changing consent or storage
   assert.match(html, /<section class="profile-disclosure__body" data-home-artwork-settings aria-label="ホームへの作品掲載">/);
   assert.match(html, /<details class="profile-disclosure profile-device" id="profile-device">/);
   for (const hook of ['data-local-work-summary', 'data-local-work-status']) assert.ok(html.includes(hook), hook);
-  for (const url of ['/feed/?view=saved', '/feed/?view=drafts', '/tools/']) assert.ok(html.includes(url), url);
+  for (const url of ['/explore/?view=saved', '/explore/?view=mine', '/feed/?view=drafts', '/tools/']) assert.ok(html.includes(url), url);
   assert.match(html, /関連付けても公開やクラウドへの送信は行いません/);
   assert.match(html, /別端末への同期は行いません/);
 });
 
-test('profile adds no runtime and preserves focus, touch targets and mobile input size', () => {
-  assert.match(html, /profile-workspace\.css\?rev=20261112-profile-workspace-1/);
-  assert.doesNotMatch(html, /<script[^>]*src="[^"?]*profile-workspace\.(?:m?js)/);
+test('profile loads the local shelf and preserves focus, touch targets and mobile input size', () => {
+  assert.match(html, /profile-workspace\.css\?rev=20261128-work-shelf-1/);
+  assert.match(html, /src="\/js\/profile-work-shelf\.mjs\?rev=20261128-work-shelf-1"/);
   assert.match(css, /:focus-visible/);
   assert.match(css, /min-height:44px/);
   assert.match(css, /input\{min-height:48px;font-size:16px/);

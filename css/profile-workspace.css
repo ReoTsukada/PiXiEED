@@ -94,3 +94,22 @@ body[data-page="profile"] .profile-workspace{padding-block:28px 56px}
 @media(max-width:700px){body[data-page="profile"] .profile-workspace{padding-block:22px 32px}.profile-workspace>.container{width:calc(100% - 32px)}.profile-workspace .profile-head{display:block;margin-bottom:20px}.profile-workspace .profile-head h1{font-size:25px}.profile-workspace .profile-overview__actions{display:flex;margin-top:18px}.profile-workspace .profile-overview__actions>.button{flex:1;justify-content:center}.profile-workspace .profile-my-posts{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.profile-utilities{grid-template-columns:1fr}.profile-sharing,.profile-device{grid-column:1/-1}.profile-workspace .profile-summary{gap:8px}.profile-workspace .profile-summary a{gap:0 4px;padding:13px 12px}.profile-workspace .profile-summary strong{font-size:26px}.profile-workspace .profile-summary a>.profile-icon{width:16px;height:16px}.profile-shortcut{gap:8px;padding:12px;font-size:13px}.profile-workspace .profile-social-shortcuts{gap:10px}.profile-disclosure>summary{padding:12px 16px}.profile-disclosure__body{padding:16px}.profile-workspace .profile-post-card{padding:6px;border-radius:15px}.profile-workspace .profile-post-card__title{font-size:13px}.profile-workspace .profile-post-card__meta{gap:4px}.profile-workspace .profile-tabs a{gap:5px;padding:8px 4px;font-size:12px}.profile-workspace .profile-tabs .profile-icon{width:18px;height:18px}}
 @media(max-width:360px){.profile-workspace .profile-tabs .profile-icon{width:16px;height:16px}.profile-workspace .profile-tabs a{gap:4px}.profile-workspace .profile-summary a{padding:12px 9px}.profile-workspace .profile-summary a>span:last-child{font-size:12px}.profile-shortcut{gap:7px;padding:12px 10px}.profile-shortcut>.profile-icon:first-child{width:18px;height:18px}.profile-shortcut>.profile-icon:last-child{width:12px;height:12px}.profile-disclosure__hint{font-size:12px}}
 @media(forced-colors:active){.profile-icon{forced-color-adjust:none;background:CanvasText}.profile-workspace .button--primary .profile-icon{background:ButtonText}.profile-workspace .profile-tabs a[aria-current="page"]{outline:2px solid Highlight;outline-offset:-3px}}
+
+.profile-work-shelf { display: grid; gap: 16px; margin-bottom: 24px; }
+.profile-work-shelf[hidden], .profile-shelf-status[hidden], .profile-shelf-grid[hidden], .profile-shelf-grid:empty { display: none; }
+.profile-work-shelf h2 { margin: 0; font-size: 21px; }
+.profile-shelf-group { border: 1px solid #dfe6df; border-radius: 16px; padding: 10px 14px 14px; background: #fff; }
+.profile-shelf-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.profile-shelf-heading h3 { margin: 0; font-size: 15px; }
+.profile-shelf-heading a { display: inline-flex; align-items: center; gap: 5px; min-height: 44px; font-size: 12px; }
+.profile-shelf-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 10px; }
+.profile-shelf-grid .portal-recent-card { display: grid; gap: 4px; min-width: 0; padding: 5px; border: 1px solid #dce6dd; border-radius: 12px; background: #fafcf9; text-decoration: none; }
+.profile-shelf-grid .portal-recent-card:hover { border-color: #7b9e88; }
+.profile-shelf-grid .portal-recent-preview { display: grid; place-items: center; aspect-ratio: 1; min-width: 0; overflow: hidden; border-radius: 8px; background: #edf2e9; color: #45624f; }
+.profile-shelf-grid .portal-recent-preview :is(canvas,img) { width: 100%; height: 100%; min-height: 0; object-fit: contain; image-rendering: pixelated; }
+.profile-shelf-grid .profile-draft-text { padding: 10px; white-space: normal; overflow-wrap: anywhere; font-size: 12px; line-height: 1.4; }
+.profile-shelf-grid .portal-recent-fallback, .profile-shelf-status { color: #566b5c; font-size: 12px; }
+.profile-shelf-grid .portal-recent-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 700; }
+.profile-shelf-grid .portal-recent-meta { font-size: 11px; color: #566b5c; }
+.profile-shelf-status { margin: 0; }
+@media (max-width: 600px) { .profile-shelf-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }

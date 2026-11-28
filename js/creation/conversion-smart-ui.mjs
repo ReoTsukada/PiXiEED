@@ -2,7 +2,7 @@ import { hasConversionRecoveryHistory } from '../tool-start-routes.mjs?rev=20261
 import { mountResultSurface } from './conversion-result-surface.mjs?rev=20261128-output-compact-rails-1';
 import { textRenderOutputSelector } from './conversion-text-output-choice.mjs?rev=20261105-video-size-1';
 import { createConversionRecoveryStore, createIndexedDbConversionRecoveryAdapter } from './conversion-recovery-store.mjs?rev=20261105-video-size-1';
-import { createConversionRecoveryController, conversionRecoveryIdentity } from './conversion-recovery-controller.mjs?rev=20261105-video-size-1';
+import { createConversionRecoveryController, conversionRecoveryIdentity } from './conversion-recovery-controller.mjs?rev=20261128-output-post-draft-1';
 import { createConversionRecoveryWorkspace } from './conversion-recovery-workspace.mjs?rev=20261111-output-offerwall-1';
 import { activateRetainedConversionInput } from './conversion-input-receipts.mjs?rev=20261105-video-size-1';
 import { mountUnifiedConversionInput, writeUnifiedProperty, conversionRecoveryStatusLabel, associateCommittedMaterialFiles } from './conversion-unified-input.mjs?rev=20261128-output-compact-rails-1';
@@ -14,7 +14,7 @@ import { createConversionFormatController } from './conversion-format-controller
 import { createNativeFormatBridge } from './conversion-format-bridge.mjs?rev=20261104-output-controller-1';
 import { mountConversionRouteChoices } from './conversion-route-choice.mjs?rev=20261101-route-choice-1';
 import { conversionSaveMessage, batchSaveActionLabel } from './conversion-clarity.mjs?rev=20261101-direct-material-1';
-import { mountConversionWorkspace } from './conversion-workspace.mjs?rev=20261128-output-compact-rails-1';
+import { mountConversionWorkspace } from './conversion-workspace.mjs?rev=20261128-output-post-draft-1';
 import { saveActionLabel, materialChangeInvalidatesSave, createDeferredFocusGuard } from './conversion-stage.mjs?rev=20261105-video-size-1';
 import { mountPublicNavigation } from '../public-navigation.mjs?rev=20261024-common-tool-start-1';
 
@@ -121,14 +121,19 @@ export function mountSmartConversion(doc = document, win = window) {
     for (const id of originalFilesByMaterialId.keys()) if (!ids.has(id)) originalFilesByMaterialId.delete(id);
   };
   let localRecovery = null, inputCount = 0;
-  const workspace = mountConversionWorkspace(main, toolbar, doc, win);
+  const workspace = mountConversionWorkspace(main, toolbar, doc, win, {
+    beforeReturn: () => localRecovery?.flushForReturn() ?? true,
+    reportReturnFailure: setReturnError,
+  });
   const button = doc.createElement('button'); button.type = 'button'; button.id = 'output-nav-export';
   button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4"/></svg><span>出力</span>';
   const buttonLabel = button.querySelector('span');
   const dock = doc.createElement('div'); dock.className = 'sc-export-status sc-save-bar';
-  dock.innerHTML = '<progress data-sc-progress aria-label="出力作成の進行状況" hidden></progress><div class="sc-save-copy"><span class="sc-export-message" role="status" aria-live="polite" tabindex="0" aria-label="出力の状態" aria-description="長い状態メッセージはここでスクロールできます。"></span></div><div class="sc-save-actions"><button type="button" data-sc-copy hidden>コピー</button><button type="button" data-sc-batch hidden></button><button type="button" data-sc-cancel hidden>中止</button></div>';
+  dock.innerHTML = '<progress data-sc-progress aria-label="出力作成の進行状況" hidden></progress><div class="sc-save-copy"><span class="sc-export-message" role="status" aria-live="polite" tabindex="0" aria-label="出力の状態" aria-description="長い状態メッセージはここでスクロールできます。"></span></div><div class="sc-save-actions"><button type="button" data-sc-post hidden>投稿の下書きへ</button><button type="button" data-sc-copy hidden>コピー</button><button type="button" data-sc-batch hidden></button><button type="button" data-sc-cancel hidden>中止</button></div>';
   dock.querySelector('.sc-save-actions').prepend(button);
   const message = dock.querySelector('.sc-export-message'), cancel = dock.querySelector('[data-sc-cancel]'), batch = dock.querySelector('[data-sc-batch]');
+  const postDraft = dock.querySelector('[data-sc-post]');
+  let preparingDraft = false;
   let nav = null, navObserver = null, frame = 0, revision = 0, lastMode = mode();
   let lastTextGenerationUrl = '', textResultMode = '', textDirty = true, lastMediaUrl = '', mediaDirty = false;
   let lastSaved = null, pendingDimensions = null, resultSurface = null;
@@ -226,6 +231,8 @@ export function mountSmartConversion(doc = document, win = window) {
     writeUnifiedProperty(button, 'disabled', locked || saveIntent.pending || (working && !live));
     setAttr(button, 'aria-busy', String(working));
     const ready = Boolean(link && (live ? live.state === 'ready' : currentMode === 'media' ? !mediaDirty && !sizeDirty && !fpsDirty : !textDirty && textResultMode === currentMode));
+    writeUnifiedProperty(postDraft, 'hidden', !(currentMode === 'media' && ready && /\.(png|webp)$/i.test(link.download)));
+    writeUnifiedProperty(postDraft, 'disabled', locked || working || saveIntent.pending || preparingDraft);
     const nativeProgress = [...main.querySelectorAll('progress:not([data-sc-progress]):not([data-sc-panel-progress])')].find(available);
     const progress = dock.querySelector('progress'); writeUnifiedProperty(progress, 'hidden', !working);
     if (nativeProgress?.hasAttribute('value')) { progress.max = nativeProgress.max; progress.value = nativeProgress.value; } else progress.removeAttribute('value');
@@ -375,6 +382,10 @@ export function mountSmartConversion(doc = document, win = window) {
     } catch { setText(message, 'このブラウザーでは素材欄のファイル選択を使ってください。'); return false; }
   }
 
+  function setReturnError(value) {
+    setSaveError(value);
+    schedule();
+  }
   function changeRoute(next) {
     setSaveError('');
     const focused = doc.activeElement, fromChoices = focused?.closest?.('[data-sc-route-choice]');
@@ -385,6 +396,38 @@ export function mountSmartConversion(doc = document, win = window) {
       else if (focused.isConnected && !focused.disabled) focused.focus({ preventScroll: true });
     }
   }
+  postDraft.addEventListener('click', async () => {
+    const link = result();
+    if (postDraft.hidden || postDraft.disabled || preparingDraft || !link) return;
+    const { href, download: filename } = link;
+    if (new URL(href).origin !== win.location.origin) return;
+    const returnLink = find('[data-conversion-return],#output-return');
+    const originPath = returnLink ? new URL(returnLink.href).pathname : '';
+    const mode = /^\/(?:camera\/|pixel-camera(?:\.html|\/|$))/.test(originPath) ? 'photo' : 'art';
+    preparingDraft = true;
+    setSaveError('投稿の下書きを準備しています…');
+    render();
+    try {
+      const response = await win.fetch(href);
+      if (!response.ok) throw new Error('出力画像を取得できませんでした。');
+      const blob = await response.blob();
+      const [{ inspectPixelImage }, { createFeedDraftStore }] = await Promise.all([
+        import('../globe/post-image.mjs'),
+        import('../social/drafts.mjs?rev=20261128-explore-puzzle-posts-1'),
+      ]);
+      const editorImage = mode === 'photo' || originPath.startsWith('/draw/');
+      const image = await inspectPixelImage(blob, { keepScale: !editorImage });
+      const title = filename.replace(/\.(png|webp)$/i, '').trim().slice(0, 60) || 'ドット絵';
+      const draft = await createFeedDraftStore().archive({ mode, title, image, visibility: 'private' });
+      win.location.assign(`/feed/?view=drafts&draft=${encodeURIComponent(draft.id)}`);
+    } catch (error) {
+      setSaveError(`下書きを作れませんでした。 ${error.message}`);
+    } finally {
+      preparingDraft = false;
+      render();
+    }
+  });
+
   source.addEventListener('change', () => changeRoute(source.value === 'text' ? 'input' : target.value === 'text' ? 'output' : 'media'));
   target.addEventListener('change', () => changeRoute(target.value === 'text' ? 'output' : source.value === 'text' ? 'input' : 'media'));
   format.addEventListener('change', () => {

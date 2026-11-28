@@ -149,8 +149,12 @@ test('Draw rail, editor UI, and direct runtime changes invalidate every parent a
       });
       assert.ok(urls.length, `${owner} references ${target}`);
       assert.ok(revisions[target], `${target} has a release revision`);
+      if (target === 'js/social/app.mjs') {
+        for (const value of urls) assert.equal(new URL(value, `https://local.invalid/${owner}`).searchParams.get('rev'), '20261128-explore-puzzle-posts-1');
+        continue;
+      }
       if (['js/creation/conversion-entry.mjs', 'js/creation/conversion-smart-ui.mjs'].includes(target)) {
-        for (const value of urls) assert.equal(new URL(value, `https://local.invalid/${owner}`).searchParams.get('rev'), '20261128-output-compact-rails-1');
+        for (const value of urls) assert.equal(new URL(value, `https://local.invalid/${owner}`).searchParams.get('rev'), '20261128-output-post-draft-1');
         continue;
       }
       if (creationGuidance.has(target)) assert.equal(revisions[target], drawToolPanelTargets.has(target) ? '20261118-draw-tool-panel-1' : drawButtonLabelTargets.has(target) ? '20261118-draw-button-label-1' : drawDisplayAdTargets.has(target) ? '20261118-draw-display-ad-1' : storeOAuthTargets.has(target) ? '20261117-chat-connect-1' : liveDrawTargets.has(target) ? '20261117-chat-connect-1' : normalApplyTargets.has(target) ? '20261117-normal-apply-1' : drawNormalMapTargets.has(target) ? '20261116-normal-release-2' : canvas1028Targets.has(target) ? '20261113-canvas1028-shared-2' : '20261112-creation-guidance-1', `${target} invalidates the creation guidance dependency closure`);

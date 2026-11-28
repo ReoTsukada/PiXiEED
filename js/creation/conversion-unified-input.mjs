@@ -403,7 +403,7 @@ export function mountUnifiedConversionInput({ main, toolbar, doc = document, win
   let ownsStyle = false;
   if (legacy && root.parentNode === main) main.insertBefore(root, legacy);
   if (!doc.querySelector('link[data-unified-input-style]')) {
-    const sheet = doc.createElement('link'); sheet.rel = 'stylesheet'; sheet.href = '/css/conversion-unified-input.css?rev=20261128-output-compact-rails-1'; sheet.dataset.unifiedInputStyle = ''; doc.head.append(sheet);
+    const sheet = doc.createElement('link'); sheet.rel = 'stylesheet'; sheet.href = '/css/conversion-unified-input.css?rev=20261128-output-post-draft-1'; sheet.dataset.unifiedInputStyle = ''; doc.head.append(sheet);
     ownsStyle = true;
   }
   const composer = doc.createElement('section'); composer.className = 'sc-unified-composer'; composer.setAttribute('aria-label', '出力の種類と素材・設定');

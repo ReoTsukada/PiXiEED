@@ -15,8 +15,8 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <title>みんなの作品・SNS｜PiXiEED</title>
   <link rel="stylesheet" href="/css/social-feed.css?rev=20261024-side-ad-layout-1">
-  <link rel="stylesheet" href="/css/social-explore.css?rev=20261126-work-grid-1">
-  <script type="module" src="/js/social/app.mjs?rev=20261116-normal-release-2"></script>
+  <link rel="stylesheet" href="/css/social-explore.css?rev=20261128-explore-puzzle-posts-1">
+  <script type="module" src="/js/social/app.mjs?rev=20261128-explore-puzzle-posts-1"></script>
 <link rel="stylesheet" href="/css/posting-consent.css?rev=20261022-posting-live-1">
 </head>
 <body data-social-page="explore">
@@ -36,56 +36,37 @@
         <p><strong>ローカルプレビュー</strong><span>投稿の表示・保存状態はこの環境で確認できます</span></p>
       </aside>
 
-      <section class="event-card" aria-labelledby="explore-events-title">
-        <h2 id="explore-events-title">イベントを探す</h2>
-        <a class="event-link" href="/events/"><img src="/assets/icons/pixieed/globe.svg" alt=""><span>開催予定・過去のイベントを見る</span><b aria-hidden="true">↗</b></a>
-        <a class="map-link" href="/globe/?view=events"><img src="/assets/icons/pixieed/globe.svg" alt=""><span>イベントを地図で見る</span><b aria-hidden="true">↗</b></a>
-      </section>
-
-      <section id="works" class="explore-hero" aria-label="PiXiEEDの作品コミュニティ">
-        <div class="explore-hero-copy">
-          <p class="explore-eyebrow">COMMUNITY / PIXIEED</p>
-          <section class="feed-heading" aria-labelledby="pageTitle">
-            <div><h1 id="pageTitle">みんなの作品</h1><p class="feed-lede" id="viewDescription">気になる作品に出会おう。</p></div>
-            <div class="explore-hero-controls">
-              <button class="refresh-button" id="refreshFeed" type="button" aria-label="作品を更新" title="作品を更新" data-action="refresh" disabled data-boot-disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4.5 17a8 8 0 0 0 13.9-2M4 17v-5h5M19.5 7A8 8 0 0 0 5.6 9"></path></svg></button>
-              <button type="button" class="account-transfer-button" aria-label="アカウントに保存・引き継ぐ" title="アカウントに保存・引き継ぐ" id="guestAccountOpen" data-action="guest-account" aria-controls="guestAccountDialog"><img src="/assets/icons/pixieed/profile.svg" alt=""></button>
-            </div>
-          </section>
-          <label class="explore-search"><span class="explore-search-heading">作品・作者を探す</span>
-            <span class="explore-search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.7" cy="10.7" r="6.4"></circle><path d="m15.4 15.4 4.5 4.5"></path></svg><input id="socialSearch" type="search" placeholder="気になる作品や作者…" aria-label="読み込んだ公開作品を検索"></span>
-          </label>
-          <p class="explore-search-note">検索できるのは読み込んだ最新30件です。</p>
-        </div>
-        <div class="explore-hero-art" aria-hidden="true">
-          <div class="explore-art-tile explore-art-tile--one"><span class="explore-art-sun"></span><span class="explore-art-ridge explore-art-ridge--one"></span><span class="explore-art-ridge explore-art-ridge--two"></span></div>
-          <div class="explore-art-tile explore-art-tile--two"><span class="explore-art-heart">♥</span></div>
-          <div class="explore-art-tile explore-art-tile--three"><span class="explore-art-spark">✳</span></div>
-        </div>
-      </section>
-
-      <section class="composer-prompt" aria-label="投稿を作成">
-        <span class="prompt-avatar" aria-hidden="true"><img src="/assets/icons/pixieed/add.svg" alt=""></span>
-        <button class="prompt-open" type="button" data-compose data-type="art" disabled data-boot-disabled>作品を投稿する <span aria-hidden="true">↗</span></button>
-        <button class="prompt-add" type="button" data-compose data-type="photo" aria-label="作品を投稿" disabled data-boot-disabled><img src="/assets/icons/pixieed/camera.svg" alt=""></button>
+      <section id="works" class="explore-timeline-heading" aria-labelledby="pageTitle">
+        <h1 id="pageTitle">みんなの作品</h1>
+        <p id="viewDescription" hidden></p>
+        <button type="button" class="explore-search-toggle" data-action="search" aria-label="作品・作者を検索" aria-controls="exploreSearchPanel" aria-expanded="false" disabled data-boot-disabled><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.7" cy="10.7" r="6.4"></circle><path d="m15.4 15.4 4.5 4.5"></path></svg></button>
       </section>
 
       <nav class="feed-views" id="feedViews" aria-label="作品の表示を切り替え">
         <button type="button" data-action="view" data-view="feed" aria-label="みんなの作品" aria-pressed="true" disabled data-boot-disabled><span aria-hidden="true">✦</span> 作品</button>
+        <button type="button" data-action="filter" data-type="puzzle" aria-pressed="false" disabled data-boot-disabled><span aria-hidden="true">▷</span> パズル</button>
         <button type="button" data-action="view" data-view="saved" aria-label="保存した作品" aria-pressed="false" disabled data-boot-disabled><span aria-hidden="true">♡</span> 保存</button>
-        <button type="button" data-action="view" data-view="local" aria-label="下書き" aria-pressed="false" disabled data-boot-disabled><span aria-hidden="true">▤</span> 下書き</button>
-        <button type="button" id="minePosts" data-action="mine" data-view="mine" aria-label="自分の投稿" aria-pressed="false" disabled data-boot-disabled><span aria-hidden="true">◉</span> 自分</button>
       </nav>
-      <div class="filter-wrap" id="feedFilterWrap">
-        <nav class="feed-filters" id="feedFilters" aria-label="投稿の種類">
-          <button type="button" data-action="filter" data-type="all" aria-pressed="true" disabled data-boot-disabled>すべて</button>
-          <button type="button" data-action="filter" data-type="art" aria-pressed="false" disabled data-boot-disabled>ドット絵</button>
-          <button type="button" data-action="filter" data-type="photo" aria-pressed="false" disabled data-boot-disabled>写真加工</button>
-          <button type="button" data-action="filter" data-type="puzzle" aria-pressed="false" disabled data-boot-disabled>パズル</button>
-          <button type="button" data-action="filter" data-type="text" aria-pressed="false" disabled data-boot-disabled>ことば</button>
-          <button type="button" data-action="filter" data-type="music" aria-pressed="false" disabled data-boot-disabled>音楽</button>
-        </nav>
-      </div>
+      <section id="exploreSearchPanel" class="explore-search-panel" aria-label="検索と絞り込み" hidden>
+        <label class="explore-search"><span class="explore-search-heading">作品・作者を探す</span>
+          <span class="explore-search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.7" cy="10.7" r="6.4"></circle><path d="m15.4 15.4 4.5 4.5"></path></svg><input id="socialSearch" type="search" placeholder="気になる作品や作者…" aria-label="読み込んだ公開作品を検索"></span>
+        </label>
+        <p class="explore-search-note">表示中の作品・作者を検索できます。</p>
+        <div class="filter-wrap" id="feedFilterWrap">
+          <nav class="feed-filters" id="feedFilters" aria-label="投稿の種類">
+            <button type="button" data-action="filter" data-type="all" aria-pressed="true" disabled data-boot-disabled>すべて</button>
+            <button type="button" data-action="filter" data-type="art" aria-pressed="false" disabled data-boot-disabled>ドット絵</button>
+            <button type="button" data-action="filter" data-type="photo" aria-pressed="false" disabled data-boot-disabled>写真加工</button>
+            <button type="button" data-action="filter" data-type="puzzle" aria-pressed="false" disabled data-boot-disabled>パズル</button>
+            <button type="button" data-action="filter" data-type="text" aria-pressed="false" disabled data-boot-disabled>ことば</button>
+            <button type="button" data-action="filter" data-type="music" aria-pressed="false" disabled data-boot-disabled>音楽</button>
+          </nav>
+        </div>
+        <div class="explore-search-actions">
+          <button class="refresh-button" id="refreshFeed" type="button" aria-label="作品を更新" title="作品を更新" data-action="refresh" disabled data-boot-disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4.5 17a8 8 0 0 0 13.9-2M4 17v-5h5M19.5 7A8 8 0 0 0 5.6 9"></path></svg></button>
+          <button type="button" class="account-transfer-button" aria-label="アカウントに保存・引き継ぐ" title="アカウントに保存・引き継ぐ" id="guestAccountOpen" data-action="guest-account" aria-controls="guestAccountDialog"><img src="/assets/icons/pixieed/profile.svg" alt=""></button>
+        </div>
+      </section>
       <div class="mine-controls"><span id="mineStatus" role="status" aria-live="polite"></span></div>
 
       <div class="new-posts-slot" id="newPostsSlot" hidden><button id="newPostsButton" type="button" data-action="show-new-posts" disabled data-boot-disabled><span aria-hidden="true">↑</span> 新しい投稿があります</button></div>
@@ -106,44 +87,7 @@
           <div id="draftAudioList" class="draft-audio-list"><p class="drafts-empty">音声ファイルの一覧は、ここを開いたときに読み込みます。</p></div>
         </details>
       </section>
-      <footer class="feed-footer"><span class="tiny-pixel" aria-hidden="true"></span> つくる人のための、ちいさなタイムライン</footer>
     </main>
-
-    <aside class="right-column" aria-label="作品から次の創作へ">
-      <section class="create-card" aria-labelledby="createTitle">
-        <a class="explore-maker-feature" href="/draw/?workspace=1&amp;social=1">
-          <span class="explore-maker-overline">MAKE YOUR WORLD</span>
-          <strong id="createTitle">あなたも、<br>つくってみる？</strong>
-          <span class="explore-maker-action">ドット絵を描く <span aria-hidden="true">↗</span></span>
-          <span class="explore-maker-pixelart" aria-hidden="true"><i></i><i></i><i></i></span>
-        </a>
-        <details class="explore-tools-more">
-          <summary>ほかの制作ツール <span aria-hidden="true">＋</span></summary>
-          <div class="explore-tools-list">
-            <a class="create-option" href="/camera/?workspace=1&amp;social=1"><span class="create-icon create-icon--photo"><img src="/assets/icons/pixieed/camera.svg" alt=""></span><span><strong>写真をドット絵に</strong><small>ピクセルカメラ</small></span><b aria-hidden="true">↗</b></a>
-            <a class="create-option" href="/audio/?workspace=1&amp;social=1"><span class="create-icon create-icon--music"><img src="/assets/icons/pixieed/music.svg" alt=""></span><span><strong>音楽を作る</strong><small>オーディオスタジオ</small></span><b aria-hidden="true">↗</b></a>
-            <a class="create-option" href="/spot-difference/?social=1"><span class="create-icon create-icon--puzzle"><img src="/assets/icons/pixieed/spot-difference.svg" alt=""></span><span><strong>間違い探し</strong><small>作品を遊びに</small></span><b aria-hidden="true">↗</b></a>
-            <a class="create-option" href="/hidden-object/?social=1"><span class="create-icon create-icon--hidden"><img src="/assets/icons/pixieed/hidden-object.svg" alt=""></span><span><strong>かくし絵を作る</strong><small>ピクセルの中に発見</small></span><b aria-hidden="true">↗</b></a>
-            <a class="create-option" href="/jigsaw/?social=1"><span class="create-icon create-icon--puzzle"><img src="/assets/icons/pixieed/jigsaw.svg" alt=""></span><span><strong>ジグソー</strong><small>自分で遊ぶ・投稿する</small></span><b aria-hidden="true">↗</b></a>
-            <a class="create-option" href="/tools/"><span class="create-icon create-icon--art"><img src="/assets/icons/pixieed/tools.svg" alt=""></span><span><strong>ツールを一覧で探す</strong><small>すべての機能</small></span><b aria-hidden="true">↗</b></a>
-          </div>
-        </details>
-      </section>
-      <section class="event-card" aria-labelledby="eventTitle">
-        <a class="explore-world-feature" href="/globe/">
-          <span class="explore-maker-overline">DISCOVER</span>
-          <strong id="eventTitle">地図で出会う</strong>
-          <span class="explore-world-action">世界の作品へ ↗</span>
-          <span class="explore-world-orb" aria-hidden="true"></span>
-        </a>
-        <details class="explore-tools-more explore-discovery-more">
-          <summary>お店 <span aria-hidden="true">＋</span></summary>
-          <div class="explore-tools-list">
-            <a class="map-link" href="/stores/"><img src="/assets/icons/pixieed/artwork.svg" alt=""><span>お店を探す</span><b aria-hidden="true">↗</b></a>
-          </div>
-        </details>
-      </section>
-    </aside>
 
     <nav class="mobile-nav public-destination-nav" aria-label="ページ切替"><a data-public-nav="home" class="mobile-nav__item" href="/"><img src="/assets/icons/pixieed/home.svg" alt=""><span>ホーム</span></a>
 <a data-public-nav="explore" class="mobile-nav__item is-current" href="/explore/" aria-current="page"><img src="/assets/icons/pixieed/telescope.svg" alt=""><span>探す</span></a>

@@ -276,7 +276,7 @@ test('initializer renders safe text anchors, caps mobile cards, and paints thumb
   assert.equal(canvas.width, 2);
   assert.equal(canvas.height, 1);
   assert.equal(card.children[2].className, 'portal-recent-meta');
-  assert.equal(card.children[2].textContent, '続きを開く');
+  assert.equal(card.children[2].textContent, '端末内');
   listeners.get('pagehide')();
   assert.equal(observers.at(-1).disconnected, true);
   listeners.get('pageshow')();

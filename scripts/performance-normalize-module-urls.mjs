@@ -194,8 +194,11 @@ function normalize(source, file) {
   changed = changed.replace(/(["'`])([^"'`\s<>]+\.(?:mjs|js|css))(\?[^"'`\s<>]*)?\1/g, (whole, quote, path, query = '') => {
     if (!path.startsWith('/') && !path.startsWith('.') || path.startsWith('//')) return whole;
     const target = path.startsWith('/') ? path.slice(1) : posix.normalize(posix.join(posix.dirname(relative(root, file)), path));
-    if (!normalLayerTargets.has(target)) return whole;
-    const next = /[?&]rev=/.test(query) ? query.replace(/([?&])rev=[^&]*/, '$1rev=20261116-normal-release-2') : query + (query ? '&' : '?') + 'rev=20261116-normal-release-2';
+    const exploreCardTargets = ['js/social/app.mjs', 'js/social/drafts.mjs'];
+    if (!normalLayerTargets.has(target) && !exploreCardTargets.includes(target)) return whole;
+    const revision = target === 'js/social/app.mjs' ? '20261128-explore-puzzle-posts-1'
+      : target === 'js/social/drafts.mjs' ? '20261128-explore-puzzle-posts-1' : '20261116-normal-release-2';
+    const next = /[?&]rev=/.test(query) ? query.replace(/([?&])rev=[^&]*/, `$1rev=${revision}`) : query + (query ? '&' : '?') + `rev=${revision}`;
     return `${quote}${path}${next}${quote}`;
   });
   // The 2026-11-17 normal lighting and output handoff update changes this
@@ -287,6 +290,14 @@ function normalize(source, file) {
     const revision = target === 'css/draw-tool-picker.css' ? '20261118-draw-text-contrast-1' : '20261118-draw-tool-panel-1';
     return `${quote}${path}?${query.replace(/(^|&)rev=[^&]*/, `$1rev=${revision}`)}${quote}`;
   });
+  const workShelfTargets = new Set([
+    'css/home-portal.css', 'css/profile-workspace.css',
+    'js/home-portal.mjs', 'js/home-recent-projects.mjs', 'js/profile-work-shelf.mjs',
+  ]);
+  const outputPostDraftTargets = new Set([
+    'css/conversion-unified-input.css', 'js/creation/conversion-entry.mjs', 'js/creation/conversion-smart-ui.mjs',
+    'js/creation/conversion-workspace.mjs', 'js/creation/conversion-recovery-controller.mjs',
+  ]);
   const sourceFirstTargets = new Set([
     'css/conversion-unified-input.css',
     'js/creation/conversion-entry.mjs', 'js/creation/conversion-smart-ui.mjs',
@@ -295,8 +306,10 @@ function normalize(source, file) {
   changed = changed.replace(/(["'`])([^"'`\s<>]+\.(?:mjs|css))\?([^"'`\s<>]*)\1/g, (whole, quote, path, query) => {
     if ((!path.startsWith('/') && !path.startsWith('.')) || path.startsWith('//')) return whole;
     const target = path.startsWith('/') ? path.slice(1) : posix.normalize(posix.join(posix.dirname(relative(root, file)), path));
-    if (!sourceFirstTargets.has(target)) return whole;
-    return `${quote}${path}?${query.replace(/(^|&)rev=[^&]*/, '$1rev=20261128-output-compact-rails-1')}${quote}`;
+    if (target === 'js/social/api.mjs') return `${quote}${path}?${query.replace(/(^|&)rev=[^&]*/, '$1rev=20261128-explore-puzzle-posts-1')}${quote}`;
+    if (!sourceFirstTargets.has(target) && !workShelfTargets.has(target) && !outputPostDraftTargets.has(target)) return whole;
+    const revision = outputPostDraftTargets.has(target) ? '20261128-output-post-draft-1' : workShelfTargets.has(target) ? '20261128-work-shelf-1' : '20261128-output-compact-rails-1';
+    return `${quote}${path}?${query.replace(/(^|&)rev=[^&]*/, `$1rev=${revision}`)}${quote}`;
   });
   return changed;
 }

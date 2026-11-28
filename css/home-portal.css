@@ -126,3 +126,13 @@ footer{flex-wrap:wrap}.footerbrand{white-space:nowrap}
 @media(max-width:359px){.tool-feature h3{font-size:21px}.tool-feature-heading{padding:18px 14px}.tool-preview-card{padding:16px}.tool-preview-steps{justify-content:flex-start;gap:8px 13px;font-size:10px}}
 @media(max-width:760px){.tool-showcase>.section-head{display:block}.tool-showcase>.section-head>a{width:fit-content;margin-top:6px}.tool-showcase>.section-head h2{font-size:23px}}
 @media(max-width:359px){.tool-showcase>.section-head h2{font-size:21px}}
+
+.home-portal [data-home-resume][hidden] { display: none; }
+.home-portal [data-home-resume] { margin: 14px 0 0; }
+.home-portal .portal-actions { margin-bottom: 18px; }
+.home-portal .portal-recent-preview { max-height: none; }
+@media (max-width: 760px) {
+  .home-portal [data-home-resume] .portal-work-shelf { align-items: start; }
+  .home-portal [data-home-resume] .portal-new-project { min-height: 0; aspect-ratio: 1; }
+  .home-portal [data-home-resume] .portal-recent-meta { display: block; }
+}

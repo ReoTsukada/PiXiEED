@@ -32,18 +32,18 @@ test('mobile toolbar allows an intrinsic-width action group and keeps touch targ
 
 test('the output entry refreshes the complete changed module and CSS chain', () => {
   for (const [file, dependencies, revision] of [
-    ['output/work/index.html', ['conversion-entry.mjs'], '20261128-output-compact-rails-1'],
-    ['output/work/index.html', ['conversion-unified-input.css'], '20261128-output-compact-rails-1'],
+    ['output/work/index.html', ['conversion-entry.mjs'], '20261128-output-post-draft-1'],
+    ['output/work/index.html', ['conversion-unified-input.css'], '20261128-output-post-draft-1'],
     ['js/creation/conversion-entry.mjs', ['output-page.mjs'], '20261117-normal-apply-1'],
     ['js/creation/conversion-entry.mjs', ['output-receive.mjs'], '20261117-normal-apply-1'],
     ['js/creation/output-receive.mjs', ['output-page.mjs'], '20261117-normal-apply-1'],
-    ['js/creation/conversion-entry.mjs', ['conversion-smart-ui.mjs'], '20261128-output-compact-rails-1'],
+    ['js/creation/conversion-entry.mjs', ['conversion-smart-ui.mjs'], '20261128-output-post-draft-1'],
     ['js/creation/conversion-entry.mjs', ['text-tools.mjs'], '20261117-normal-apply-1'],
     ['js/creation/conversion-smart-ui.mjs', ['conversion-unified-input.mjs'], '20261128-output-compact-rails-1'],
     ['js/creation/conversion-smart-ui.mjs', ['conversion-result-surface.mjs'], '20261128-output-compact-rails-1'],
     ['js/creation/conversion-smart-ui.mjs', ['conversion-result-surface.mjs'], '20261128-output-compact-rails-1'],
     ['js/creation/conversion-result-surface.mjs', ['conversion-source-preview.css'], '20261110-output-layout-7'],
-    ['js/creation/conversion-unified-input.mjs', ['conversion-unified-input.css'], '20261128-output-compact-rails-1'],
+    ['js/creation/conversion-unified-input.mjs', ['conversion-unified-input.css'], '20261128-output-post-draft-1'],
     ['js/creation/conversion-page.mjs', ['conversion-service.mjs'], '20261117-normal-apply-1'],
     ['js/creation/conversion-page.mjs', ['conversion-timeline.mjs'], '20261117-normal-apply-1'],
     ['js/creation/output-receive.mjs', ['conversion-service.mjs'], '20261117-normal-apply-1'],
@@ -54,7 +54,7 @@ test('the output entry refreshes the complete changed module and CSS chain', () 
     ['js/creation/conversion-media-recovery.mjs', ['conversion-timeline.mjs'], '20261117-normal-apply-1'],
     ['js/creation/conversion-smart-ui.mjs', ['conversion-smart-ui.css'], '20261105-video-size-1'],
     ['js/creation/conversion-smart-ui.mjs', ['conversion-stage.mjs'], '20261105-video-size-1'],
-    ['js/creation/conversion-smart-ui.mjs', ['conversion-workspace.mjs'], '20261128-output-compact-rails-1'],
+    ['js/creation/conversion-smart-ui.mjs', ['conversion-workspace.mjs'], '20261128-output-post-draft-1'],
     ['js/creation/conversion-workspace.mjs', ['conversion-stage.mjs'], '20261105-video-size-1'],
   ]) for (const dependency of dependencies) assert.ok(read(file).includes(`${dependency}?rev=${revision}`), `${file}: ${dependency}`);
 });

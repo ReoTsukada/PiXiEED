@@ -85,3 +85,29 @@ test('missing optional placements retain the already displayed showcase object',
   h.answer('/rest/v1/social_post_map_points',[],404);
   assert.equal((await result)[0],first);
 });
+
+test('puzzle archive joins only published legacy posts to their original image and playable problem', async () => {
+  const spot = `pixfind-sd-${id(11)}`;
+  const wrong = `pixfind-ho-${id(12)}`;
+  const normal = { ...mapRow(1), puzzle_mode: 'jigsaw' };
+  const legacy = { id: id(21), pixfind_puzzle_id: spot, title: '以前の間違い探し', published_at: '2026-02-01T00:00:00Z' };
+  const calls = [];
+  const api = createSocialApi({ config, storage: null, fetchImpl: async value => {
+    const url = new URL(value);
+    calls.push(url);
+    const images = [{ id: spot, mode: 'spot-difference', original_url: `${config.url}/storage/v1/object/public/pixfind-puzzles/puzzles/${spot}/original.png` },
+      { id: wrong, mode: 'hidden-object', original_url: `${config.url}/storage/v1/object/public/pixfind-puzzles/puzzles/${spot}/original.png` }];
+    const rows = url.pathname.endsWith('/pixfind_puzzles') ? images
+      : url.pathname.endsWith('/social_posts') ? [legacy, { ...legacy, id: id(22), pixfind_puzzle_id: wrong }]
+      : [normal];
+    return Response.json(rows);
+  } });
+  const result = await api.listPuzzles();
+  assert.equal(result.nextOffset, null);
+  assert.deepEqual(result.posts.map(post => [post.id, post.href]), [
+    [`map:${id(1)}`, `/jigsaw/?postPuzzle=${id(1)}`],
+    [`pixfind:${id(21)}`, `/play/spot-difference/?puzzle=${spot}`],
+  ]);
+  assert.equal(calls.find(url => url.pathname.endsWith('/social_posts')).searchParams.get('status'), 'eq.published');
+  assert.equal((await api.get(`pixfind:${id(21)}`)).title, legacy.title);
+});

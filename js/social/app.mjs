@@ -1,7 +1,7 @@
 import { createPostingConsentUi } from '../posting-consent-ui.mjs?rev=20261111-output-offerwall-1';
 import { localPuzzlePlayPath, publicPuzzlePlayPath, savePuzzleForSelf, hasUncertainPuzzlePublication } from './puzzle-audience.mjs?rev=20261021-jigsaw-public-1';
-import { createSocialApi } from './api.mjs?rev=20261116-normal-release-2';
-import { createFeedDraftStore } from './drafts.mjs?rev=20261021-jigsaw-public-1';
+import { createSocialApi } from './api.mjs?rev=20261128-explore-puzzle-posts-1';
+import { createFeedDraftStore } from './drafts.mjs?rev=20261128-explore-puzzle-posts-1';
 import { activateOrdinaryDisplayAd, createOrdinaryDisplayAdCard, createOrdinaryAdPageGate, ordinaryAdEligibility } from '../ads/ordinary-ad-placement.mjs?rev=20261024-ordinary-ad-1';
 import { ordinaryAdConfig } from '../../data/ordinary-ad-config.mjs?rev=20261024-ordinary-ad-config-1';
 import { connectOptionalFeedAds, createFeedAdRuntime, createPublicFeedGutterGate, isPublicFeedGutterEligible } from '../ads/ordinary-ad-entry.mjs?rev=20261024-side-ad-layout-2';
@@ -9,6 +9,7 @@ import { toolStartHref } from '../tool-start-routes.mjs?rev=20261110-output-resu
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+const PUZZLE_LABELS = { spot_difference: '間違い探し', hidden_object: 'もの探し', jigsaw: 'ジグソー' };
 const LABELS = { art: 'ドット絵', photo: '写真加工', puzzle: 'パズル', text: 'ことば', music: '音楽' };
 const MODES = new Set(Object.keys(LABELS));
 const FEED_VIEWS = Object.freeze({
@@ -73,6 +74,17 @@ async function sha256Blob(blob) {
 
 function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore(), windowRef = window, documentRef = document, ordinaryAds = {} } = {}) {
   const explorePage = documentRef.body.dataset.socialPage === 'explore';
+  const exploreSearchPanel = $('#exploreSearchPanel', documentRef);
+  const exploreSearchButton = $('[aria-controls="exploreSearchPanel"]', documentRef);
+  let exploreSearchExpanded = false;
+  function showExploreSearch(expanded, view = currentView()) {
+    if (!exploreSearchPanel || !exploreSearchButton) return;
+    exploreSearchExpanded = Boolean(expanded);
+    const open = view === 'feed' && exploreSearchExpanded;
+    exploreSearchPanel.hidden = !open;
+    exploreSearchButton.setAttribute('aria-expanded', String(open));
+  }
+
   const app = $('#socialApp', documentRef), feed = $('#feed', documentRef), status = $('#feedStatus', documentRef);
   const retry = $('#feedRetry', documentRef), composer = $('#composerDialog', documentRef), form = $('#composerForm', documentRef);
   const ordinaryGutterHost = $('#ordinaryFeedGutter', documentRef);
@@ -92,6 +104,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
   const state = { posts: [], minePosts: null, mineMode: false, staged: [], readWarnings: [], mode: 'art', composerPane: 'content', attachment: null, localPuzzle:null, receipt: null, outputId: null, output: null, outputDetached: false, audioRecord: null, audioDetached: false, audioWarning: '', audioGeneration: 0, audioListLoaded: false, activeDraft: null, filter: 'all', query: '', bookmarks: new Set(), liked: new Map(), loading: false, feedFailed: false, busy: false, submitted: false, submissionCleared: false, draftReady: false, archiveSaved: false, pageHidden: false, fileGeneration: 0, detailId: null, lastDetailId: null, detailPane: 'work', detailPaneScroll: new Map(), unsentComments: new Map(), priorFocus: null, priorDraftId: null, composerUrl: null, detailHistory: false, audioUrl: null, detailAudioUrl: null, saveChain: Promise.resolve(), initialized: false, handoffToken: 0, composerGeneration: 0, detailGeneration: 0, pendingCleanup: new Set() };
 
   const pendingLikes = new Set();
+  let favoriteWrites = Promise.resolve();
   const boundSearchInputs = new WeakSet();
   function bindSearch(input) {
     if (!input) return;
@@ -200,12 +213,41 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     try { return new Intl.DateTimeFormat('ja-JP', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(time)); }
     catch { return '日時不明'; }
   }
+  const puzzles = { posts: [], nextOffset: 0, loading: false, error: false };
+  let savedLegacy = [], savedLegacyKey = '';
+  const puzzleView = () => !state.mineMode && state.filter === 'puzzle';
+  const knownPosts = () => [...(state.minePosts || []), ...state.posts, ...puzzles.posts, ...savedLegacy];
   function filteredPosts() {
-    const source = state.filter === 'local' ? [] : state.mineMode && state.minePosts ? state.minePosts : state.posts;
+    const source = puzzleView() ? puzzles.posts : state.filter === 'saved'
+      ? [...new Map([...state.posts, ...puzzles.posts, ...savedLegacy].map(post => [post.id, post])).values()]
+        .sort((a, b) => b.createdAt - a.createdAt || a.id.localeCompare(b.id))
+      : state.filter === 'local' ? [] : state.mineMode && state.minePosts ? state.minePosts : state.posts;
     const term = state.query.toLocaleLowerCase('ja');
     return source.filter((post) => (state.filter === 'all' || state.filter === 'saved' || post.kind === state.filter)
       && (state.filter !== 'saved' || state.bookmarks.has(post.id))
       && (!term || `${post.title} ${post.caption} ${post.author?.name || ''}`.toLocaleLowerCase('ja').includes(term)));
+  }
+  function compactPostText(value, limit) {
+    const normalized = String(value || '').trim().replace(/\s+/g, ' ');
+    const characters = Array.from(normalized);
+    return characters.length > limit ? characters.slice(0, limit - 1).join('') + '…' : normalized;
+  }
+  function postIcon(tag, attrs, kind) {
+    const paths = {
+      heart: 'M20.8 8.6c0 4.4-8.8 9.5-8.8 9.5S3.2 13 3.2 8.6a4.6 4.6 0 0 1 8.8-1.8 4.6 4.6 0 0 1 8.8 1.8Z',
+      map: 'm3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3ZM9 3v15m6-12v15',
+      detail: 'M12 11v5m0-8h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z',
+      play: 'm9 5 11 7-11 7Z',
+    };
+    const label = attrs['aria-label'];
+    const control = node(tag, { ...attrs, title: label, class: `post-icon-control post-icon-control--${kind}` });
+    const svg = documentRef.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('focusable', 'false');
+    const path = documentRef.createElementNS(svg.namespaceURI, 'path');
+    path.setAttribute('d', paths[kind]); svg.append(path); control.append(svg);
+    return control;
   }
   function renderPost(post) {
     const card = node('article', { class: 'post-card', 'data-post-id': post.id });
@@ -215,11 +257,16 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     const profile = node('strong', {}, post.author?.name || '作者情報なし');
     byline.append(profile, node('small', {}, formatDate(post.createdAt)));
     header.append(byline);
-    if (post.mapHref) header.append(node('a', { class: 'post-more', href: post.mapHref, 'aria-label': '地図で作品を見る' }, '↗'));
+    if (explorePage) {
+      const saved = state.bookmarks.has(post.id) || state.liked.get(post.id) === true;
+      header.append(postIcon('button', { type: 'button', 'data-action': 'favorite', 'aria-label': saved ? 'いいね・保存を取り消す' : 'いいね・保存', 'aria-pressed': String(saved), disabled: pendingLikes.has(post.id) }, 'heart'));
+    }
+    if (!explorePage && post.mapHref) header.append(node('a', { class: 'post-more', href: post.mapHref, 'aria-label': '地図で作品を見る' }, '↗'));
     card.append(header);
     const open = node('button', { class: `post-media post-media--${post.kind}`, type: 'button', 'data-action': 'detail', 'aria-label': `${post.title}の詳細を開く` });
     open.style.position = 'relative';
-    if (post.image?.width && post.image?.height) open.style.aspectRatio = `${post.image.width} / ${post.image.height}`;
+    if (explorePage) open.style.aspectRatio = '4 / 3';
+    else if (post.image?.width && post.image?.height) open.style.aspectRatio = `${post.image.width} / ${post.image.height}`;
     else if (post.image?.src || post.kind === 'puzzle') open.style.aspectRatio = '4 / 3';
     else open.style.aspectRatio = 'auto';
     open.style.border = '0'; open.style.padding = '0'; open.style.background = '#e8ede8'; open.style.cursor = 'pointer';
@@ -235,10 +282,22 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
       open.append(music);
     } else if (post.kind === 'text') {
       const copy = node('span', { class: 'post-text-preview' });
-      copy.append(node('strong', {}, post.title), ...(post.caption ? [node('span', {}, post.caption)] : [])); open.append(copy);
+      if (explorePage) copy.append(node('span', {}, compactPostText(post.caption || post.title, 64)));
+      else copy.append(node('strong', {}, post.title), ...(post.caption ? [node('span', {}, post.caption)] : []));
+      open.append(copy);
     } else if (post.kind === 'puzzle') open.append(node('span', { class: 'post-text-preview', 'aria-hidden': 'true' }, 'パズル'));
-    const badge = node('span', { class: 'post-type-badge' }, LABELS[post.kind] || '作品'); open.append(badge);
+    const badge = node('span', { class: 'post-type-badge' }, PUZZLE_LABELS[post.puzzleMode] || LABELS[post.kind] || '作品'); open.append(badge);
     card.append(open);
+    if (explorePage) {
+      card.append(node('h2', { class: 'post-copy post-compact-title', title: post.title }, compactPostText(post.title, 36)),
+        node('p', { class: 'post-copy post-compact-caption' }, compactPostText(post.caption, 48)));
+      const controls = node('div', { class: 'post-compact-controls', 'aria-label': '作品の操作' });
+      if (post.mapHref) controls.append(postIcon('a', { href: post.mapHref, 'aria-label': '地図で作品を見る' }, 'map'));
+      if (post.kind === 'puzzle') controls.append(postIcon('a', { href: post.href, 'aria-label': 'パズルで遊ぶ' }, 'play'));
+      controls.append(postIcon('button', { type: 'button', 'data-action': 'detail', 'aria-label': '詳細を開く' }, 'detail'));
+      card.append(controls);
+      return card;
+    }
     if (post.kind !== 'text') card.append(node('h2', { class: 'post-copy' }, post.title));
     if (post.caption && post.kind !== 'text') card.append(node('p', { class: 'post-copy' }, post.caption));
     const actions = node('div', { class: 'post-actions' });
@@ -513,9 +572,25 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
       deactivateFeedAds(); renderDrafts(); feed.replaceChildren(); feed.setAttribute('aria-busy', 'false'); retry.hidden = true;
       updateReadWarningDetails(false); statusText('下書きはこの端末に保存されています。'); return;
     }
+    const showingPuzzles = puzzleView();
+    if (state.filter === 'saved') {
+      const refs = [...state.bookmarks].filter(ref => ref.startsWith('pixfind:')).sort();
+      const key = refs.join(',');
+      if (key !== savedLegacyKey) {
+        savedLegacyKey = key;
+        void api.savedLegacyPuzzles(refs).then(posts => {
+          if (key !== savedLegacyKey) return;
+          savedLegacy = posts;
+          if (state.filter === 'saved') render({ preserveAnchor: true });
+        }).catch(() => {
+          if (key === savedLegacyKey && state.filter === 'saved') toast('保存したパズルを読み込めませんでした。');
+        });
+      }
+    }
+    if (showingPuzzles && puzzles.nextOffset === 0 && !puzzles.loading && !puzzles.error) void loadPuzzles();
     const posts = filteredPosts();
-    const pending = state.loading || (!state.initialized && !state.feedFailed);
-    const showReadWarnings = state.filter !== 'saved';
+    const pending = showingPuzzles ? puzzles.loading : state.loading || (!state.initialized && !state.feedFailed);
+    const showReadWarnings = state.filter !== 'saved' && !showingPuzzles;
     const eligible = !state.mineMode && state.filter === 'all' && !state.query;
     const feedAdEligible = ordinaryAdEligibility(feedAdContext(posts, eligible));
     const flow = planFeedFlow(posts, {
@@ -529,9 +604,16 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     reconcileFeed(flow.map(renderFlowEntry).filter(Boolean));
     activateFeedAds(posts, eligible);
     feed.setAttribute('aria-busy', String(pending));
-    if (!posts.length && !pending) feed.append(renderEmptyState());
+    if (!posts.length && !pending && !(showingPuzzles && puzzles.error)) feed.append(renderEmptyState());
+    if (showingPuzzles && !pending && (puzzles.error || puzzles.nextOffset !== null)) {
+      feed.append(node('button', { class: 'feed-empty-action', type: 'button', 'data-action': 'more-puzzles' },
+        puzzles.error ? 'パズルの読み込みを再試行' : '以前のパズルをもっと見る'));
+    }
     updateFeedGutter(posts, eligible);
-    if (pending) {
+    if (showingPuzzles) {
+      statusText(puzzles.error ? 'パズルを読み込めませんでした。再試行できます。'
+        : pending ? '公開パズルを読み込んでいます…' : `${posts.length}件のパズルを表示中`);
+    } else if (pending) {
       statusText(posts.length ? `${posts.length}件を表示中。残りの公開作品を読み込んでいます…` : '公開作品を読み込んでいます…');
     } else if (showReadWarnings && state.readWarnings.length) {
       const range = posts.length ? `${posts.length}件を表示中。` : '取得できた範囲: 0件。';
@@ -577,10 +659,12 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     list.replaceChildren(...state.readWarnings.map((warning) => node('li', {}, warning)));
   }
   function updateFilters() {
-    $$('#feedFilters [data-action="filter"]', app).forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.type === state.filter && !state.mineMode)));
+    $$('#feedFilters [data-action="filter"], #feedViews [data-action="filter"]', app).forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.type === state.filter && !state.mineMode)));
     const mine = $('#minePosts', documentRef); if (mine) mine.setAttribute('aria-pressed', String(state.mineMode));
     const view = state.mineMode ? 'mine' : state.filter === 'local' ? 'local' : state.filter === 'saved' ? 'saved' : 'feed';
     const [title, description] = FEED_VIEWS[view];
+    showExploreSearch(exploreSearchExpanded, view);
+    if (exploreSearchButton) exploreSearchButton.toggleAttribute('data-filtered', view === 'feed' && (Boolean(state.query) || state.filter !== 'all'));
     if (explorePage) documentRef.body.dataset.exploreView = view;
     $('#pageTitle', documentRef).textContent = explorePage && view === 'feed' ? 'みんなの作品' : title;
     $('#viewDescription', documentRef).textContent = explorePage && view === 'feed' ? '気になる作品に出会おう。' : description;
@@ -592,7 +676,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     }
     for (const button of $$('.rail-link[data-action="saved"]', app)) button.setAttribute('aria-pressed', String(view === 'saved'));
     // Page destinations stay selected independently of local saved/draft tabs.
-    $$('#feedViews [data-action="view"]', app).forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.view === view)));
+    $$('#feedViews [data-action="view"]', app).forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.view === view && !puzzleView())));
     const filters = $('#feedFilterWrap', documentRef); if (filters) filters.hidden = view !== 'feed';
     const filterSummary = filters?.querySelector('summary');
     if (filterSummary) filterSummary.textContent = `種類: ${LABELS[state.filter] || 'すべて'} ▾`;
@@ -608,7 +692,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
       }
       const rows = items.map((draft) => {
         const row = node('article', { class: 'draft-row' });
-        const open = node('button', { type: 'button', 'data-action': 'open-draft', 'data-draft-id': draft.id }, `${LABELS[draft.mode] || '下書き'} · ${draft.title || 'タイトル未設定'} · ${formatDate(draft.savedAt)}`);
+        const open = node('button', { type: 'button', 'data-action': 'open-draft', 'data-draft-id': draft.id }, `${draft.title || 'タイトル未設定'} · 投稿の下書き · 端末内 · ${formatDate(draft.savedAt)}`);
         const remove = node('button', { type: 'button', 'data-action': 'remove-draft', 'data-draft-id': draft.id, 'aria-label': '下書きを削除' }, '削除');
         const menu = node('details', { class: 'draft-row-actions' }); menu.append(node('summary', { 'aria-label': `${draft.title || 'この下書き'}の操作` }, '操作'), remove);
         row.append(open, menu); return row;
@@ -617,6 +701,25 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
       if (focusedId) (draftsHost.querySelector(`[data-draft-id="${CSS.escape(focusedId)}"]`) || draftsHost.querySelector('[data-action="open-draft"]'))?.focus({ preventScroll: true });
     }).catch((error) => draftsHost.replaceChildren(node('p', { class: 'drafts-empty' }, `下書きを読み込めませんでした。${niceError(error, '')}`)));
   }
+  async function loadPuzzles({ reset = false } = {}) {
+    if (puzzles.loading || (!reset && puzzles.nextOffset === null)) return;
+    puzzles.loading = true;
+    puzzles.error = false;
+    if (reset) render({ preserveAnchor: true });
+    try {
+      const page = await api.listPuzzles({ offset: reset ? 0 : puzzles.nextOffset });
+      const posts = new Map((reset ? [] : puzzles.posts).map(post => [post.id, post]));
+      for (const post of page.posts) posts.set(post.id, post);
+      puzzles.posts = [...posts.values()].sort((a, b) => b.createdAt - a.createdAt || a.id.localeCompare(b.id));
+      puzzles.nextOffset = page.nextOffset;
+    } catch {
+      puzzles.error = true;
+    } finally {
+      puzzles.loading = false;
+      if (!state.pageHidden && (puzzleView() || state.filter === 'saved')) render({ preserveAnchor: true });
+    }
+  }
+
   async function refresh({ initial = false } = {}) {
     if (state.loading) return;
     state.loading = true; state.feedFailed = false; retry.hidden = true; state.readWarnings = [];
@@ -624,7 +727,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     updateReadWarningDetails(state.filter !== 'saved' && state.filter !== 'local');
     if (initial) { feed.setAttribute('aria-busy', 'true'); statusText('公開作品を読み込んでいます…'); }
     try {
-      const latest = await api.list({ limit: 30, onUpdate: (!state.initialized || initial) ? (posts) => {
+      const latest = await api.list({ limit: 30, includeLegacyPuzzles: explorePage, onUpdate: (!state.initialized || initial) ? (posts) => {
         if (state.pageHidden) return;
         state.posts = posts;
         render({ preserveAnchor: true });
@@ -646,7 +749,8 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
       state.feedFailed = true;
       deactivateFeedAds();
       feed.setAttribute('aria-busy', 'false');
-      if (state.filter === 'local') statusText('下書きはこの端末に保存されています。');
+      if (puzzleView()) render({ preserveAnchor: true });
+      else if (state.filter === 'local') statusText('下書きはこの端末に保存されています。');
       else if (state.filter === 'saved') statusText('保存した作品はこの端末で管理されます。');
       else { statusText(`作品を読み込めませんでした。${niceError(error, '接続を確認して再試行してください。')}`); retry.hidden = false; }
       updateReadWarningDetails(state.filter !== 'saved' && state.filter !== 'local');
@@ -1021,8 +1125,8 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     activeEditConsent?.destroy(); activeEditConsent = null;
     const work = [], info = [];
     const title = node('h3', {}, post.title);
-    const visibility = post.source === 'sns' ? ` · ${post.visibility === 'private' ? '非公開' : 'サーバー公開'}` : '';
-    const author = node('p', {}, `${post.author?.name || '作者情報なし'} · ${formatDate(post.createdAt)}${visibility}`);
+    const visibility = post.visibility === 'private' ? '非公開' : '公開済み';
+    const author = node('p', {}, `${post.author?.name || '作者情報なし'} · ${formatDate(post.createdAt)} · ${visibility}`);
     work.push(title); info.push(author);
     if (post.image?.src) {
       const image = node('img', { src: post.image.src, alt: post.title, loading: 'lazy' });
@@ -1060,7 +1164,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     const reason = node('select', { name: 'reason', 'aria-label': '通報理由' });
     for (const [value, label] of [['spam', 'スパム'], ['copyright', '著作権'], ['harmful', '有害な内容'], ['other', 'その他']]) reason.append(node('option', { value }, label));
     const disclosure = node('details'); disclosure.append(node('summary', {}, 'この投稿を通報'), node('label', { class: 'composer-label' }, '理由'), reason, node('label', { class: 'composer-label' }, '補足'), node('textarea', { name: 'details', 'aria-label': '通報の補足', maxlength: '500', rows: '2', placeholder: '任意・500文字まで' }), node('button', { type: 'submit', class: 'detail-action' }, '通報を送信'), node('p', { class: 'report-status', 'data-report-status': 'true', role: 'status', 'aria-live': 'polite' }));
-    report.append(disclosure); report.dataset.reportTarget = post.id; info.push(report);
+    report.append(disclosure); report.dataset.reportTarget = post.id; if (post.source !== 'pixfind') info.push(report);
     detailBody.replaceChildren(workPane, infoPane); applyDetailPane();
   }
   function applyDetailPane() {
@@ -1080,9 +1184,15 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
       windowRef.requestAnimationFrame(() => { if (detail.open && !wide) detailBody.scrollTop = scrollTop; });
     }
   }
+  let detailOrigin = null;
   async function openDetail(id, { push = true, fromHistory = false } = {}) {
     const generation = ++state.detailGeneration;
-    let post = (state.minePosts || []).find((item) => item.id === id) || state.posts.find((item) => item.id === id);
+    const origin = documentRef.activeElement;
+    const card = origin?.closest?.('[data-post-id]');
+    if (push || !detailOrigin) detailOrigin = {
+      id, action: origin?.dataset?.action, top: card?.getBoundingClientRect().top, scroll: windowRef.scrollY,
+    };
+    let post = knownPosts().find((item) => item.id === id);
     if (!post || post.source === 'sns' && post.owned !== true) {
       try { const serverPost = await api.get(id, { authenticated: true }); if (serverPost) post = serverPost; }
       catch (error) { if (!post) { if (generation === state.detailGeneration) toast(`作品を読み込めませんでした。${niceError(error, '')}`); return; } }
@@ -1111,7 +1221,19 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     if (detail.open) detail.close();
     if (!fromPop && state.detailHistory && windowRef.history.state?.socialDetail) windowRef.history.back();
     else if (!fromPop) { const url = new URL(windowRef.location.href); url.searchParams.delete('post'); windowRef.history.replaceState(windowRef.history.state || {}, '', url); }
-    state.detailHistory = false; state.priorFocus?.focus?.({ preventScroll: true });
+    state.detailHistory = false;
+    const origin = detailOrigin;
+    if (!origin) return;
+    const restore = () => {
+      if (detail.open || detailOrigin !== origin) return;
+      const card = feed.querySelector(`[data-post-id="${CSS.escape(origin.id)}"]`);
+      const control = origin.action && card?.querySelector(`[data-action="${CSS.escape(origin.action)}"]`);
+      (control || state.priorFocus)?.focus?.({ preventScroll: true });
+      const top = card && Number.isFinite(origin.top)
+        ? windowRef.scrollY + card.getBoundingClientRect().top - origin.top : origin.scroll;
+      windowRef.scrollTo({ top, behavior: 'instant' });
+    };
+    windowRef.requestAnimationFrame(restore);
   }
   async function submitDetailForm(event) {
     const form = event.target.closest?.('form[data-action]'), action = form?.dataset.action;
@@ -1197,6 +1319,9 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
       return;
     }
     if (name === 'view') {
+      if (action.dataset.view === 'feed' && explorePage && viewPositions.get('feed')?.filter === 'puzzle') {
+        viewPositions.set('feed', { ...viewPositions.get('feed'), filter: 'all' });
+      }
       void navigateView(action.dataset.view); return;
     }
     if (name === 'clear-search') {
@@ -1205,14 +1330,30 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
       windowRef.history.replaceState(windowRef.history.state || {}, '', url);
       render(); search.focus({ preventScroll: true }); return;
     }
-    if (name === 'filter') { state.mineMode = false; state.filter = action.dataset.type || 'all'; render(); void savePreferences({ filter: state.filter }); return; }
+    if (name === 'filter') {
+      if (action.closest('#feedViews') && currentView() !== 'feed') await navigateView('feed', { restore: false });
+      state.mineMode = false; state.filter = action.dataset.type || 'all';
+      render(); void savePreferences({ filter: state.filter }); return;
+    }
     if (name === 'mine') {
       action.disabled = true;
       try { await navigateView('mine'); } finally { action.disabled = false; } return;
     }
-    if (name === 'refresh' || name === 'retry') { void refresh({ initial: state.posts.length === 0 }); return; }
+    if (name === 'more-puzzles') { void loadPuzzles(); render({ preserveAnchor: true }); return; }
+    if (name === 'refresh' || name === 'retry') {
+      if (puzzleView()) void loadPuzzles({ reset: true });
+      else void refresh({ initial: state.posts.length === 0 });
+      return;
+    }
     if (name === 'show-new-posts') { acceptNewPosts(); return; }
-    if (name === 'search') { if (currentView() !== 'feed') await navigateView('feed'); $('#feedFilterWrap details', documentRef)?.setAttribute('open', ''); ensureSearch().focus(); return; }
+    if (name === 'search') {
+      if (exploreSearchPanel && currentView() === 'feed' && !exploreSearchPanel.hidden) { showExploreSearch(false); return; }
+      if (currentView() !== 'feed') await navigateView('feed');
+      showExploreSearch(true);
+      $('#feedFilterWrap details', documentRef)?.setAttribute('open', '');
+      ensureSearch().focus();
+      return;
+    }
     if (name === 'saved') { void navigateView('saved'); return; }
     if (name === 'open-draft') { state.priorDraftId = action.dataset.draftId; const draft = await drafts.get(action.dataset.draftId); if (draft) void openComposer(draft.mode, { draft }); return; }
     if (name === 'remove-draft') { if (!windowRef.confirm('この端末の下書きを削除しますか？\nキャンセルすると内容を残します。')) return; try { await drafts.remove(action.dataset.draftId); renderDrafts(); if (state.audioListLoaded) void refreshAudioList(); toast('下書きを削除しました。'); } catch (error) { toast(`下書きを削除できませんでした。${niceError(error, '')}`); } return; }
@@ -1237,6 +1378,43 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
       return;
     }
     if (name === 'tools') { deactivateFeedAds(); tools?.showModal(); return; }
+    if (name === 'favorite' && explorePage) {
+      const id = action.closest('[data-post-id]')?.dataset.postId;
+      const post = knownPosts().find(item => item.id === id);
+      if (!post || pendingLikes.has(id)) return;
+      pendingLikes.add(id);
+      action.disabled = true;
+      const save = !state.bookmarks.has(id) && state.liked.get(id) !== true;
+      const write = favoriteWrites.then(async () => {
+        const bookmarks = new Set(state.bookmarks);
+        if (save) bookmarks.add(id); else bookmarks.delete(id);
+        if (bookmarks.size > 200) throw new Error('保存できる作品は200件までです。');
+        await drafts.savePreferences({ bookmarks: [...bookmarks] });
+        state.bookmarks = bookmarks;
+      });
+      favoriteWrites = write.catch(() => {});
+      try {
+        await write;
+        if (post.likeable) {
+          try {
+            await api.setLike(id, save);
+            state.liked.set(id, save);
+          } catch (error) {
+            state.liked.delete(id);
+            toast(`この端末の保存を更新しました。公開のいいねを更新できませんでした。${niceError(error, '')}`);
+            return;
+          }
+        }
+        toast(save ? '保存した作品に追加しました。' : '保存した作品から外しました。');
+      } catch (error) {
+        toast(`保存作品を更新できませんでした。${niceError(error, '')}`);
+      } finally {
+        pendingLikes.delete(id);
+        action.disabled = false;
+        render();
+      }
+      return;
+    }
     if (name === 'like') {
       const id = action.closest('[data-post-id]')?.dataset.postId;
       if (!id || pendingLikes.has(id)) return;
@@ -1438,14 +1616,24 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     state.query = initialQuery;
     windowRef.history.replaceState(windowRef.history.state || {}, '', feedViewUrl(windowRef.location.href, currentView(), state.query));
     const search = ensureSearch();
-    if (state.query) search.focus({ preventScroll: true });
+    if (state.query) { showExploreSearch(true); search.focus({ preventScroll: true }); }
     const postRef = params.get('post'), outputRef = params.get('output'), compose = params.get('compose');
+    const draftRef = params.get('draft');
     if (outputRef) {
       await openComposer('music');
       if (state.audioRecord?.sourceOutputId === outputRef && !state.audioRecord.needsPersist) cleanOutputReference(outputRef);
       else await loadOutput(outputRef);
     }
     else if (compose && ['draw', 'pixel-camera', 'spot-difference', 'hidden-object', 'jigsaw'].includes(compose)) { await openComposer(compose === 'draw' ? 'art' : compose === 'pixel-camera' ? 'photo' : 'puzzle'); void adopt(compose); }
+    else if (initialView === 'local' && draftRef) {
+      const url = new URL(windowRef.location.href);
+      url.searchParams.delete('draft');
+      windowRef.history.replaceState(windowRef.history.state || {}, '', url);
+      const draft = await drafts.get(draftRef).catch(() => null);
+      if (draft) { state.priorDraftId = draft.id; await openComposer(draft.mode, { draft }); }
+      else announce('この端末に下書きが見つかりません。');
+    }
+    else if (compose === 'new') await openComposer('art');
     else if (active && compose === 'resume') await openComposer(active.mode, { draft: active });
     void refresh({ initial: true });
     if (postRef) void openDetail(postRef, { push: false });

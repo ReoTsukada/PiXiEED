@@ -1,3 +1,4 @@
+import { isLegacyPuzzleShareId, legacyPuzzleImageUrl } from '../creation/puzzle-share-identity.mjs?rev=20261004-legacy-puzzle-share-1';
 import { assertPublicPuzzleIntent } from './puzzle-audience.mjs?rev=20261021-jigsaw-public-1';
 import { supabaseConfig } from '../../data/site-config.js?rev=20261004-puzzle-share-1';
 
@@ -304,6 +305,67 @@ export function createSocialApi({ config = supabaseConfig, fetchImpl = globalThi
     return fetchRows({ url, select: 'post_id,title,caption,public_image_path,published_at,globe_cell_id,map_space', optional: OPTIONAL_MAP_COLUMNS, fetchImpl, key: cfg.key, signal, timeoutMs });
   }
 
+  async function readLegacyPuzzles({ limit = 30, offset = 0, id, postIds, signal } = {}) {
+    const cfg = project(config);
+    const url = tableUrl(cfg.origin, 'social_posts');
+    url.searchParams.set('status', 'eq.published');
+    url.searchParams.set('post_kind', 'eq.pixfind');
+    url.searchParams.set('distribution_mode', 'eq.pixfind');
+    url.searchParams.set('published_at', 'not.is.null');
+    url.searchParams.set('order', 'published_at.desc,id.desc');
+    url.searchParams.set('limit', String(id ? 1 : limit + 1));
+    if (id) url.searchParams.set('id', `eq.${id}`);
+    else if (postIds) url.searchParams.set('id', `in.(${postIds.join(',')})`);
+    else url.searchParams.set('offset', String(offset));
+    const rows = await fetchRows({ url, select: 'id,title,caption,creator_display_name,published_at,pixfind_puzzle_id', fetchImpl, key: cfg.key, signal, timeoutMs });
+    const legacyMode = (value) => isLegacyPuzzleShareId('hidden_object', value) ? 'hidden_object'
+      : isLegacyPuzzleShareId('spot_difference', value) ? 'spot_difference' : null;
+    const ids = [...new Set(rows.map(row => row.pixfind_puzzle_id).filter(legacyMode))];
+    if (!ids.length) return { posts: [], count: rows.length };
+    const puzzlesUrl = tableUrl(cfg.origin, 'pixfind_puzzles');
+    puzzlesUrl.searchParams.set('id', `in.(${ids.join(',')})`);
+    const puzzles = await fetchRows({ url: puzzlesUrl, select: 'id,mode,game_mode,play_mode,original_url,author_name', fetchImpl, key: cfg.key, signal, timeoutMs });
+    const byId = new Map(puzzles.map(row => [row.id, row]));
+    return { count: rows.length, posts: rows.slice(0, limit).flatMap((row) => {
+      const postId = uuid(row.id);
+      const puzzle = byId.get(row.pixfind_puzzle_id);
+      const puzzleMode = legacyMode(puzzle?.id);
+      const game = puzzleMode?.replace('_', '-');
+      const title = cleanText(row.title, { max: 60, required: true });
+      const createdAt = dateValue(row.published_at);
+      const src = legacyPuzzleImageUrl(puzzle?.original_url, { puzzleId: puzzle?.id, supabaseUrl: cfg.origin });
+      if (!postId || !puzzleMode || !title || !createdAt || !src
+        || [puzzle.mode, puzzle.game_mode, puzzle.play_mode].some(mode => mode && mode !== game && mode !== puzzleMode)) return [];
+      return [Object.freeze({
+        id: `pixfind:${postId}`, postId, source: 'pixfind', kind: 'puzzle', puzzleMode, title,
+        caption: cleanText(row.caption, { max: 180 }) || '',
+        author: Object.freeze({ name: cleanText(row.creator_display_name || puzzle.author_name, { max: 40 }) || '' }),
+        createdAt, image: Object.freeze({ src }), href: `/play/${game}/?puzzle=${encodeURIComponent(puzzle.id)}`,
+        mapHref: null, likeable: false,
+      })];
+    }) };
+  }
+
+  async function listPuzzles({ offset = 0, signal } = {}) {
+    const cfg = project(config);
+    const limit = 30;
+    const url = tableUrl(cfg.origin, cfg.table);
+    url.searchParams.set('map_space', 'eq.globe');
+    url.searchParams.set('published_at', 'not.is.null');
+    url.searchParams.set('puzzle_mode', 'in.(spot_difference,hidden_object,jigsaw)');
+    url.searchParams.set('order', 'published_at.desc,post_id.desc');
+    url.searchParams.set('offset', String(offset));
+    url.searchParams.set('limit', String(limit + 1));
+    const [rows, legacy] = await Promise.all([fetchRows({
+      url, select: 'post_id,title,caption,public_image_path,published_at,globe_cell_id,map_space,puzzle_mode',
+      optional: ['post_kind', 'author_name'], fetchImpl, key: cfg.key, signal, timeoutMs,
+    }), readLegacyPuzzles({ limit, offset, signal })]);
+    return {
+      posts: [...rows.slice(0, limit).map(row => mapPost(row, cfg)).filter(post => post?.kind === 'puzzle'), ...legacy.posts],
+      nextOffset: rows.length > limit || legacy.count > limit ? offset + limit : null,
+    };
+  }
+
   async function readShowcases({ limit, id, signal, onPosts }) {
     const cfg = project(config);
     const postsUrl = tableUrl(cfg.origin, 'social_posts');
@@ -350,13 +412,13 @@ export function createSocialApi({ config = supabaseConfig, fetchImpl = globalThi
     };
   }
 
-  async function list({ signal, limit = 30, before, onUpdate } = {}) {
+  async function list({ signal, limit = 30, before, onUpdate, includeLegacyPuzzles = false } = {}) {
     const cfg = project(config);
     const bounded = boundedLimit(limit);
-    let mapPosts = [], showcasePosts = [], snsPosts = [];
+    let mapPosts = [], showcasePosts = [], snsPosts = [], legacyPosts = [];
     const snapshot = () => {
       const merged = new Map();
-      for (const post of [...mapPosts, ...showcasePosts, ...snsPosts]) merged.set(post.id, post);
+      for (const post of [...mapPosts, ...showcasePosts, ...snsPosts, ...legacyPosts]) merged.set(post.id, post);
       return [...merged.values()].sort((a, b) => b.createdAt - a.createdAt || a.id.localeCompare(b.id)).slice(0, bounded);
     };
     const publish = () => {
@@ -368,7 +430,7 @@ export function createSocialApi({ config = supabaseConfig, fetchImpl = globalThi
     };
     // These are independent public reads. In particular, a slow/missing placement
     // table must not delay starting the text/music request or rendering other posts.
-    const [mapResult, showcaseResult, snsResult] = await Promise.allSettled([
+    const [mapResult, showcaseResult, snsResult, legacyResult] = await Promise.allSettled([
       readMap({ limit: bounded, signal }).then(rows => {
         mapPosts = rows.map(row => mapPost(row, cfg)).filter(Boolean); publish(); return rows;
       }),
@@ -378,7 +440,10 @@ export function createSocialApi({ config = supabaseConfig, fetchImpl = globalThi
       readSns('list', { limit: bounded, ...(before ? { before } : {}) }, signal).then(result => {
         if (Array.isArray(result?.posts)) { snsPosts = result.posts.map(row => mapSnsPost(row, cfg.origin)).filter(Boolean); publish(); }
         return result;
-      })
+      }),
+      includeLegacyPuzzles ? readLegacyPuzzles({ limit: bounded, signal }).then(result => {
+        legacyPosts = result.posts; publish();
+      }) : null,
     ]);
     const failureWarning = (label, error) => error?.code === 'timeout'
       ? `${label}の読み込みが時間切れになりました。再試行できます。`
@@ -386,6 +451,7 @@ export function createSocialApi({ config = supabaseConfig, fetchImpl = globalThi
     const failures = [];
     if (mapResult.status === 'rejected') failures.push(failureWarning('地図の投稿', mapResult.reason));
     if (showcaseResult.status === 'rejected') failures.push(failureWarning('ショーケース', showcaseResult.reason));
+    if (legacyResult.status === 'rejected') failures.push(failureWarning('以前のパズル投稿', legacyResult.reason));
     let snsFailure = null;
     if (snsResult.status === 'fulfilled') {
       const rows = snsResult.value?.posts;
@@ -402,7 +468,7 @@ export function createSocialApi({ config = supabaseConfig, fetchImpl = globalThi
       readWarnings = [];
       throw new SocialApiError('aborted', '投稿一覧の読み込みを中止しました。');
     }
-    if (mapResult.status === 'rejected' && showcaseResult.status === 'rejected' && snsResult.status === 'rejected') {
+    if (mapResult.status === 'rejected' && showcaseResult.status === 'rejected' && snsResult.status === 'rejected' && !legacyPosts.length) {
       readWarnings = [...failures];
       if (mapResult.reason?.code === 'timeout') throw mapResult.reason;
       if (showcaseResult.reason?.code === 'timeout') throw showcaseResult.reason;
@@ -414,6 +480,8 @@ export function createSocialApi({ config = supabaseConfig, fetchImpl = globalThi
   }
 
   async function get(value, { signal, authenticated = false } = {}) {
+    const legacyId = typeof value === 'string' && value.startsWith('pixfind:') ? uuid(value.slice(8)) : '';
+    if (legacyId) return (await readLegacyPuzzles({ id: legacyId, limit: 1, signal })).posts[0] || null;
     const ref = parseReference(value);
     if (!ref && typeof value === 'string') {
       const sns = /^sns:([0-9a-f-]{36})$/i.exec(value);
@@ -455,6 +523,16 @@ export function createSocialApi({ config = supabaseConfig, fetchImpl = globalThi
 
   return Object.freeze({
     list,
+    listPuzzles,
+    async savedLegacyPuzzles(refs) {
+      const ids = [...new Set(refs.filter(ref => ref.startsWith('pixfind:')).map(ref => uuid(ref.slice(8))).filter(Boolean))];
+      const requests = [];
+      for (let index = 0; index < ids.length; index += 30) {
+        const postIds = ids.slice(index, index + 30);
+        requests.push(readLegacyPuzzles({ postIds, limit: postIds.length }));
+      }
+      return (await Promise.all(requests)).flatMap(result => result.posts);
+    },
     get,
     getReadWarnings: () => [...readWarnings],
     async submit(post) {

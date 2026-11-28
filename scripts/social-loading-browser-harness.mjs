@@ -13,7 +13,7 @@ assert(roots.after,'Set PIXIEED_SNS_AFTER to a built site');
 const out=process.env.PIXIEED_SNS_REPORT || '/tmp/pixieed-sns-perf-20261108/browser';
 await mkdir(out,{recursive:true});
 const id=n=>`${String(n).padStart(8,'0')}-1111-4111-8111-111111111111`;
-const mapRow=n=>({post_id:id(n),title:`公開作品 ${n}`,caption:'合成テスト用。公開されません。',published_at:`2026-11-01T00:${String(n).padStart(2,'0')}:00Z`,map_space:'globe',globe_cell_id:'globe:v11-meridian-parallel-quarter-degree:1:1',public_image_path:`fixture/${n}.png`,post_kind:n%2?'pixel_art':'pixel_camera'});
+const mapRow=n=>({post_id:id(n),title:n===8?'海辺の長いタイトルを持つ作品のカードを読みやすく整える表示確認用サンプルです。':`公開作品 ${n}`,caption:n===8?'水平線の向こうに夕日が沈むところを描きました。光が波の間でほどけていく様子を一色ずつ描いています。カードで見える説明文の長さも確認します。':'合成テスト用。公開されません。',published_at:`2026-11-01T00:${String(n).padStart(2,'0')}:00Z`,map_space:'globe',globe_cell_id:'globe:v11-meridian-parallel-quarter-degree:1:1',public_image_path:`fixture/${n}.png`,post_kind:n%2?'pixel_art':'pixel_camera'});
 const mapRows=Array.from({length:8},(_,i)=>mapRow(i+1));
 const showcaseRows=[{id:id(20),title:'ショーケース',caption:'合成作品',published_at:'2026-11-02T00:00:00Z',status:'published',post_kind:'image',distribution_mode:'showcase',media_object_path:'fixture/20.png'}];
 const snsRows=[{id:id(30),title:'ことば',body:'合成投稿',createdAt:'2026-11-03T00:00:00Z',kind:'text',visibility:'public'}];
@@ -37,12 +37,15 @@ async function setup(viewport,{placementDelay=250,failAll=false,empty=false,regr
  await context.route('**/*',async route=>{
   const request=route.request(),u=new URL(request.url());
   if(u.origin===origin){
-   if(regression&&u.pathname==='/js/globe/post-supabase.mjs')return route.fulfill({contentType:'text/javascript',body:`export function createSupabasePostActions(){return {hasLiked:async()=>{window.__likeReads=(window.__likeReads||0)+1;if(window.__failLikeRead){window.__failLikeRead=false;throw new Error('Synthetic read failure')}return false},setLike:async()=>{window.__likeWrites=(window.__likeWrites||0)+1;await new Promise(r=>window.__releaseLike=r)}}}`});
+   if(regression&&u.pathname==='/js/globe/post-supabase.mjs')return route.fulfill({contentType:'text/javascript',body:`export function createSupabasePostActions(){return {hasLiked:async()=>false,setLike:async(id,on)=>{window.__likeWrites=(window.__likeWrites||0)+1;window.__lastLike=on;if(window.__failLike){window.__failLike=false;throw new Error('Synthetic like failure')}await new Promise(r=>window.__releaseLike=r)}}}`});
    return route.continue();
   }
   if(u.hostname!=='kyyiuakrqomzlikfaire.supabase.co')return route.abort();
   const respond=(data,status=200)=>route.fulfill({status,contentType:'application/json',headers:{'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'*'},body:JSON.stringify(data)});
-  if(u.pathname.startsWith('/storage/v1/object/public/')&&request.method()==='GET')return route.fulfill({contentType:'image/png',body:png});
+  if(u.pathname.startsWith('/storage/v1/object/public/')&&request.method()==='GET'){
+   const sample=Number(u.pathname.match(/(\d+)\.png$/)?.[1])%2?'assets/samples/maou.png':'assets/pixel-studio/samples/coffee.png';
+   return route.fulfill({contentType:'image/png',body:await readFile(path.join(activeRoot,sample)).catch(()=>png)});
+  }
   const action=request.method()==='POST'?JSON.parse(request.postData()||'{}').action:null;
   if(!['GET','HEAD'].includes(request.method())&&!(u.pathname==='/functions/v1/social-feed'&&['list','get'].includes(action))){writes.push({path:u.pathname,method:request.method(),action});return route.abort();}
   const item={path:u.pathname,action,start:Date.now()};api.push(item);
@@ -77,15 +80,19 @@ try {
  for(const viewport of [{width:320,height:568},{width:390,height:844},{width:1280,height:800}]){
   const s=await setup(viewport,{placementDelay:2600,regression:true}),p=s.page;await p.goto(origin+'/explore/',{waitUntil:'domcontentloaded'});
   await p.waitForSelector('#feed [data-post-id]');assert.equal(await p.locator('#feed').getAttribute('aria-busy'),'true');assert.equal(await p.locator('.feed-empty-state').count(),0);
-  const mapCard=p.locator(`[data-post-id="map:${id(8)}"]`),like=mapCard.locator('[data-action="like"]');await like.click();
+  const mapCard=p.locator(`[data-post-id="map:${id(8)}"]`),like=mapCard.locator('[data-action="favorite"]');await like.click();
   await p.waitForFunction(()=>window.__likeWrites===1);
   // Text source arrives and triggers a progressive render while setLike is held.
   await p.waitForSelector(`[data-post-id="sns:${id(30)}"]`);assert.equal(await like.isDisabled(),true);
-  await p.evaluate(()=>document.querySelector('[data-action="like"]').dispatchEvent(new MouseEvent('click',{bubbles:true})));assert.equal(await p.evaluate(()=>window.__likeWrites),1);
-  await p.evaluate(()=>window.__releaseLike());await p.waitForFunction(()=>document.querySelector('[data-post-id] [data-action="like"][aria-pressed="true"]'));
+  await like.dispatchEvent('click');assert.equal(await p.evaluate(()=>window.__likeWrites),1);
+  await p.evaluate(()=>window.__releaseLike());await p.waitForFunction(()=>document.querySelector('[data-post-id] [data-action="favorite"][aria-pressed="true"]'));
   // Retain visible image nodes when optional placement fails.
   await p.evaluate(()=>window.__firstShowcaseImage=document.querySelector('[data-post-id^="showcase:"] img'));
-  await mapCard.locator('[data-action="bookmark"]').click();await p.waitForFunction(id=>document.querySelector(`[data-post-id="map:${id}"] [data-action="bookmark"]`)?.getAttribute('aria-pressed')==='true',id(8));
+  assert.equal(await mapCard.locator('[data-action="bookmark"]').count(),0);
+  assert.equal(await p.evaluate(()=>window.__lastLike),true);
+  assert.equal(await mapCard.locator('h2').evaluate(node=>getComputedStyle(node).whiteSpace),'nowrap');
+  assert.equal(await mapCard.locator('h2').textContent().then(value=>Array.from(value).length),36);
+  assert.equal(await mapCard.locator('.post-compact-caption').textContent().then(value=>Array.from(value).length),48);
   await p.evaluate(()=>{const card=document.querySelector('[data-post-id^="map:"]');card.scrollIntoView({behavior:'instant'});window.__anchor={id:card.dataset.postId,top:card.getBoundingClientRect().top};});
   await p.waitForSelector('#feed[aria-busy="false"]');
   assert.equal(await p.evaluate(()=>window.__firstShowcaseImage===document.querySelector('[data-post-id^="showcase:"] img')),true);
@@ -93,21 +100,52 @@ try {
   const anchorCheck=await p.evaluate(()=>({before:window.__anchor.top,after:document.querySelector(`[data-post-id="${window.__anchor.id}"]`).getBoundingClientRect().top,scroll:scrollY}));
   assert.ok(Math.abs(anchorCheck.before-anchorCheck.after)<2,JSON.stringify(anchorCheck));
   assert.equal(await p.locator('#feedWarningDetails').isVisible(),true);
-  // Failed read without any source rerender must leave Like available for retry.
-  const retryLike=p.locator(`[data-post-id="map:${id(1)}"] [data-action="like"]`);
-  await p.evaluate(()=>window.__failLikeRead=true);await retryLike.click();
-  await p.waitForFunction(()=>document.querySelector('#toast').textContent.includes('Synthetic read failure'));
-  assert.equal(await retryLike.isDisabled(),false);await retryLike.click();
-  await p.waitForFunction(()=>window.__likeWrites===2);await p.evaluate(()=>window.__releaseLike());
-  await p.waitForFunction(()=>[...document.querySelectorAll('[data-action="like"][aria-pressed="true"]')].length===2);
+  // A failed public update still leaves a saved work available on the device.
+  const retryLike=p.locator(`[data-post-id="map:${id(1)}"] [data-action="favorite"]`);
+  await p.evaluate(()=>window.__failLike=true);await retryLike.click();
+  await p.waitForFunction(()=>document.querySelector('#toast').textContent.includes('Synthetic like failure'));
+  assert.equal(await retryLike.isDisabled(),false);
+  assert.equal(await retryLike.getAttribute('aria-pressed'),'true');
+  await retryLike.click();
+  await p.waitForFunction(()=>window.__likeWrites===3);
+  assert.equal(await p.evaluate(()=>window.__lastLike),false);
+  await p.evaluate(()=>window.__releaseLike());
+  await p.waitForFunction(()=>[...document.querySelectorAll('[data-action="favorite"][aria-pressed="true"]')].length===1);
+  const sizes=await p.locator('#feed .post-card[data-post-id]').evaluateAll(cards=>cards.map(card=>card.getBoundingClientRect().height));
+  assert.ok(Math.max(...sizes)-Math.min(...sizes)<=1, JSON.stringify(sizes));
   await mapCard.locator('[data-action="detail"]').first().click();await p.waitForSelector('#detailDialog[open]');
   await p.keyboard.press('Escape');await p.waitForSelector('#detailDialog:not([open])',{state:'attached'});
   await p.locator('[data-action="view"][data-view="saved"]').click();await p.waitForFunction(()=>document.querySelectorAll('#feed [data-post-id]').length===1);
-  await p.locator('[data-action="view"][data-view="local"]').click();assert.equal(await p.locator('#draftsPanel').isVisible(),true);
-  await p.goBack();await p.waitForFunction(()=>document.querySelector('#feedViews [data-view="saved"]').getAttribute('aria-pressed')==='true');
+  const savedUrl=p.url();
+  await p.goto(origin+'/profile/');
+  await p.getByRole('link',{name:'投稿の下書き'}).click();
+  await p.waitForSelector('#draftsPanel:visible');
+  await p.goto(savedUrl);await p.waitForFunction(()=>document.querySelector('#feedViews [data-view="saved"]').getAttribute('aria-pressed')==='true');
   await p.locator('[data-action="view"][data-view="feed"]').click();await p.waitForFunction(()=>document.querySelectorAll('#feed [data-post-id]').length===10);
-  await p.locator('.prompt-open').click();await p.waitForSelector('#composerDialog[open]');await p.keyboard.press('Escape');await p.waitForSelector('#composerDialog:not([open])',{state:'attached'});
-  await p.evaluate(()=>scrollTo(0,0));await p.screenshot({path:path.join(out,`after-${viewport.width}.png`),fullPage:false});
+  assert.equal(await p.locator('#feedViews button').count(),2);
+  assert.equal(await p.locator('#exploreSearchPanel').isVisible(),false);
+  const search=p.getByRole('button',{name:'作品・作者を検索'});
+  await search.click();await p.locator('#feedFilters').waitFor();
+  await p.locator('#socialSearch').fill('海辺');
+  await p.waitForFunction(()=>document.querySelectorAll('#feed [data-post-id]').length===1);
+  await p.locator('#socialSearch').fill('');
+  await search.click();
+  assert.equal(await p.locator('#exploreSearchPanel').isVisible(),false);
+  await p.evaluate(()=>scrollTo({top:0,behavior:'instant'}));
+  const first=await p.locator('#feed [data-post-id]').first().boundingBox();
+  const nav=await p.locator('.public-destination-nav').boundingBox();
+  assert.ok(first.y+first.height<=nav.y,JSON.stringify({first,nav}));
+  await p.screenshot({path:path.join(out,`after-${viewport.width}.png`),fullPage:false});
+  const textFavorite=p.locator(`[data-post-id="sns:${id(30)}"] [data-action="favorite"]`);
+  await textFavorite.click();await p.waitForFunction(id=>document.querySelector(`[data-post-id="sns:${id}"] [aria-pressed="true"]`),id(30));
+  await p.locator('[data-action="view"][data-view="saved"]').click();
+  await p.waitForFunction(()=>document.querySelectorAll('#feed [data-post-id]').length===2);
+  await p.reload();await p.waitForFunction(()=>document.querySelectorAll('#feed [data-post-id]').length===2&&document.querySelector('#feed[aria-busy="false"]'));
+  assert.equal(await textFavorite.getAttribute('aria-pressed'),'true');
+  await p.goto(origin+'/tools/');
+  await p.getByRole('link',{name:'作品を投稿する',exact:true}).click();
+  await p.waitForSelector('#composerDialog[open]');
+  await p.keyboard.press('Escape');await p.waitForSelector('#composerDialog:not([open])',{state:'attached'});
   assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);assert.deepEqual(s.errors,[]);assert.deepEqual(s.writes,[]);
   checks.push({viewport,case:'progressive-like-bookmark-detail-history-composer-scroll-image',passed:true});await s.context.close();
  }

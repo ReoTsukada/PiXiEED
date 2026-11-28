@@ -83,7 +83,7 @@ test('six home actions use equal desktop cards and responsive, accessible contro
   for (const label of ['描く', '音楽を作る', '写真をドット絵に', 'イベントを調べる', '投稿を見る', '画像出力']) assert.ok(actions.includes(`<strong>${label}</strong>`));
   for (const href of ['/tools/start/draw/', '/tools/start/audio/', '/tools/start/camera/', '/globe/?view=events', '/explore/#works', '/output/text/']) assert.ok(actions.includes(`href="${href}"`));
   for (const name of ['draw-pc-maou-480.webp','home-audio-editor-480.webp','home-camera-workspace-480.webp','home-events-screen-480.png','home-explore-screen-480.png','home-ascii-preview-480.webp']) assert.ok(actions.includes(name), name);
-  assert.ok(home.indexOf('class="portal-actions"') < home.indexOf('class="portal-work-entry"'));
+  assert.ok(home.indexOf('class="portal-work-entry"') < home.indexOf('class="portal-actions"'));
 });
 
 test('shop destination makes the external catalog and item categories clear', () => {
@@ -138,7 +138,7 @@ test('whole-home experience keeps a plus entry and real saved thumbnails', () =>
 });
 test('guide explains local, backup, export and public destinations using the actual composer', () => {
   assert.doesNotMatch(guide, /ホームの［作品やことばを投稿する］|ホームで投稿を作成/);
-  assert.match(explore, /data-compose[^>]*>作品を投稿する/);
+  assert.match(readFileSync(new URL('../../tools/index.html', import.meta.url), 'utf8'), /href="\/explore\/\?compose=new">作品を投稿する/);
   assert.match(guide, /href="\/explore\/">コミュニティで投稿を作成・作品を見る/);
   for (const text of ['［掲載設定］', '地図の掲載先', '［下書きに保存］', '自動同期されません', 'ブラウザーデータの削除', '編集データをバックアップ（PXD）', '出力画面', '［取り込む］', '作品保存やファイル出力だけでは公開されません']) assert.ok(guide.includes(text), text);
   assert.match(guide, /id="save-work"/);
@@ -150,7 +150,7 @@ test('the home shelf defers its local preview reader until the shelf is visible'
   assert.match(homeModule, /IntersectionObserver/);
   assert.match(homeModule, /entry.isIntersecting/);
   assert.match(homeModule, /rootMargin:'0px'/);
-  assert.match(homeModule, /await import\('\.\/home-recent-projects\.mjs\?rev=20261117-home-pageshow-1'\)/);
+  assert.match(homeModule, /await import\('\.\/home-recent-projects\.mjs\?rev=20261128-work-shelf-1'\)/);
   assert.doesNotMatch(homeModule, /from .*pxd-store|from .*pxd-codec|from .*draw-page|cloneAsToolProject|forkProject/);
 });
 

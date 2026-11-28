@@ -19,7 +19,7 @@
   <link rel="stylesheet" href="/css/site-header.css?rev=20261012-nav-polish-1">
   <link rel="stylesheet" href="/css/page-gutters.css?rev=20261020-page-gutters-1" data-page-gutters-style>
   <link rel="stylesheet" href="/css/home-artwork-settings.css?rev=20261112-profile-workspace-1">
-  <link rel="stylesheet" href="/css/profile-workspace.css?rev=20261112-profile-workspace-1">
+  <link rel="stylesheet" href="/css/profile-workspace.css?rev=20261128-work-shelf-1">
 </head>
 <body data-page="profile" data-page-gutters="content" class="app-page">
   <a class="skip-link" href="#main">本文へ移動</a>
@@ -31,9 +31,22 @@
         <noscript>自分のページを表示するにはJavaScriptを有効にしてください。</noscript>
       </div>
       <div class="container profile-utilities">
-        <nav class="profile-social-shortcuts" aria-label="投稿と下書き">
-          <a class="profile-shortcut" href="/feed/?view=saved"><span class="profile-icon profile-icon--bookmark" aria-hidden="true"></span><span>保存した投稿</span><span class="profile-icon profile-icon--forward" aria-hidden="true"></span></a>
-          <a class="profile-shortcut" href="/feed/?view=drafts"><span class="profile-icon profile-icon--draw" aria-hidden="true"></span><span>投稿の下書き</span><span class="profile-icon profile-icon--forward" aria-hidden="true"></span></a>
+        <section class="profile-work-shelf" aria-labelledby="profile-work-shelf-title" data-profile-work-shelf hidden>
+          <h2 id="profile-work-shelf-title">作品のつづき</h2>
+          <section class="profile-shelf-group" aria-labelledby="profile-draw-shelf-title">
+            <div class="profile-shelf-heading"><h3 id="profile-draw-shelf-title">制作中の絵</h3><a href="/draw/?workspace=1">絵の作品一覧 <span aria-hidden="true">↗</span></a></div>
+            <div id="portal-recent-list" class="profile-shelf-grid portal-recent-list" aria-label="この端末の絵"></div>
+            <p id="portal-recent-status" class="profile-shelf-status" role="status">この端末の作品を確認しています…</p>
+          </section>
+          <section class="profile-shelf-group" aria-labelledby="profile-draft-shelf-title">
+            <div class="profile-shelf-heading"><h3 id="profile-draft-shelf-title">投稿の下書き</h3><a href="/feed/?view=drafts">下書き一覧 <span aria-hidden="true">↗</span></a></div>
+            <div class="profile-shelf-grid" data-profile-draft-list></div>
+            <p class="profile-shelf-status" data-profile-draft-status role="status">この端末の下書きを確認しています…</p>
+          </section>
+        </section>
+        <nav class="profile-social-shortcuts" aria-label="公開・保存した作品">
+          <a class="profile-shortcut" href="/explore/?view=mine"><span class="profile-icon profile-icon--draw" aria-hidden="true"></span><span>自分の投稿</span><span class="profile-icon profile-icon--forward" aria-hidden="true"></span></a>
+          <a class="profile-shortcut" href="/explore/?view=saved"><span class="profile-icon profile-icon--bookmark" aria-hidden="true"></span><span>お気に入り</span><span class="profile-icon profile-icon--forward" aria-hidden="true"></span></a>
         </nav>
         <details class="profile-disclosure profile-sharing" id="profile-sharing">
           <summary><span class="profile-icon profile-icon--home" aria-hidden="true"></span><strong>ホームへの作品掲載</strong><span class="profile-disclosure__hint">設定</span></summary>
@@ -59,5 +72,6 @@
   <script type="module" src="/js/creation/profile-likes-page.mjs?rev=20261116-normal-release-2"></script>
   <script type="module" src="/js/site-header.mjs?rev=20261111-output-offerwall-1"></script>
   <script type="module" src="/js/creation/home-artwork-settings.mjs?rev=20261112-home-review-1"></script>
+  <script type="module" src="/js/profile-work-shelf.mjs?rev=20261128-work-shelf-1"></script>
 </body>
 </html>

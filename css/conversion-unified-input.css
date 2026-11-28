@@ -440,11 +440,11 @@ body.has-smart-conversion:has(.sc-unified-composer[data-editor-handoff="true"]) 
   font-weight: 700;
 }
 body.has-smart-conversion .sc-save-bar[hidden] { display: none !important; }
-body.has-smart-conversion .sc-save-bar .sc-save-actions:has([data-sc-copy]:not([hidden])) {
+body.has-smart-conversion .sc-save-bar .sc-save-actions:has(:is([data-sc-copy], [data-sc-post]):not([hidden])) {
   display: grid;
   grid-template-columns: minmax(0,1fr) auto;
 }
-body.has-smart-conversion .sc-save-bar [data-sc-copy] {
+body.has-smart-conversion .sc-save-bar :is([data-sc-copy], [data-sc-post]) {
   min-height: 44px;
   padding: 6px 14px;
   border: 1px solid #b4c5b6;
