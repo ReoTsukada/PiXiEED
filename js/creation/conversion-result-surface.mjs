@@ -31,7 +31,9 @@ export function mountResultSurface({ main, doc = document, win = window, schedul
   const summary = legacy.querySelector('.sc-preview-summary');
   const settingsButton = main.querySelector('[data-sc-settings-open]');
   const oldCardHidden=card.hidden;
-  const positions = [card, legacy, summary, settingsButton].filter(Boolean).map(node => ({ node, parent: node.parentNode, next: node.nextSibling }));
+  const nativePanel = main.querySelector('#sc-settings-panel');
+  const inlinePanel = composer.dataset.editorHandoff !== 'true' ? nativePanel : null;
+  const positions = [card, legacy, summary, settingsButton, inlinePanel].filter(Boolean).map(node => ({ node, parent: node.parentNode, next: node.nextSibling }));
   const host = doc.createElement('section'); host.className = 'sc-result-surface'; host.setAttribute('aria-label', '選択した出力形式のプレビュー');
   host.innerHTML = '<div class="sc-preview-toolbar" data-sc-preview-toolbar><header><strong>出力プレビュー</strong><div class="sc-preview-header-actions"><button type="button" data-result-refresh aria-label="プレビューを更新" title="プレビューを更新" hidden>更新</button><button type="button" data-result-cancel hidden>更新を中止</button></div></header></div><div class="sc-result-body" data-sc-result-body><div class="sc-result-content"><img alt="生成した出力ファイルのプレビュー" hidden><audio controls hidden></audio><video controls playsinline hidden></video><p data-result-fallback hidden></p><label data-result-text-label hidden></label><textarea data-result-text readonly spellcheck="false" wrap="off" hidden></textarea><p data-result-text-note hidden></p></div><p data-result-state role="status" aria-live="polite"></p></div><details class="sc-result-aux" aria-label="素材とコピーなどの操作"><summary>素材・コピーなどの操作</summary><div class="sc-result-aux-content"></div></details>';
   composer.after(host);
@@ -42,8 +44,88 @@ export function mountResultSurface({ main, doc = document, win = window, schedul
   const sourceInspector = mountConversionSourceInspector({ doc, win });
   const headerActions = host.querySelector('.sc-preview-header-actions');
   headerActions.append(sourceInspector.element);
-  const sourceAndSettings = composer.querySelector('.sc-unified-head');
-  if (settingsButton && sourceAndSettings) sourceAndSettings.append(settingsButton);
+  const expandButton = doc.createElement('button');
+  expandButton.type = 'button';
+  expandButton.textContent = '拡大';
+  expandButton.setAttribute('aria-label', '出力プレビューを拡大');
+  expandButton.hidden = true;
+  headerActions.append(expandButton);
+  const expanded = doc.createElement('dialog');
+  expanded.className = 'sc-expanded-preview';
+  expanded.setAttribute('aria-label', '出力プレビュー');
+  expanded.innerHTML = '<form method="dialog"><button>閉じる</button></form><div data-expanded-content></div>';
+  host.append(expanded);
+  const expandedContent = expanded.querySelector('[data-expanded-content]');
+  const stillPreview = () => content.querySelector('canvas:not([hidden]), img:not([hidden])[src]');
+  expandButton.addEventListener('click', () => {
+    let preview;
+    const still = stillPreview();
+    if (still?.tagName === 'CANVAS') {
+      preview = still.cloneNode(false);
+      preview.getContext('2d')?.drawImage(still, 0, 0);
+    } else if (still) {
+      preview = still.cloneNode(false);
+    } else if (!resultText.hidden) {
+      preview = doc.createElement('pre');
+      preview.textContent = resultText.value;
+    }
+    if (!preview) return;
+    expandedContent.replaceChildren(preview);
+    expanded.showModal();
+  });
+  expanded.addEventListener('close', () => expandedContent.replaceChildren());
+
+  const sourceNodes = ['.sc-source-intro', '.sc-unified-head', '.sc-unified-text']
+    .map(selector => composer.querySelector(selector)).filter(Boolean);
+  const sourcePositions = sourceNodes.map(node => ({ node, parent: node.parentNode, next: node.nextSibling }));
+  const sourceRail = doc.createElement('section');
+  sourceRail.className = 'sc-source-rail';
+  sourceRail.id = 'conversion-source-rail';
+  sourceRail.setAttribute('aria-label', '素材');
+  sourceRail.append(...sourceNodes);
+  composer.id = 'conversion-settings-rail';
+  composer.setAttribute('aria-label', '出力設定');
+  if (settingsButton) composer.append(settingsButton);
+  if (inlinePanel) {
+    composer.insertBefore(inlinePanel, composer.querySelector('[data-sc-unified-help]'));
+    main.dataset.inlineOutputSettings = '';
+  }
+  const desktopLayout = win.matchMedia?.('(min-width: 960px)');
+  const desktopDetails = [...composer.querySelectorAll('.sc-handoff-settings, .sc-unified-settings')];
+  const mobileExpansion = new Map();
+  function showDesktopDetails() {
+    for (const details of desktopDetails) {
+      if (desktopLayout?.matches && !mobileExpansion.has(details)) {
+        mobileExpansion.set(details, details.open);
+        details.open = true;
+      } else if (!desktopLayout?.matches && mobileExpansion.has(details)) {
+        details.open = mobileExpansion.get(details);
+        mobileExpansion.delete(details);
+      }
+    }
+  }
+  function keepDesktopDetailsOpen(event) {
+    if (desktopLayout?.matches && desktopDetails.some(details => details.firstElementChild?.contains(event.target))) event.preventDefault();
+  }
+  composer.addEventListener('click', keepDesktopDetailsOpen);
+  desktopLayout?.addEventListener('change', showDesktopDetails);
+  showDesktopDetails();
+
+  const railSwitcher = doc.createElement('div');
+  railSwitcher.className = 'sc-rail-switcher';
+  railSwitcher.setAttribute('role', 'group');
+  railSwitcher.setAttribute('aria-label', '出力パネルを切り替える');
+  railSwitcher.innerHTML = '<button type="button" data-output-rail="source" aria-controls="conversion-source-rail" aria-pressed="true">素材</button><button type="button" data-output-rail="settings" aria-controls="conversion-settings-rail" aria-pressed="false">設定</button>';
+  host.after(sourceRail, railSwitcher);
+  main.dataset.outputRails = 'source';
+  railSwitcher.addEventListener('click', event => {
+    const button = event.target.closest('[data-output-rail]');
+    if (!button) return;
+    main.dataset.outputRails = button.dataset.outputRail;
+    for (const option of railSwitcher.querySelectorAll('[data-output-rail]')) {
+      option.setAttribute('aria-pressed', String(option === button));
+    }
+  });
   let sourceStyle = doc.querySelector?.('link[data-source-preview-style]') || null, ownsSourceStyle = false;
   if (!sourceStyle && doc.head) {
     sourceStyle = doc.createElement('link'); sourceStyle.rel = 'stylesheet';
@@ -186,11 +268,17 @@ export function mountResultSurface({ main, doc = document, win = window, schedul
     }
     if(p.current&&p.owner==='preview'&&q.result?.notice)description+=' '+q.result.notice;
     if(current.capability?.notice&&p.current)description+=' '+current.capability.notice;
-    set(message,'textContent',p.state==='empty'?'入力すると、ここで仕上がりを確認できます。':description);
+    set(message,'textContent',p.state==='empty'?'素材を追加すると、ここに結果が表示されます。':description);
     const queueWorking = ['queued','rendering'].includes(q.state);
     set(refresh,'hidden',!current.loaded || (current.mode==='media' ? !current.capability?.supported || (current.ready && !current.working) || (p.current && current.capability?.automatic) : current.working));
+    const refreshLabel = current.mode === 'input' && !outputMatches ? 'プレビューを作る' : '更新';
+    set(refresh,'textContent',refreshLabel);
+    const refreshDescription = refreshLabel === '更新' ? 'プレビューを更新' : refreshLabel;
+    if (refresh.getAttribute('aria-label') !== refreshDescription) refresh.setAttribute('aria-label',refreshDescription);
+    set(refresh,'title',refreshDescription);
     set(refresh,'disabled',current.working || queueWorking);
     set(cancel,'hidden',current.mode==='media'?!queueWorking:!current.working);
+    set(expandButton,'hidden',!showText && (!showMedia || !stillPreview()));
     for (const tag of ['audio','video']) if (content.hidden) content.querySelector(tag).pause?.();
   }
   queue = createResultPreviewQueue({ timers:win, render: (payload,{signal}) => payload.api.previewOutput({signal,pendingFps:payload.pendingFps,pendingSize:payload.pendingSize}), onState: () => { draw(); schedule(); } });
@@ -226,6 +314,11 @@ export function mountResultSurface({ main, doc = document, win = window, schedul
       stopped=true;queue.destroy();clearDecode();clearUrl();media();sourceInspector.destroy();
       // Restore the summary before its material surface is destroyed, then the legacy subtree.
       for (const item of positions.slice().reverse()) item.parent.insertBefore(item.node,item.next?.parentNode===item.parent?item.next:null);
+      for (const item of sourcePositions.slice().reverse()) item.parent.insertBefore(item.node,item.next?.parentNode===item.parent?item.next:null);
+      desktopLayout?.removeEventListener('change', showDesktopDetails);
+      composer.removeEventListener('click', keepDesktopDetailsOpen);
+      for (const [details, open] of mobileExpansion) details.open = open;
+      sourceRail.remove(); railSwitcher.remove(); delete main.dataset.outputRails; delete main.dataset.inlineOutputSettings;
       card.hidden=oldCardHidden;auxiliary.remove();host.remove();if(ownsSourceStyle)sourceStyle.remove();delete main.dataset.unifiedResult;delete main.dataset.resultSource;delete main.dataset.resultMode;
     },
   };

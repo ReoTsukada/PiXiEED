@@ -287,6 +287,17 @@ function normalize(source, file) {
     const revision = target === 'css/draw-tool-picker.css' ? '20261118-draw-text-contrast-1' : '20261118-draw-tool-panel-1';
     return `${quote}${path}?${query.replace(/(^|&)rev=[^&]*/, `$1rev=${revision}`)}${quote}`;
   });
+  const sourceFirstTargets = new Set([
+    'css/conversion-unified-input.css',
+    'js/creation/conversion-entry.mjs', 'js/creation/conversion-smart-ui.mjs',
+    'js/creation/conversion-unified-input.mjs', 'js/creation/conversion-result-surface.mjs', 'js/creation/conversion-workspace.mjs',
+  ]);
+  changed = changed.replace(/(["'`])([^"'`\s<>]+\.(?:mjs|css))\?([^"'`\s<>]*)\1/g, (whole, quote, path, query) => {
+    if ((!path.startsWith('/') && !path.startsWith('.')) || path.startsWith('//')) return whole;
+    const target = path.startsWith('/') ? path.slice(1) : posix.normalize(posix.join(posix.dirname(relative(root, file)), path));
+    if (!sourceFirstTargets.has(target)) return whole;
+    return `${quote}${path}?${query.replace(/(^|&)rev=[^&]*/, '$1rev=20261128-output-compact-rails-1')}${quote}`;
+  });
   return changed;
 }
 

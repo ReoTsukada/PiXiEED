@@ -5,10 +5,11 @@ import { mountConversionStage } from './conversion-stage.mjs?rev=20261105-video-
 import { createConversionPreviewController } from './conversion-preview-controller.mjs?rev=20261104-engine-boundaries-3';
 
 /** Include every visible grid track before falling back to page scrolling. */
-export function conversionWorkspaceMinimumHeight({ unified = false, toolbarHeight = 0, footerHeight = 0, footerMargin = 0, viewportWidth = 0 } = {}) {
+export function conversionWorkspaceMinimumHeight({ unified = false, compactRails = false, toolbarHeight = 0, footerHeight = 0, footerMargin = 0, viewportWidth = 0 } = {}) {
   if (!unified) return 180;
   const dimension = value => Number.isFinite(value) ? Math.max(0, value) : 0;
   const desktop = dimension(viewportWidth) >= 960;
+  if (compactRails) return dimension(toolbarHeight) + 112 + 80 + 44 + 24;
   const settingsMinimum = desktop ? 320 : 200;
   const previewMinimum = 240;
   const gridGaps = desktop ? 16 : 24;
@@ -63,7 +64,7 @@ export function mountConversionWorkspace(main, toolbar, doc = document, win = wi
   });
   toolbar.querySelector('.sc-input-actions').prepend(back);
   const desktop = win.matchMedia('(min-width: 960px)');
-  const panelController = createWorkspacePanel({ panel, open, desktop, win, modalOnly: () => main.dataset.unifiedResult === 'true' });
+  const panelController = createWorkspacePanel({ panel, open, desktop, win, modalOnly: () => main.dataset.unifiedResult === 'true' && !main.hasAttribute('data-inline-output-settings') });
   panel.querySelector('[data-sc-settings-close]').addEventListener('click', panelController.dismiss);
   panel.addEventListener('cancel', event => { event.preventDefault(); panelController.dismiss(); });
   panel.addEventListener('click', event => { if (event.target === panel) { const r = panel.getBoundingClientRect(); if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) panelController.dismiss(); } });
@@ -86,7 +87,7 @@ export function mountConversionWorkspace(main, toolbar, doc = document, win = wi
     const footerHeight = footer?.getBoundingClientRect().height || 0;
     const footerStyle = footerHeight > 0 ? win.getComputedStyle?.(footer) : null;
     const footerMargin = (parseFloat(footerStyle?.marginTop) || 0) + (parseFloat(footerStyle?.marginBottom) || 0);
-    const minWorkspaceHeight = conversionWorkspaceMinimumHeight({ unified: main.dataset.unifiedResult === 'true', toolbarHeight, footerHeight, footerMargin, viewportWidth: win.innerWidth });
+    const minWorkspaceHeight = conversionWorkspaceMinimumHeight({ unified: main.dataset.unifiedResult === 'true', compactRails: win.innerWidth < 960 && 'outputRails' in main.dataset, toolbarHeight, footerHeight, footerMargin, viewportWidth: win.innerWidth });
     main.style.setProperty('--sc-space', `${Math.max(minWorkspaceHeight, available)}px`);
     doc.body.classList.toggle('sc-scroll-fallback', available < minWorkspaceHeight);
     doc.body.style.setProperty('--sc-bottom-reserve', `${Math.max(0, height + (viewport?.offsetTop || 0) - (dock?.getBoundingClientRect().top || height))}px`);
@@ -150,7 +151,7 @@ export function mountConversionWorkspace(main, toolbar, doc = document, win = wi
     if (open.disabled) open.disabled = false;
     const close = panel.querySelector('[data-sc-settings-close]');
     if (close.disabled) close.disabled = false;
-    panelController.update(media);
+    panelController.update(media && (!main.hasAttribute('data-inline-output-settings') || loaded));
     main.dataset.workspaceMedia = String(media);
     main.dataset.workspaceReady = String(media && ready);
     text(open, '設定');

@@ -1,11 +1,11 @@
 import { hasConversionRecoveryHistory } from '../tool-start-routes.mjs?rev=20261110-output-result-1';
-import { mountResultSurface } from './conversion-result-surface.mjs?rev=20261117-normal-apply-1';
+import { mountResultSurface } from './conversion-result-surface.mjs?rev=20261128-output-compact-rails-1';
 import { textRenderOutputSelector } from './conversion-text-output-choice.mjs?rev=20261105-video-size-1';
 import { createConversionRecoveryStore, createIndexedDbConversionRecoveryAdapter } from './conversion-recovery-store.mjs?rev=20261105-video-size-1';
 import { createConversionRecoveryController, conversionRecoveryIdentity } from './conversion-recovery-controller.mjs?rev=20261105-video-size-1';
 import { createConversionRecoveryWorkspace } from './conversion-recovery-workspace.mjs?rev=20261111-output-offerwall-1';
 import { activateRetainedConversionInput } from './conversion-input-receipts.mjs?rev=20261105-video-size-1';
-import { mountUnifiedConversionInput, writeUnifiedProperty, conversionRecoveryStatusLabel, associateCommittedMaterialFiles } from './conversion-unified-input.mjs?rev=20261117-normal-apply-1';
+import { mountUnifiedConversionInput, writeUnifiedProperty, conversionRecoveryStatusLabel, associateCommittedMaterialFiles } from './conversion-unified-input.mjs?rev=20261128-output-compact-rails-1';
 import { createUnifiedImportController, importUnifiedMediaFiles } from './conversion-unified-import.mjs?rev=20261105-video-size-1';
 import { createConversionSaveIntent } from './conversion-save-controller.mjs?rev=20261104-controllers-2';
 import { downloadConversionResult } from './conversion-save-bridge.mjs?rev=20261104-controllers-2';
@@ -14,7 +14,7 @@ import { createConversionFormatController } from './conversion-format-controller
 import { createNativeFormatBridge } from './conversion-format-bridge.mjs?rev=20261104-output-controller-1';
 import { mountConversionRouteChoices } from './conversion-route-choice.mjs?rev=20261101-route-choice-1';
 import { conversionSaveMessage, batchSaveActionLabel } from './conversion-clarity.mjs?rev=20261101-direct-material-1';
-import { mountConversionWorkspace } from './conversion-workspace.mjs?rev=20261110-output-layout-7';
+import { mountConversionWorkspace } from './conversion-workspace.mjs?rev=20261128-output-compact-rails-1';
 import { saveActionLabel, materialChangeInvalidatesSave, createDeferredFocusGuard } from './conversion-stage.mjs?rev=20261105-video-size-1';
 import { mountPublicNavigation } from '../public-navigation.mjs?rev=20261024-common-tool-start-1';
 
@@ -126,7 +126,7 @@ export function mountSmartConversion(doc = document, win = window) {
   button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4"/></svg><span>出力</span>';
   const buttonLabel = button.querySelector('span');
   const dock = doc.createElement('div'); dock.className = 'sc-export-status sc-save-bar';
-  dock.innerHTML = '<progress data-sc-progress aria-label="出力作成の進行状況" hidden></progress><div class="sc-save-copy"><span class="sc-export-message" role="status" aria-live="polite" tabindex="0" aria-label="出力の状態" aria-description="長い状態メッセージはここでスクロールできます。"></span></div><div class="sc-save-actions"><button type="button" data-sc-batch hidden></button><button type="button" data-sc-cancel hidden>中止</button></div>';
+  dock.innerHTML = '<progress data-sc-progress aria-label="出力作成の進行状況" hidden></progress><div class="sc-save-copy"><span class="sc-export-message" role="status" aria-live="polite" tabindex="0" aria-label="出力の状態" aria-description="長い状態メッセージはここでスクロールできます。"></span></div><div class="sc-save-actions"><button type="button" data-sc-copy hidden>コピー</button><button type="button" data-sc-batch hidden></button><button type="button" data-sc-cancel hidden>中止</button></div>';
   dock.querySelector('.sc-save-actions').prepend(button);
   const message = dock.querySelector('.sc-export-message'), cancel = dock.querySelector('[data-sc-cancel]'), batch = dock.querySelector('[data-sc-batch]');
   let nav = null, navObserver = null, frame = 0, revision = 0, lastMode = mode();
@@ -194,6 +194,9 @@ export function mountSmartConversion(doc = document, win = window) {
     if (format.disabled !== state.disabled) format.disabled = state.disabled;
     setText(ui('[data-sc-format-label]'), mode() === 'input' ? '文字からつくるもの' : mode() === 'output' ? '文字の表現' : '保存形式');
   }
+  const copyButton = dock.querySelector('[data-sc-copy]');
+  copyButton.addEventListener('click', () => $('[data-tx-copy]')?.click());
+
   function render() {
     ensureNav();
     const currentMode = mode(), locked = busy(), live = liveText();
@@ -236,6 +239,11 @@ export function mountSmartConversion(doc = document, win = window) {
     setText(buttonLabel, label);
     setAttr(button, 'aria-label', label);
     writeUnifiedProperty(cancel, 'hidden', !working || !cancelAction());
+    if (unified) {
+      writeUnifiedProperty(dock, 'hidden', (!loaded() && !working) || (currentMode !== 'media' && !ready && !saveIntent.pending));
+      writeUnifiedProperty(copyButton, 'hidden', currentMode !== 'output' || !ready || outputPreview?.kind !== 'text');
+    }
+
     const nativeStatus = statusText();
     const savedCurrent = lastSaved?.mode === currentMode && lastSaved.revision === revision && lastSaved.href === href;
     const displayedStatus = saveError || conversionSaveMessage({ loaded: loaded(), working, saved: savedCurrent, nativeStatus });

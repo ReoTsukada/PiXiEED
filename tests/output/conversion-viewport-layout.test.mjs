@@ -30,7 +30,7 @@ test('image and text outputs share responsive settings/preview rows with a safe 
   assert.match(unifiedCss, /body\.has-smart-conversion:not\(\.sc-scroll-fallback\):has\(/);
   assert.doesNotMatch(unifiedCss, /\[data-output-tab="text"\][^}]*height: auto/);
   assert.match(workspace, /const toolbarHeight = main\.querySelector\('\.sc-toolbar'\)\?\.getBoundingClientRect\(\)\.height \|\| 0/);
-  assert.match(workspace, /const minWorkspaceHeight = conversionWorkspaceMinimumHeight\(\{ unified: main\.dataset\.unifiedResult === 'true', toolbarHeight, footerHeight, footerMargin, viewportWidth: win\.innerWidth \}\)/);
+  assert.match(workspace, /const minWorkspaceHeight = conversionWorkspaceMinimumHeight\(\{ unified: main\.dataset\.unifiedResult === 'true', compactRails: win\.innerWidth < 960 && 'outputRails' in main\.dataset, toolbarHeight, footerHeight, footerMargin, viewportWidth: win\.innerWidth \}\)/);
   assert.match(workspace, /classList\.toggle\('sc-scroll-fallback', available < minWorkspaceHeight\)/);
   assert.match(unifiedCss, /width: min\(1180px,calc\(100% - 32px\)\) !important; max-width: 1180px !important/);
   assert.match(unifiedCss, /@media \(min-width: 960px\)[\s\S]*?\.sc-settings-panel \{[^}]*position: fixed;[^}]*grid-column: auto; grid-row: auto/);
@@ -47,8 +47,8 @@ test('all output engines share the settings pane and preserve node ownership whe
   assert.equal(unifiedOutputLocation({ mode: 'media', loaded: true, modal: true }), 'settings');
   const resultSurface = read('js/creation/conversion-result-surface.mjs');
   assert.doesNotMatch(resultSurface, /data-sc-result-control-band|unifiedControls|controlsPosition/);
-  assert.match(resultSurface, /sourceAndSettings = composer\.querySelector\('\.sc-unified-head'\)[\s\S]*settingsButton && sourceAndSettings\) sourceAndSettings\.append\(settingsButton\)/);
-  assert.match(resultSurface, /positions = \[card, legacy, summary, settingsButton\]/);
+  assert.match(resultSurface, /if \(settingsButton\) composer\.append\(settingsButton\)/);
+  assert.match(resultSurface, /positions = \[card, legacy, summary, settingsButton, inlinePanel\]/);
   assert.match(resultSurface, /if \(summary\) auxiliaryContent\.append\(summary\);\s*auxiliaryContent\.append\(card, legacy\);[\s\S]*composer\.append\(auxiliary\)/);
   assert.match(resultSurface, /data-result-refresh[^]*?data-result-cancel/);
   assert.match(resultSurface, /identityChanged[\s\S]*body\.scrollTop = 0/);
@@ -73,7 +73,7 @@ test('all output engines share the settings pane and preserve node ownership whe
   assert.match(unifiedCss, /\.sc-unified-controls > \.sc-size-control:not\(\[hidden\]\) \{[^}]*grid-column: 2/);
 });
 
-test('text editing scrolls inside its composer while output controls and a flexible preview remain reachable', () => {
+test('text editing scrolls inside its source rail while output controls and a flexible preview remain reachable', () => {
   assert.match(unifiedCss, /\.sc-unified-composer \{\s*grid-row: 2; grid-column: 1; height: 100%; min-height: 0; max-height: none; margin-top: 0;\s*overflow: auto/);
   assert.match(unifiedCss, /\.sc-unified-head \{ display: grid; grid-template-columns: repeat\(2,minmax\(0,1fr\)\); align-items: stretch/);
   assert.match(unifiedCss, /\.sc-unified-head > \.sc-unified-sources \{ grid-column: 1 \/ -1; width: 100%; min-width: 0; flex-wrap: nowrap; overflow-x: auto/);
@@ -82,8 +82,8 @@ test('text editing scrolls inside its composer while output controls and a flexi
   assert.ok(composerMarkup.indexOf('class="sc-unified-head"') < composerMarkup.indexOf('class="sc-unified-text"'));
   assert.match(input, /controls\.before\(controlsHome\)/, 'the return marker precedes controls in the composer DOM');
   assert.match(input, /composer\.insertBefore\(controls, controlsHome\.nextSibling\)/, 'controls return before the source row after a modal/panel visit');
-  assert.match(input, /function revealTextEditor\(\) \{[\s\S]*sourceRect\.bottom > composerRect\.bottom[\s\S]*composer\.scrollTop \+= sourceRect\.bottom - composerRect\.bottom/);
-  assert.match(input, /source\.focus\(\{ preventScroll: true \}\); revealTextEditor\(\)/, 'opening the editor reveals its focused textarea through composer-local scrolling');
+  assert.match(input, /function revealTextEditor\(\) \{[\s\S]*sourceRect\.bottom > composerRect\.bottom[\s\S]*rail\.scrollTop \+= sourceRect\.bottom - composerRect\.bottom/);
+  assert.match(input, /source\.focus\(\{ preventScroll: true \}\); revealTextEditor\(\)/, 'opening the editor reveals its focused textarea through source-rail scrolling');
   assert.match(unifiedCss, /\.sc-result-content:has\(> \[data-result-text\]:not\(\[hidden\]\)\) \{\s*display: flex/);
   assert.match(unifiedCss, /\.sc-result-content > \[data-result-text\] \{[^}]*min-height: 120px; max-height: none; resize: none; overflow: auto/);
   assert.match(unifiedCss, /\.sc-result-content \{[^}]*flex: 1 1 160px; min-height: 160px; min-width: 0; max-height: none; overflow: auto/);

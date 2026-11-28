@@ -403,7 +403,7 @@ export function mountUnifiedConversionInput({ main, toolbar, doc = document, win
   let ownsStyle = false;
   if (legacy && root.parentNode === main) main.insertBefore(root, legacy);
   if (!doc.querySelector('link[data-unified-input-style]')) {
-    const sheet = doc.createElement('link'); sheet.rel = 'stylesheet'; sheet.href = '/css/conversion-unified-input.css?rev=20261117-normal-apply-1'; sheet.dataset.unifiedInputStyle = ''; doc.head.append(sheet);
+    const sheet = doc.createElement('link'); sheet.rel = 'stylesheet'; sheet.href = '/css/conversion-unified-input.css?rev=20261128-output-compact-rails-1'; sheet.dataset.unifiedInputStyle = ''; doc.head.append(sheet);
     ownsStyle = true;
   }
   const composer = doc.createElement('section'); composer.className = 'sc-unified-composer'; composer.setAttribute('aria-label', '出力の種類と素材・設定');
@@ -416,6 +416,18 @@ export function mountUnifiedConversionInput({ main, toolbar, doc = document, win
   const emptyAdd = composer.querySelector('[data-sc-unified-add]'); emptyAdd.setAttribute('aria-label', 'ファイルを追加');
   const addSlot = main.querySelector('.sc-material-add-slot'), addHome = addSlot?.parentNode, oldAddSlotHidden = addSlot?.hidden ?? false;
   const sourceStrip = composer.querySelector('.sc-unified-sources');
+  const materialList = addHome?.matches('.sc-material-strip') ? addHome : null;
+  const materialHome = materialList?.parentNode;
+  const materialNext = materialList?.nextSibling;
+  const addControl = addSlot?.querySelector('button');
+  const originalAddLabel = addControl?.getAttribute('aria-label');
+  const originalAddText = addControl?.textContent;
+  if (addControl) {
+    addControl.textContent = '＋';
+    addControl.setAttribute('aria-label', '素材を追加');
+    addControl.title = '素材を追加';
+  }
+
   const oldPickHidden = textFilePick?.hidden;
   if(textFilePick)textFilePick.hidden=true;
   const emptyArea = legacy?.querySelector('.sc-empty-state');
@@ -447,6 +459,20 @@ export function mountUnifiedConversionInput({ main, toolbar, doc = document, win
   const expressionRow = composer.querySelector('[data-sc-unified-format-row]'), expressionLabel = composer.querySelector('[data-sc-unified-format-label]');
   const outputTabs = composer.querySelector('[role="tablist"]'), outputControl = outputTabs.parentElement, tabButtons = Object.fromEntries(OUTPUT_TABS.map(tab => [tab, composer.querySelector(`#sc-output-tab-${tab}`)]));
   toolbar.insertBefore(outputControl, toolbar.querySelector('.sc-route') || null);
+  const sourceHead = composer.querySelector('.sc-unified-head');
+  const sourceIntro = doc.createElement('div');
+  sourceIntro.className = 'sc-source-intro';
+  sourceIntro.innerHTML = '<h2>素材を選ぶ</h2><p>ファイルはこの端末内で処理されます。</p>';
+  const asciiShortcut = doc.createElement('button');
+  asciiShortcut.type = 'button';
+  asciiShortcut.className = 'sc-ascii-shortcut';
+  asciiShortcut.textContent = 'ASCIIアートに変換';
+  asciiShortcut.hidden = true;
+  if (!receivedToolOutput) {
+    composer.prepend(sourceIntro, sourceHead, textWrap, outputControl);
+    controls.after(asciiShortcut);
+  }
+
 
   let handoffSettings = null, handoffAux = null, handoffSummary = null, handoffSummaryObserver = null,
     handoffLateObserver = null, handoffReadyStatusObserver = null, handoffSummaryUpdateListener = null, handoffSummaryRefresh = null;
@@ -471,6 +497,7 @@ export function mountUnifiedConversionInput({ main, toolbar, doc = document, win
     if (nativeOutputSettings.multiple) auxContent.append(nativeOutputSettings.multiple);
     composer.insertBefore(fileRow, composer.firstChild);
     composer.insertBefore(handoffSettings, fileRow.nextSibling);
+    fileRow.before(sourceHead);
     composer.append(handoffAux);
     if (nativeOutputSettings.fileSettings) nativeOutputSettings.fileSettings.hidden = true;
     if (nativeOutputSettings.settingsButton) nativeOutputSettings.settingsButton.hidden = true;
@@ -489,7 +516,7 @@ export function mountUnifiedConversionInput({ main, toolbar, doc = document, win
   } else if (simpleHandoffSettings) {
     const fileRow = doc.createElement('section'); fileRow.className = 'sc-handoff-file';
     fileRow.setAttribute('aria-label', '保存するファイル');
-    const filenameLabel = doc.createElement('span'); filenameLabel.className = 'sc-handoff-filename-label'; filenameLabel.textContent = 'ファイル名';
+    const filenameLabel = doc.createElement('span'); filenameLabel.className = 'sc-handoff-filename-label'; filenameLabel.textContent = '保存名';
     const filenameValue = doc.createElement('strong'); filenameValue.className = 'sc-handoff-filename-value';
     fileRow.append(filenameLabel, filenameValue);
     handoffSettings = doc.createElement('details'); handoffSettings.className = 'sc-handoff-settings';
@@ -509,6 +536,7 @@ export function mountUnifiedConversionInput({ main, toolbar, doc = document, win
     if (simpleHandoffSettings.support) auxContent.append(simpleHandoffSettings.support);
     composer.insertBefore(fileRow, composer.firstChild);
     composer.insertBefore(handoffSettings, fileRow.nextSibling);
+    fileRow.before(sourceHead);
     composer.append(handoffAux);
     if (simpleHandoffSettings.settingsButton) simpleHandoffSettings.settingsButton.hidden = true;
     const updateHandoffSummary = () => {
@@ -519,8 +547,12 @@ export function mountUnifiedConversionInput({ main, toolbar, doc = document, win
       handoffSummary.textContent = [formatOption?.textContent?.trim() || String(formatValue).toUpperCase(), dimensions].filter(Boolean).join(' · ');
       const savedName = main.querySelector('[data-download]')?.download || simpleHandoffSettings.filename?.textContent?.trim()
         || simpleHandoffSettings.sourceRow?.querySelector('[data-name]')?.textContent?.trim() || '';
-      filenameValue.textContent = savedName;
-      filenameValue.hidden = !savedName;
+      const visibleSourceName = sourceStrip.querySelector('.sc-material-card[data-selected="true"] .sc-material-select > strong')?.textContent;
+      const showSaveName = Boolean(savedName && savedName !== visibleSourceName);
+      writeUnifiedProperty(filenameValue, 'textContent', savedName);
+      writeUnifiedProperty(filenameValue, 'hidden', !showSaveName);
+      writeUnifiedProperty(filenameLabel, 'hidden', !showSaveName);
+      writeUnifiedProperty(fileRow, 'hidden', !showSaveName && !simpleHandoffSettings.actions);
     };
     handoffSummaryRefresh = updateHandoffSummary;
     updateHandoffSummary();
@@ -555,6 +587,14 @@ export function mountUnifiedConversionInput({ main, toolbar, doc = document, win
     handoffReadyStatusObserver?.observe(saveMessage, { childList: true, characterData: true, subtree: true });
   }
   const fileButton = composer.querySelector('[data-ui-source="file"]'), textButton = composer.querySelector('[data-ui-source="text"]');
+  const fileLabel = doc.createElement('span');
+  const fileThumbnail = doc.createElement('canvas');
+  fileThumbnail.className = 'sc-source-thumbnail';
+  fileThumbnail.setAttribute('aria-hidden', 'true');
+  fileThumbnail.hidden = true;
+  fileButton.replaceChildren(fileThumbnail, fileLabel);
+  let previousThumbnail = null;
+
   const sourceEdit = composer.querySelector('[data-sc-edit-source]');
   const nativeAction = root.querySelector('[data-tx-action]'), nativeStyle = root.querySelector('[data-tx-style]');
   if (textFilePick) settings.append(textFilePick);
@@ -566,9 +606,10 @@ export function mountUnifiedConversionInput({ main, toolbar, doc = document, win
   const cleanups = [];
   const listen = (node, event, fn, options) => { node.addEventListener(event, fn, options); cleanups.push(() => node.removeEventListener(event, fn, options)); };
   function revealTextEditor() {
-    const composerRect = composer.getBoundingClientRect(), sourceRect = source.getBoundingClientRect();
-    if (sourceRect.bottom > composerRect.bottom) composer.scrollTop += sourceRect.bottom - composerRect.bottom;
-    else if (sourceRect.top < composerRect.top) composer.scrollTop -= composerRect.top - sourceRect.top;
+    const rail = source.closest?.('.sc-source-rail') || composer;
+    const composerRect = rail.getBoundingClientRect(), sourceRect = source.getBoundingClientRect();
+    if (sourceRect.bottom > composerRect.bottom) rail.scrollTop += sourceRect.bottom - composerRect.bottom;
+    else if (sourceRect.top < composerRect.top) rail.scrollTop -= composerRect.top - sourceRect.top;
   }
   const optionsFrom = select => [...(select?.options || [])].map(o => ({ value: o.value, label: o.textContent.trim(), disabled: o.disabled || (o.parentElement?.tagName==='OPTGROUP'&&o.parentElement.disabled), ...(o.parentElement?.tagName==='OPTGROUP'?{group:o.parentElement.label}:{}) }));
   const currentNative = () => formatController?.snapshot?.({ busy: isBusy() }) || { available: false, options: [], value: '' };
@@ -592,6 +633,7 @@ export function mountUnifiedConversionInput({ main, toolbar, doc = document, win
     if (isBusy() || api.snapshot().composing) return false;
     sourceKind = 'text';
     sourceEditorOpen = true;
+    main.querySelector('[data-output-rail="source"]')?.click();
     api.setMode('input');
     update(); schedule(); source.focus({ preventScroll: true }); revealTextEditor(); return true;
   }
@@ -799,7 +841,7 @@ export function mountUnifiedConversionInput({ main, toolbar, doc = document, win
       if (controlsTarget === composer) composer.insertBefore(controls, controlsHome.nextSibling); else controlsTarget.prepend(controls);
       if (focused?.isConnected && !focused.disabled) focused.focus({ preventScroll: true });
     }
-    const alternate = composer.querySelector('[data-sc-text-alternate]');
+    const alternate = sourceHead.querySelector('[data-sc-text-alternate]');
     writeUnifiedProperty(alternate, 'hidden', !state.alternateTextAvailable); writeUnifiedProperty(alternate, 'disabled', busyState);
     writeUnifiedProperty(alternate, 'textContent', `別の文章（${Number(state.alternateTextLength || 0).toLocaleString()}文字）`);
     const textImport = visibility.tab === 'text' && sourceKind === 'text';
@@ -863,34 +905,76 @@ export function mountUnifiedConversionInput({ main, toolbar, doc = document, win
     const hasText = Boolean(state.text?.trim());
     const sources = sourceStrip;
     const hasMaterial=unifiedModeHasMaterial({ mode, text: state.text, loaded: Boolean(mat?.loaded), file: state.file });
+    const awaitingSource = !receivedToolOutput && !hasMaterial && !sourceEditorOpen;
+    writeUnifiedAttribute(main, 'data-awaiting-source', String(awaitingSource));
+    writeUnifiedProperty(sourceIntro, 'hidden', !awaitingSource);
+    writeUnifiedProperty(outputControl, 'hidden', awaitingSource);
+    writeUnifiedProperty(controls, 'hidden', awaitingSource);
+    writeUnifiedProperty(asciiShortcut, 'hidden', receivedToolOutput || mode !== 'media' || !eligibility.art);
+    writeUnifiedProperty(asciiShortcut, 'disabled', busyState);
     const placement=unifiedMaterialPlacement({mode,loaded:Boolean(mat?.loaded),hasMaterial});
-    if(addSlot){const destination=textImport?addHome:placement==='shared-strip'?sources:addHome;if(destination&&addSlot.parentNode!==destination)destination.append(addSlot);writeUnifiedAttribute(addSlot,'role',placement==='shared-strip'&&!textImport?'presentation':'listitem');writeUnifiedProperty(addSlot,'hidden',textImport);}
-    const emptyTarget = mode === 'media' && emptyArea ? composer.querySelector('.sc-unified-head') : textImport ? meta : composer.querySelector('.sc-unified-head');
-    if (emptyAdd.parentNode !== emptyTarget) {
-      if (emptyTarget === meta) meta.append(emptyAdd); else emptyTarget.prepend(emptyAdd);
+    const inlineMaterials = Boolean(materialList && mode === 'media' && mat?.loaded);
+    if (materialList && materialHome) {
+      if (inlineMaterials && materialList.parentNode !== sources) sources.append(materialList);
+      if (!inlineMaterials && materialList.parentNode !== materialHome) materialHome.insertBefore(materialList, materialNext);
+      if (inlineMaterials) for (const actions of materialList.querySelectorAll('.sc-material-card > .sc-material-card-actions')) {
+        const details = doc.createElement('details');
+        details.className = 'sc-material-options';
+        const summary = doc.createElement('summary');
+        summary.textContent = '⋯';
+        summary.setAttribute('aria-label', '素材の操作');
+        actions.before(details);
+        details.append(summary, actions);
+      }
     }
-    emptyAdd.classList.toggle('sc-unified-text-add', textImport);
-    writeUnifiedProperty(emptyAdd.querySelector('[data-sc-add-label]'), 'textContent', textImport ? '読込' : 'ファイルを追加');
-    writeUnifiedProperty(emptyAdd, 'hidden', textImport ? false : hasMaterial);
+    if (addSlot) {
+      const destination = inlineMaterials || textImport ? addHome : placement === 'shared-strip' ? sources : addHome;
+      if (destination && addSlot.parentNode !== destination) destination.append(addSlot);
+      writeUnifiedAttribute(addSlot, 'role', destination === sources ? 'presentation' : 'listitem');
+      writeUnifiedProperty(addSlot, 'hidden', textImport);
+    }
+    const emptyTarget = !awaitingSource && sourceKind === 'text' ? sources : sourceHead;
+    if (emptyAdd.parentNode !== emptyTarget) {
+      if (emptyTarget === sources) sources.append(emptyAdd); else sourceHead.prepend(emptyAdd);
+    }
+    emptyAdd.classList.toggle('sc-inline-source-add', emptyTarget === sources);
+    writeUnifiedProperty(emptyAdd.querySelector('[data-sc-add-label]'), 'textContent', awaitingSource ? 'ファイルを選ぶ' : textImport ? '読込' : 'ファイルを追加');
+    writeUnifiedAttribute(emptyAdd, 'aria-label', awaitingSource ? 'ファイルを選ぶ' : textImport ? '文章ファイルを読み込む' : 'ファイルを追加');
+    writeUnifiedProperty(emptyAdd, 'hidden', emptyTarget !== sources && hasMaterial);
     writeUnifiedProperty(dropNote,'hidden',hasMaterial);
-    writeUnifiedProperty(textButton, 'hidden', sourceKind === 'text');
-    writeUnifiedProperty(textButton, 'textContent', '文章を編集');
-    writeUnifiedProperty(fileButton, 'hidden', !hasMediaMaterial());
+    writeUnifiedProperty(textButton, 'hidden', !awaitingSource && sourceKind === 'text');
+    const textExcerpt = Array.from(state.text?.trim().replace(/\s+/g, ' ') || '').slice(0, 24).join('');
+    const textCardLabel = textExcerpt ? `文章 · ${textExcerpt}` : '文章を入力';
+    writeUnifiedProperty(textButton, 'textContent', awaitingSource ? '文章を入力' : textCardLabel);
+    writeUnifiedAttribute(textButton, 'title', awaitingSource ? '文章を入力' : '文章を編集');
+    writeUnifiedProperty(fileButton, 'hidden', inlineMaterials || !hasMediaMaterial());
     const showSourceChoices = showUnifiedMaterialChoices({ mode, hasText, hasFiles: hasMediaMaterial() })
       || (sourceKind === 'file' && (mode === 'media' || mode === 'output'))
       || (!hasMediaMaterial() && mode === 'media');
-    writeUnifiedProperty(sources, 'hidden', textImport ? !showUnifiedMaterialChoices({ mode, hasText, hasFiles: hasMediaMaterial() }) : placement!=='shared-strip'&&!showSourceChoices);
-    writeUnifiedProperty(fileButton, 'textContent', filename ? `📄 ${filename}` : 'ファイル素材');
+    writeUnifiedProperty(sources, 'hidden', !(sourceKind === 'text' && !awaitingSource) && !inlineMaterials && !awaitingSource && (textImport ? !showUnifiedMaterialChoices({ mode, hasText, hasFiles: hasMediaMaterial() }) : placement!=='shared-strip'&&!showSourceChoices));
+    writeUnifiedProperty(fileLabel, 'textContent', filename || 'ファイル素材');
+    const thumbnail = mode === 'media' ? main.querySelector('.sc-material-card[data-selected="true"] .sc-material-pixel') : null;
+    if (thumbnail !== previousThumbnail) {
+      previousThumbnail = thumbnail;
+      if (thumbnail) {
+        fileThumbnail.width = thumbnail.width;
+        fileThumbnail.height = thumbnail.height;
+        fileThumbnail.getContext('2d')?.drawImage(thumbnail, 0, 0);
+      }
+    }
+    writeUnifiedProperty(fileThumbnail, 'hidden', !thumbnail);
     writeUnifiedAttribute(fileButton, 'aria-pressed', String(sourceKind === 'file'));
     writeUnifiedAttribute(textButton, 'aria-pressed', String(sourceKind === 'text'));
     const textSourceVisible = sourceKind === 'text' && mode !== 'media';
-    const fileSourceVisible = sourceKind === 'file' && (Boolean(state.file) || Boolean(mat?.loaded) || Boolean(mat?.assets?.length));
-    writeUnifiedProperty(sourceEdit, 'hidden', !textSourceVisible && !fileSourceVisible);
+    if (textSourceVisible && !awaitingSource) {
+      if (sourceEdit.parentNode !== sources) sources.prepend(sourceEdit);
+    } else if (sourceEdit.parentNode !== sourceHead) sourceHead.append(sourceEdit);
+    writeUnifiedProperty(sourceEdit, 'hidden', !textSourceVisible || awaitingSource);
     writeUnifiedProperty(sourceEdit, 'disabled', busyState);
-    writeUnifiedProperty(sourceEdit, 'textContent', sourceKind === 'text' ? (sourceEditorOpen ? '編集を閉じる' : '文章を編集')
-      : sourceFileKind === 'image' ? '画像を追加・変更' : ['audio', 'video'].includes(sourceFileKind) ? 'メディアを追加・変更' : 'ファイルを追加・変更');
+    writeUnifiedProperty(sourceEdit, 'textContent', sourceEditorOpen ? '編集を閉じる' : textCardLabel);
+    writeUnifiedAttribute(sourceEdit, 'aria-label', sourceEditorOpen ? '文章の編集を閉じる' : '文章を編集');
     writeUnifiedAttribute(sourceEdit, 'aria-expanded', String(sourceKind === 'text' && sourceEditorOpen));
-    writeUnifiedAttribute(sourceEdit, 'aria-controls', sourceKind === 'text' ? 'tx-source' : 'output-layout');
+    writeUnifiedAttribute(sourceEdit, 'aria-controls', 'tx-source');
     writeUnifiedAttribute(composer, 'data-text-editor-open', String(sourceEditorOpen));
     for (const button of [textButton, fileButton, purpose, expression, emptyAdd]) writeUnifiedProperty(button, 'disabled', busyState);
     const guide = composer.querySelector('[data-sc-unified-guide]');
@@ -934,16 +1018,10 @@ export function mountUnifiedConversionInput({ main, toolbar, doc = document, win
   listen(textButton, 'click', activateText); listen(fileButton, 'click', activateFile);
   listen(sourceEdit, 'click', () => {
     if (isBusy() || api.snapshot().composing) return;
-    if (sourceKind === 'text') {
-      sourceEditorOpen = !sourceEditorOpen;
-      update(); schedule();
-      if (sourceEditorOpen) { source.focus({ preventScroll: true }); revealTextEditor(); }
-      else composer.scrollTop = 0;
-      return;
-    }
-    // Use the ordinary additive picker. A generic change affordance must not
-    // trigger the stage's potentially destructive “replace all” control.
-    if (choose) choose(); else emptyAdd.click();
+    sourceEditorOpen = !sourceEditorOpen;
+    update(); schedule();
+    if (sourceEditorOpen) { source.focus({ preventScroll: true }); revealTextEditor(); }
+    else composer.scrollTop = 0;
   });
   const selectOutputTab = async (tab, focus = false) => {
     const state = api.snapshot(), mode = activeMode(), mat = materialState(), plan = routePlan(tab, state, mode, mat);
@@ -1022,6 +1100,15 @@ export function mountUnifiedConversionInput({ main, toolbar, doc = document, win
     catch(error){localError=error?.message||'形式を変更できませんでした。';}
     update();schedule();
   };
+  listen(asciiShortcut, 'click', async () => {
+    localError = '';
+    try {
+      if (!await setPurposeValue('art')) throw new Error('この素材をASCIIアートに変換できませんでした。');
+      if (nativeStyle?.value !== 'ascii') formatController?.choose?.('ascii', { busy: isBusy() });
+      expression.focus({ preventScroll: true });
+    } catch (error) { localError = error.message; }
+    update(); schedule();
+  });
   listen(artStyle,'change',()=>changeFileStyle(artStyle));
   listen(codeFormat,'change',()=>changeFileStyle(codeFormat));
   listen(codeOpen,'click',async()=>{
@@ -1092,10 +1179,19 @@ export function mountUnifiedConversionInput({ main, toolbar, doc = document, win
     if (nativeOutputSettings?.fileSettings) nativeOutputSettings.fileSettings.hidden = oldFileSettingsHidden;
     if (nativeOutputSettings?.settingsButton) nativeOutputSettings.settingsButton.hidden = oldSettingsButtonHidden;
     if(addSlot&&addHome){if(addSlot.parentNode!==addHome)addHome.append(addSlot);addSlot.setAttribute('role','listitem');addSlot.hidden=oldAddSlotHidden;}
+    if (materialList && materialHome && materialList.parentNode !== materialHome) materialHome.insertBefore(materialList, materialNext);
+    for (const details of materialList?.querySelectorAll('.sc-material-options') || []) details.replaceWith(details.lastElementChild);
+    if (addControl) {
+      addControl.textContent = originalAddText;
+      if (originalAddLabel === null) addControl.removeAttribute('aria-label'); else addControl.setAttribute('aria-label', originalAddLabel);
+      addControl.removeAttribute('title');
+    }
+
     if(textFilePick)textFilePick.hidden=oldPickHidden;
     restoreUnifiedNodePositions(originalPositions);
     if (nativeSizeControl) nativeSizeControl.hidden = oldNativeSizeControlHidden;
     for (const url of receiptUrls.values()) win.URL.revokeObjectURL(url); receiptUrls.clear();
+    main.removeAttribute('data-awaiting-source');
     controls.remove(); composer.remove(); settings.remove(); dropNote.remove(); emptyAdd.remove(); outputControl.remove();
     if (oldUnifiedFlag === null) main.removeAttribute('data-unified-input'); else main.setAttribute('data-unified-input', oldUnifiedFlag);
     if (oldRootFlag === null) root.removeAttribute('data-unified-input'); else root.setAttribute('data-unified-input', oldRootFlag);

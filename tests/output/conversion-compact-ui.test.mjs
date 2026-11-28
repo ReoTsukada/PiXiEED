@@ -32,18 +32,18 @@ test('mobile toolbar allows an intrinsic-width action group and keeps touch targ
 
 test('the output entry refreshes the complete changed module and CSS chain', () => {
   for (const [file, dependencies, revision] of [
-    ['output/work/index.html', ['conversion-entry.mjs'], '20261118-draw-display-ad-1'],
-    ['output/work/index.html', ['conversion-unified-input.css'], '20261117-normal-apply-1'],
+    ['output/work/index.html', ['conversion-entry.mjs'], '20261128-output-compact-rails-1'],
+    ['output/work/index.html', ['conversion-unified-input.css'], '20261128-output-compact-rails-1'],
     ['js/creation/conversion-entry.mjs', ['output-page.mjs'], '20261117-normal-apply-1'],
     ['js/creation/conversion-entry.mjs', ['output-receive.mjs'], '20261117-normal-apply-1'],
     ['js/creation/output-receive.mjs', ['output-page.mjs'], '20261117-normal-apply-1'],
-    ['js/creation/conversion-entry.mjs', ['conversion-smart-ui.mjs'], '20261117-normal-apply-1'],
+    ['js/creation/conversion-entry.mjs', ['conversion-smart-ui.mjs'], '20261128-output-compact-rails-1'],
     ['js/creation/conversion-entry.mjs', ['text-tools.mjs'], '20261117-normal-apply-1'],
-    ['js/creation/conversion-smart-ui.mjs', ['conversion-unified-input.mjs'], '20261117-normal-apply-1'],
-    ['js/creation/conversion-smart-ui.mjs', ['conversion-result-surface.mjs'], '20261117-normal-apply-1'],
-    ['js/creation/conversion-smart-ui.mjs', ['conversion-result-surface.mjs'], '20261117-normal-apply-1'],
+    ['js/creation/conversion-smart-ui.mjs', ['conversion-unified-input.mjs'], '20261128-output-compact-rails-1'],
+    ['js/creation/conversion-smart-ui.mjs', ['conversion-result-surface.mjs'], '20261128-output-compact-rails-1'],
+    ['js/creation/conversion-smart-ui.mjs', ['conversion-result-surface.mjs'], '20261128-output-compact-rails-1'],
     ['js/creation/conversion-result-surface.mjs', ['conversion-source-preview.css'], '20261110-output-layout-7'],
-    ['js/creation/conversion-unified-input.mjs', ['conversion-unified-input.css'], '20261117-normal-apply-1'],
+    ['js/creation/conversion-unified-input.mjs', ['conversion-unified-input.css'], '20261128-output-compact-rails-1'],
     ['js/creation/conversion-page.mjs', ['conversion-service.mjs'], '20261117-normal-apply-1'],
     ['js/creation/conversion-page.mjs', ['conversion-timeline.mjs'], '20261117-normal-apply-1'],
     ['js/creation/output-receive.mjs', ['conversion-service.mjs'], '20261117-normal-apply-1'],
@@ -54,7 +54,7 @@ test('the output entry refreshes the complete changed module and CSS chain', () 
     ['js/creation/conversion-media-recovery.mjs', ['conversion-timeline.mjs'], '20261117-normal-apply-1'],
     ['js/creation/conversion-smart-ui.mjs', ['conversion-smart-ui.css'], '20261105-video-size-1'],
     ['js/creation/conversion-smart-ui.mjs', ['conversion-stage.mjs'], '20261105-video-size-1'],
-    ['js/creation/conversion-smart-ui.mjs', ['conversion-workspace.mjs'], '20261110-output-layout-7'],
+    ['js/creation/conversion-smart-ui.mjs', ['conversion-workspace.mjs'], '20261128-output-compact-rails-1'],
     ['js/creation/conversion-workspace.mjs', ['conversion-stage.mjs'], '20261105-video-size-1'],
   ]) for (const dependency of dependencies) assert.ok(read(file).includes(`${dependency}?rev=${revision}`), `${file}: ${dependency}`);
 });
@@ -74,9 +74,9 @@ test('output guidance is progressive, warnings stay inline, and add actions reta
   assert.match(recovery, /data-sc-local-recovery-message role="status"/);
   assert.match(result, /現在の設定でまだ出力が生成されていません。/);
   assert.match(result, /更新中です。前回の出力があれば、その内容と形式を表示します。/);
-  assert.match(result, /入力すると、ここで仕上がりを確認できます。/);
+  assert.match(result, /素材を追加すると、ここに結果が表示されます。/);
   assert.match(result, /data-result-refresh aria-label="プレビューを更新"[^>]*>更新/);
-  assert.match(unifiedCss, /\.sc-unified-text \.tx-input-meta > \.sc-unified-text-add/);
+  assert.match(unifiedCss, /\.sc-unified-sources \.sc-inline-source-add/);
 });
 
 test('output tabs keep engine and source controls decoupled from category', () => {
@@ -87,12 +87,12 @@ test('output tabs keep engine and source controls decoupled from category', () =
   assert.match(input, /conversionOutputTabVisibility\(tabState\.tab, mode\)/);
   assert.match(input, /showTextEngine: mode === 'input' \|\| mode === 'output'/);
   assert.match(input, /sourceKind === 'text' \? '文字の扱い' : '作るもの'/);
-  assert.match(input, /sourceKind === 'text' \? \(sourceEditorOpen \? '編集を閉じる' : '文章を編集'\)/);
-  assert.match(input, /writeUnifiedProperty\(textButton, 'hidden', sourceKind === 'text'\)/, 'hide the duplicate source-strip edit control while its edit affordance is active');
+  assert.match(input, /sourceEditorOpen \? '編集を閉じる' : textCardLabel/);
+  assert.match(input, /writeUnifiedProperty\(textButton, 'hidden', !awaitingSource && sourceKind === 'text'\)/, 'hide the duplicate source-strip edit control while its edit affordance is active');
   assert.match(sourceActivation, /sourceEditorOpen = true;[\s\S]*source\.focus\(\{ preventScroll: true \}\)/, 'the source-switch edit entry opens and focuses the editor in one click');
   assert.match(smartUi, /choose\(\) \{ if \(mode\(\) === 'input'\) \{ if \(unified\?\.openTextEditor\) unified\.openTextEditor\(\); else \$\('\[data-tx-source\]'\)\?\.focus\(\); \} else choose\(\); \}/, 'the empty-output CTA opens the collapsed text editor before focusing it');
-  assert.match(input, /sourceFileKind === 'image' \? '画像を追加・変更'/);
-  assert.match(clickHandler, /if \(choose\) choose\(\); else emptyAdd\.click\(\)/);
+  assert.match(input, /addControl\.setAttribute\('aria-label', '素材を追加'\)/);
+  assert.match(clickHandler, /sourceEditorOpen = !sourceEditorOpen/);
   assert.doesNotMatch(clickHandler, /data-sc-material-replace/);
   assert.match(input, /文字認識（OCR）ではありません/);
   assert.match(unifiedCss, /data-text-editor-open="false"\] \.sc-unified-text \{ display: none/);

@@ -62,7 +62,7 @@ function fixture(){
 test('actual mount shares one host, readonly preview has no download, and destroy restores original DOM order and URLs',async()=>{
  const f=fixture();const actual=f.host;
  assert.ok(actual);assert.equal(f.card.parentNode,f.composer.querySelector('.sc-result-aux-content'));assert.equal(f.legacy.parentNode,f.composer.querySelector('.sc-result-aux-content'));assert.equal(f.summary.parentNode,f.composer.querySelector('.sc-result-aux-content'));
- assert.equal(f.controls.parentNode,f.composer,'unified output controls stay in the settings pane');assert.equal(f.settingsButton.parentNode,f.head,'native settings entry stays on the settings side');
+ assert.equal(f.controls.parentNode,f.composer,'unified output controls stay in the settings pane');assert.equal(f.settingsButton.parentNode,f.composer,'native settings entry belongs to the settings rail');
  let renders=0;const blob=new Blob(['png']);
  f.api.update({mode:'media',key:'a',loaded:true,ready:false,working:false,capability:{supported:true,automatic:true},api:{previewOutput:async()=>{renders++;return{blob,filename:'a.png'};}}});
  await f.tick();assert.equal(renders,1);assert.equal(actual.dataset.current,'true');assert.match(actual.querySelector('img').src,/^blob:/);
