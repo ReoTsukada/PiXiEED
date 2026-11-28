@@ -400,7 +400,6 @@ function mount() {
     hintNotice.textContent = allowance;
     hintButton.setAttribute('aria-label', `ヒント：未発見の場所を一時表示。${allowance}`);
     hintButton.setAttribute('aria-busy', String(pending));
-    hintButton.dataset.freeRemaining = String(freeRemaining);
     hintButton.title = `未発見の場所を一時表示（正解には数えません。${allowance}）`;
   } });
   const syncHint = () => {

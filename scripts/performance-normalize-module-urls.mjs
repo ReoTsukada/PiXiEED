@@ -306,6 +306,7 @@ function normalize(source, file) {
   changed = changed.replace(/(["'`])([^"'`\s<>]+\.(?:mjs|css))\?([^"'`\s<>]*)\1/g, (whole, quote, path, query) => {
     if ((!path.startsWith('/') && !path.startsWith('.')) || path.startsWith('//')) return whole;
     const target = path.startsWith('/') ? path.slice(1) : posix.normalize(posix.join(posix.dirname(relative(root, file)), path));
+    if (target === 'js/creation/pixfind-play.mjs') return `${quote}${path}?${query.replace(/(^|&)rev=[^&]*/, '$1rev=20261128-pixfind-start-1')}${quote}`;
     if (target === 'js/social/api.mjs') return `${quote}${path}?${query.replace(/(^|&)rev=[^&]*/, '$1rev=20261128-explore-puzzle-posts-1')}${quote}`;
     if (!sourceFirstTargets.has(target) && !workShelfTargets.has(target) && !outputPostDraftTargets.has(target)) return whole;
     const revision = outputPostDraftTargets.has(target) ? '20261128-output-post-draft-1' : workShelfTargets.has(target) ? '20261128-work-shelf-1' : '20261128-output-compact-rails-1';

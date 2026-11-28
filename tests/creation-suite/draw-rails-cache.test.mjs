@@ -149,6 +149,11 @@ test('Draw rail, editor UI, and direct runtime changes invalidate every parent a
       });
       assert.ok(urls.length, `${owner} references ${target}`);
       assert.ok(revisions[target], `${target} has a release revision`);
+      if (target === 'js/creation/pixfind-play.mjs') {
+        assert.equal(revisions[target], '20261128-pixfind-start-1');
+        for (const value of urls) assert.equal(new URL(value, `https://local.invalid/${owner}`).searchParams.get('rev'), revisions[target]);
+        continue;
+      }
       if (target === 'js/social/app.mjs') {
         for (const value of urls) assert.equal(new URL(value, `https://local.invalid/${owner}`).searchParams.get('rev'), '20261128-explore-puzzle-posts-1');
         continue;
