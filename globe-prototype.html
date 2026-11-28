@@ -12,6 +12,7 @@
       var params = new URLSearchParams(location.search);
       var isTelescope = params.get('tool') === 'telescope';
       if (params.get('embed') === '1') document.documentElement.classList.add('is-embedded');
+      if (params.get('embed') === '1' && params.get('explore') === '1' && !isTelescope) document.documentElement.classList.add('is-explore-map');
       if (!isTelescope) document.documentElement.classList.add('is-map-loading');
       if (location.protocol === 'file:') {
         var target = new URL('/globe-prototype.html', 'http://127.0.0.1:4173');
@@ -22,6 +23,8 @@
     }());
   </script>
   <style>
+    html.is-explore-map #mapLayerSwitch, html.is-explore-map .map-events-dock__all { display: none !important; }
+    html.is-explore-map .map-events-dock__top { grid-template-columns: minmax(0, 1fr); }
     html.is-map-loading .map-load-notice { pointer-events:none; position:absolute; z-index:8; top:max(76px,env(safe-area-inset-top)); left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:10px; width:max-content; max-width:calc(100% - 24px); min-height:44px; padding:8px 14px; border:1px solid rgba(140,210,226,.24); border-radius:999px; color:#d8edef; background:#071520ed; box-shadow:0 8px 24px rgba(0,0,0,.3); font:600 13px/1.35 system-ui,sans-serif; }
     html.is-map-loading .map-load-notice[hidden] { display:flex; }
     html.is-map-loading .map-load-notice p { margin:0; overflow:hidden; text-overflow:ellipsis; }
@@ -109,7 +112,7 @@
     <a href="/tools/" aria-label="ツール" data-globe-nav-tools><img src="/assets/icons/pixieed/tools.svg" alt=""></a>
     <a href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>
   </nav>
-  <script type="module" src="js/globe/prototype.mjs?rev=20261111-output-offerwall-1"></script>
+  <script type="module" src="/js/globe/prototype.mjs?rev=20261128-explore-modes-1"></script>
   <script type="module" src="/js/site-header.mjs?rev=20261128-explore-shop-1"></script>
   <script type="module" src="/js/tool-help-bootstrap.mjs?rev=20261116-normal-release-2"></script>
 </body>

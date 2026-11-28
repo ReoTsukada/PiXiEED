@@ -13,14 +13,14 @@ test('Explore is the community experience and matches the home visual language',
   assert.match(home, /class="portal-actions"/);
   assert.match(home, /class="portal-action" href="\/explore\/#works"/);
   assert.match(explore, /data-social-page="explore"/);
-  assert.match(explore, /class="explore-timeline-heading"/);
+  assert.match(explore, /id="pageTitle" class="sr-only"/);
   assert.doesNotMatch(explore, /class="(?:explore-hero|composer-prompt|event-card|right-column)"/);
   assert.match(read('tools/index.html'), /href="\/explore\/\?compose=new">作品を投稿する/);
   assert.match(read('profile/index.html'), /href="\/explore\/\?view=mine"/);
   assert.match(explore, /css\/social-explore\.css\?rev=/);
   assert.match(explore, /js\/social\/app\.mjs\?rev=20261128-growing-catalog-1/);
   assert.match(explore, /href="\/"/);
-  assert.match(explore, /href="\/globe\/"/);
+  assert.match(explore, /data-explore-layout="map"/);
   assert.match(explore, /href="\/tools\/"/);
   assert.doesNotMatch(explore, /data-social-page="home"/);
   assert.ok(!explore.split('\n').some(line => line.trim() === 'ide>'), 'No broken closing tag fragment');

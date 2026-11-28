@@ -81,7 +81,7 @@ test('six home actions use equal desktop cards and responsive, accessible contro
   assert.ok(actions);
   assert.equal((actions.match(/class="portal-action"/g) || []).length, 6);
   for (const label of ['描く', '音楽を作る', '写真をドット絵に', 'イベントを調べる', '投稿を見る', '画像出力']) assert.ok(actions.includes(`<strong>${label}</strong>`));
-  for (const href of ['/tools/start/draw/', '/tools/start/audio/', '/tools/start/camera/', '/globe/?view=events', '/explore/#works', '/output/text/']) assert.ok(actions.includes(`href="${href}"`));
+  for (const href of ['/tools/start/draw/', '/tools/start/audio/', '/tools/start/camera/', '/explore/?content=events&amp;layout=map', '/explore/#works', '/output/text/']) assert.ok(actions.includes(`href="${href}"`));
   for (const name of ['draw-pc-maou-480.webp','home-audio-editor-480.webp','home-camera-workspace-480.webp','home-events-screen-480.png','home-explore-screen-480.png','home-ascii-preview-480.webp']) assert.ok(actions.includes(name), name);
   assert.ok(home.indexOf('class="portal-work-entry"') < home.indexOf('class="portal-actions"'));
 });

@@ -19,7 +19,8 @@
   <link rel="stylesheet" href="/css/social-explore.css?rev=20261128-growing-catalog-1">
   <script type="module" src="/js/social/app.mjs?rev=20261128-growing-catalog-1"></script>
 <link rel="stylesheet" href="/css/posting-consent.css?rev=20261022-posting-live-1">
-  <link rel="stylesheet" href="/css/explore-sections.css?rev=20261128-explore-shop-1">
+  <link rel="stylesheet" href="/css/explore-sections.css?rev=20261128-explore-modes-1">
+  <script type="module" src="/js/explore-modes.mjs?rev=20261128-explore-modes-1"></script>
 </head>
 <body data-social-page="explore">
   <div class="social-app" id="socialApp">
@@ -31,29 +32,36 @@
       </nav>
     </header>
 
-  <nav class="explore-sections" aria-label="探すページの表示">
-    <a href="/explore/" aria-current="page"><img src="/assets/icons/pixieed/artwork.svg" width="20" height="20" alt="">みんなの作品</a>
-    <a href="/globe/"><img src="/assets/icons/pixieed/globe.svg" width="20" height="20" alt="">地図</a>
-  </nav>
+    <div class="explore-sections" id="exploreModes" aria-label="探す">
+      <div class="explore-toggle" role="group" aria-label="探す対象">
+        <button type="button" data-explore-content="posts" aria-pressed="true">投稿</button>
+        <button type="button" data-explore-content="events" aria-pressed="false">イベント</button>
+      </div>
+      <div class="explore-toggle explore-toggle--view" role="group" aria-label="表示方法">
+        <button type="button" data-explore-layout="list" aria-pressed="true"><img src="/assets/icons/pixieed/tools.svg" alt="" width="16" height="16">一覧</button>
+        <button type="button" data-explore-layout="map" aria-pressed="false"><img src="/assets/icons/pixieed/globe.svg" alt="" width="16" height="16">マップ</button>
+      </div>
+    </div>
 
-    <main class="feed-column">
+    <main class="feed-column" id="explorePosts" aria-labelledby="pageTitle">
       <noscript><p>フィードの閲覧と下書き保存にはJavaScriptが必要です。<a href="/tools/">制作ツール一覧</a>も利用できます。</p></noscript>
       <aside class="demo-banner" id="localPreviewNotice" aria-label="ローカルプレビューのお知らせ" hidden>
         <span class="demo-banner__dot" aria-hidden="true"></span>
         <p><strong>ローカルプレビュー</strong><span>投稿の表示・保存状態はこの環境で確認できます</span></p>
       </aside>
 
-      <section id="works" class="explore-timeline-heading" aria-labelledby="pageTitle">
-        <h1 id="pageTitle">みんなの作品</h1>
+      <div id="works">
+        <h1 id="pageTitle" class="sr-only">みんなの作品</h1>
         <p id="viewDescription" hidden></p>
-        <button type="button" class="explore-search-toggle" data-action="search" aria-label="作品・作者を検索" aria-controls="exploreSearchPanel" aria-expanded="false" disabled data-boot-disabled><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.7" cy="10.7" r="6.4"></circle><path d="m15.4 15.4 4.5 4.5"></path></svg></button>
-      </section>
-
+      </div>
+      <div class="explore-list-controls">
       <nav class="feed-views" id="feedViews" aria-label="作品の表示を切り替え">
         <button type="button" data-action="view" data-view="feed" aria-label="みんなの作品" aria-pressed="true" disabled data-boot-disabled><span aria-hidden="true">✦</span> 作品</button>
         <button type="button" data-action="filter" data-type="puzzle" aria-pressed="false" disabled data-boot-disabled><span aria-hidden="true">▷</span> パズル</button>
         <button type="button" data-action="view" data-view="saved" aria-label="保存した作品" aria-pressed="false" disabled data-boot-disabled><span aria-hidden="true">♡</span> 保存</button>
       </nav>
+        <button type="button" class="explore-search-toggle" data-action="search" aria-label="作品・作者を検索" aria-controls="exploreSearchPanel" aria-expanded="false" disabled data-boot-disabled><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.7" cy="10.7" r="6.4"></circle><path d="m15.4 15.4 4.5 4.5"></path></svg></button>
+      </div>
       <section id="exploreSearchPanel" class="explore-search-panel" aria-label="検索と絞り込み" hidden>
         <label class="explore-search"><span class="explore-search-heading">作品・作者を探す</span>
           <span class="explore-search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.7" cy="10.7" r="6.4"></circle><path d="m15.4 15.4 4.5 4.5"></path></svg><input id="socialSearch" type="search" placeholder="気になる作品や作者…" aria-label="読み込んだ公開作品を検索"></span>
@@ -95,6 +103,20 @@
         </details>
       </section>
     </main>
+    <section class="feed-column explore-events" id="exploreEvents" aria-label="イベント一覧" hidden>
+      <div class="explore-toggle explore-event-period" id="exploreEventPeriod" role="group" aria-label="開催時期">
+        <button type="button" value="all" aria-pressed="true">すべて</button>
+        <button type="button" value="future" aria-pressed="false">今後・開催中</button>
+        <button type="button" value="past" aria-pressed="false">過去</button>
+      </div>
+      <p id="exploreEventStatus" class="feed-status" role="status" hidden></p>
+      <button id="exploreEventRetry" class="feed-retry" type="button" hidden>もう一度読み込む</button>
+      <div id="exploreEventCards" class="feed-list"></div>
+    </section>
+    <section id="exploreMap" aria-label="マップ" hidden>
+      <iframe id="exploreMapFrame" title="投稿とイベントのマップ" allow="geolocation"></iframe>
+    </section>
+
 
     <nav class="mobile-nav public-destination-nav" aria-label="ページ切替"><a data-public-nav="home" class="mobile-nav__item" href="/"><img src="/assets/icons/pixieed/home.svg" alt=""><span>ホーム</span></a>
 <a data-public-nav="explore" class="mobile-nav__item is-current" href="/explore/" aria-current="page"><img src="/assets/icons/pixieed/telescope.svg" alt=""><span>探す</span></a>

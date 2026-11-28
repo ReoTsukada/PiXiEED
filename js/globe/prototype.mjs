@@ -11,7 +11,10 @@ const telescopePostModulesPromise = telescopeTool ? loadPostUiModules() : null;
 // Astronomy belongs to the stand-alone telescope; a map never starts its timers or catalogue.
 const astronomy = telescopeTool ? await Promise.all([import('./astro-ui.mjs?v=20261005-admin-boundary-1'), import('./real-sky.mjs?v=20260927-sky-events-v1')]) : null;
 const telescopePostModules = telescopePostModulesPromise ? await telescopePostModulesPromise : null;
-const embedMode = new URLSearchParams(location.search).get('embed') === '1';
+const mapParams = new URLSearchParams(location.search);
+const embedMode = mapParams.get('embed') === '1';
+const exploreMode = embedMode && window.parent !== window && !telescopeTool && mapParams.get('explore') === '1';
+let exploreLayer = mapParams.get('layer') === 'events' ? 'events' : 'posts';
 // Explicit artwork/post arrivals take precedence over a previous browsing position.
 let navigationState = null, navigationRestorationCancelled = false, openEvents = false;
 try {
@@ -311,8 +314,8 @@ function createPrototypeRenderer(options = {}) {
     globalThis.__PIXIEED_MAP_EVENTS__ = eventUi;
     updateMapContent();
     if (navigationState?.view) renderer.setView(navigationState.view);
-    setMapContentLayer(openEvents ? 'events' : navigationState?.layer || 'posts');
-    if (navigationState?.events) {
+    setMapContentLayer(exploreMode ? exploreLayer : openEvents ? 'events' : navigationState?.layer || 'posts');
+    if (navigationState?.events && !exploreMode) {
       const saved = navigationState.events;
       void eventUi.ready.then(() => { if (!navigationRestorationCancelled) eventUi.restoreNavigationState(saved); });
     }
@@ -402,6 +405,10 @@ function updateMapContent() {
   if (currentHover) showCellHover(currentHover);
 }
 function setMapContentLayer(layer) {
+  if (exploreMode && layer !== exploreLayer) {
+    exploreLayer = layer;
+    window.parent.postMessage({ type: 'pixieed:explore-map-layer-changed', layer }, location.origin);
+  }
   mapContentLayer = layer === 'events' ? 'events' : 'posts';
   renderer?.setMapContentLayer?.(mapContentLayer);
   globeStage.classList.toggle('is-events-layer', mapContentLayer === 'events');
@@ -413,9 +420,20 @@ function setMapContentLayer(layer) {
   updateStartupControls();
 }
 function syncObservationViews() {
-  if (viewSwitch) viewSwitch.hidden = telescopeTool;
+  if (viewSwitch) viewSwitch.hidden = telescopeTool || exploreMode;
   if (telescopeTool && (globeStage.classList.contains('is-orrery') || globeStage.classList.contains('is-scope'))) paintRealSky();
 }
+if (exploreMode) window.addEventListener('message', event => {
+  const layer = event.data?.layer;
+  if (event.origin !== location.origin || event.source !== window.parent
+      || event.data?.type !== 'pixieed:explore-map-layer' || !['posts', 'events'].includes(layer)) return;
+  exploreLayer = layer;
+  if (!renderer || !eventUi || mapContentLayer === layer) return;
+  postUi?.close();
+  eventUi.close();
+  setMapContentLayer(layer);
+});
+
 viewSwitch?.addEventListener('click', event => {
   const button = event.target.closest('[data-map-content]');
   if (!button || button.getAttribute('aria-pressed') === 'true') return;

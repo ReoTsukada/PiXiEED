@@ -95,13 +95,11 @@ test('all static store detail map CTAs describe the world map destination', () =
   assert.match(read('js/app.js'), /href="\/globe\/">世界地図を見る<\/a>/);
 });
 
-test('Explore and map share the same section links and mark their own section current', () => {
-  for (const [file, active] of [['explore/index.html', '/explore/'], ['globe/index.html', '/globe/']]) {
-    const html = read(file);
-    const tabBar = html.match(/<nav class="explore-sections"[^>]*>([\s\S]*?)<\/nav>/)?.[1];
-    assert.ok(tabBar, file);
-    assert.deepEqual([...tabBar.matchAll(/<a href="([^"]+)"/g)].map(match => match[1]), ['/explore/', '/globe/']);
-    assert.equal(tabBar.match(/<a href="([^"]+)" aria-current="page"/)?.[1], active);
-    assert.match(html, /data-public-nav="explore"[^>]*aria-current="page"/);
-  }
+test('Explore keeps layout and content independent under the same navigation', () => {
+  const html = read('explore/index.html');
+  assert.deepEqual([...html.matchAll(/data-explore-content="([^"]+)"/g)].map(match => match[1]), ['posts', 'events']);
+  assert.deepEqual([...html.matchAll(/data-explore-layout="([^"]+)"/g)].map(match => match[1]), ['list', 'map']);
+  assert.match(html, /id="exploreMapFrame"/);
+  assert.match(html, /data-public-nav="explore"[^>]*aria-current="page"/);
+  assert.match(read('globe/index.html'), /<iframe id="globeFrame"/);
 });
