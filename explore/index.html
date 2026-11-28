@@ -19,6 +19,7 @@
   <link rel="stylesheet" href="/css/social-explore.css?rev=20261128-growing-catalog-1">
   <script type="module" src="/js/social/app.mjs?rev=20261128-growing-catalog-1"></script>
 <link rel="stylesheet" href="/css/posting-consent.css?rev=20261022-posting-live-1">
+  <link rel="stylesheet" href="/css/explore-sections.css?rev=20261128-explore-shop-1">
 </head>
 <body data-social-page="explore">
   <div class="social-app" id="socialApp">
@@ -29,6 +30,11 @@
         <a class="explore-profile-link" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" width="22" height="22" alt=""></a>
       </nav>
     </header>
+
+  <nav class="explore-sections" aria-label="探すページの表示">
+    <a href="/explore/" aria-current="page"><img src="/assets/icons/pixieed/artwork.svg" width="20" height="20" alt="">みんなの作品</a>
+    <a href="/globe/"><img src="/assets/icons/pixieed/globe.svg" width="20" height="20" alt="">地図</a>
+  </nav>
 
     <main class="feed-column">
       <noscript><p>フィードの閲覧と下書き保存にはJavaScriptが必要です。<a href="/tools/">制作ツール一覧</a>も利用できます。</p></noscript>
@@ -93,7 +99,7 @@
     <nav class="mobile-nav public-destination-nav" aria-label="ページ切替"><a data-public-nav="home" class="mobile-nav__item" href="/"><img src="/assets/icons/pixieed/home.svg" alt=""><span>ホーム</span></a>
 <a data-public-nav="explore" class="mobile-nav__item is-current" href="/explore/" aria-current="page"><img src="/assets/icons/pixieed/telescope.svg" alt=""><span>探す</span></a>
 <a data-public-nav="create" class="mobile-nav__item" href="/tools/"><img src="/assets/icons/pixieed/tools.svg" alt=""><span>つくる</span></a>
-<a data-public-nav="map" class="mobile-nav__item" href="/globe/"><img src="/assets/icons/pixieed/globe.svg" alt=""><span>地図</span></a>
+<a data-public-nav="shop" class="mobile-nav__item" href="/books/"><img src="/assets/icons/pixieed/shop.svg" alt=""><span>ショップ</span></a>
 <a data-public-nav="me" class="mobile-nav__item" href="/profile/"><img src="/assets/icons/pixieed/profile.svg" alt=""><span>自分</span></a></nav>
 
     <dialog class="composer-dialog" id="composerDialog" aria-labelledby="composerTitle">

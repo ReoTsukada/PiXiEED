@@ -53,8 +53,8 @@ export function addSiteFontFallback(html) {
 export function addSiteHeaderBenefits(html, name = '') {
   const original = html;
   // Keep the established shared-header version normalization.
-  html = html.replace(/(href="\/css\/site-header\.css)(?:\?rev=[^\"]*)?("?)/i, '$1?rev=20261024-free-tools-1$2');
-  html = html.replace(/(src="[^"<>]*\/js\/site-header\.mjs)(?:\?[^"<>]*)?("?)/gi, '$1?rev=20261111-output-offerwall-1$2');
+  html = html.replace(/(href="\/css\/site-header\.css)(?:\?rev=[^\"]*)?("?)/i, '$1?rev=20261128-explore-shop-1$2');
+  html = html.replace(/(src="[^"<>]*\/js\/site-header\.mjs)(?:\?[^"<>]*)?("?)/gi, '$1?rev=20261128-explore-shop-1$2');
   html = html.replace(/<script\b(?=[^>]*\bsrc\s*=\s*(["'])\/js\/site-header-benefits\.mjs(?:\?[^"']*)?\1)[^>]*>\s*<\/script>\s*/gi, '');
   const skipped = headerRewardRedirects.has(name) || /<body\b[^>]*\bdata-admin-page\b/i.test(html);
   return { html, added: false, removed: html !== original, skipped };
@@ -191,7 +191,7 @@ export async function buildPagesSite({ root = sourceRoot, output, esbuildPath } 
       }
       // Explicit new public sources are also reviewable in a clean local build
       // before they are committed. Arbitrary untracked work stays excluded.
-      for (const name of ['js/creation/conversion-source-inspector.mjs', 'css/conversion-source-preview.css', 'assets/icons/pixieed/back.svg', 'css/task-ui.css', 'css/help-center.css', 'explore/index.html', 'welcome/index.html', 'js/public-navigation.mjs', 'css/public-navigation.css', 'js/creation/output-audio-capabilities.mjs', 'js/creation/output-audio-encode.mjs', 'css/output-side-ad.css', 'js/ads/output-side-ad.mjs', 'css/page-gutters.css', 'js/information-auto-ads.mjs', 'js/event-archive-ad-policy.mjs', 'css/draw-audio-timbre-panel.css', 'js/creation/draw-audio-timbre-panel.mjs',
+      for (const name of ['js/creation/conversion-source-inspector.mjs', 'css/conversion-source-preview.css', 'assets/icons/pixieed/back.svg', 'css/task-ui.css', 'css/help-center.css', 'explore/index.html', 'welcome/index.html', 'js/public-navigation.mjs', 'js/public-navigation-entry.mjs', 'css/public-navigation.css', 'js/creation/output-audio-capabilities.mjs', 'js/creation/output-audio-encode.mjs', 'css/output-side-ad.css', 'js/ads/output-side-ad.mjs', 'css/page-gutters.css', 'js/information-auto-ads.mjs', 'js/event-archive-ad-policy.mjs', 'css/draw-audio-timbre-panel.css', 'js/creation/draw-audio-timbre-panel.mjs',
         'js/creation/draw-normal-map.mjs', 'js/creation/draw-normal-map-settings.mjs', 'js/creation/draw-normal-map-panel.mjs', 'css/draw-normal-map.css',
         'ai/index.html', 'ai/privacy/index.html', 'ai/support/index.html', 'css/ai-connect.css', 'js/mcp/pixel-art-contract.mjs', 'js/mcp/receive-page.mjs', 'js/mcp/draw-import.mjs', 'js/mcp/connection-config.mjs', 'js/mcp/tool-catalog.mjs',
         'assets/icons/pixieed/color-adjust.svg', 'assets/icons/pixieed/text.svg', 'assets/icons/pixieed/draw.svg',
@@ -200,7 +200,7 @@ export async function buildPagesSite({ root = sourceRoot, output, esbuildPath } 
         'assets/icons/pixieed/selection.svg', 'assets/icons/pixieed/adjustments.svg',
         'draw/editor.html', 'audio/editor.html', 'js/tool-shell.mjs', 'js/tool-entry-compat.js', 'js/tool-direct.mjs', 'js/tool-workspace-state.mjs', 'css/tool-shell.css', 'css/tool-direct.css',
         'js/creation/creation-runtime.mjs', 'js/creation/creation-snapshot.mjs', 'js/creation/draw-lazy-panels.mjs', 'js/creation/draw-render-optimization.mjs',
-        'js/creation/audio-video-capabilities.mjs', 'js/draw-guide-entry.mjs', 'css/globe-navigation.css', 'js/globe/map-navigation-state.mjs',
+        'js/creation/audio-video-capabilities.mjs', 'js/draw-guide-entry.mjs', 'css/globe-navigation.css', 'css/explore-sections.css', 'assets/icons/pixieed/shop.svg', 'js/globe/map-navigation-state.mjs',
         'js/globe/map-page-layout.mjs',
         // User-approved site introduction assets; local review captures remain excluded.
         'assets/screenshots/intro-pending-20261021/camera-mobile.png',

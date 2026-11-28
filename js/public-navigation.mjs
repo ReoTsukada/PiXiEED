@@ -1,9 +1,8 @@
-import { PUBLIC_NAV_ITEMS, currentPublicNavKey } from './page-navigation.mjs?rev=20261024-common-tool-start-1';
+import { PUBLIC_NAV_ITEMS, currentPublicNavKey } from './page-navigation.mjs?rev=20261128-explore-shop-1';
 
 const isToolPage = (body) => {
   if (!body) return false;
-  if (body.hasAttribute('data-tool-short') || body.hasAttribute('data-tool-shell')
-      || body.classList.contains('tool-shell') || body.classList.contains('creation-editor')
+  if (body.hasAttribute('data-tool-short') || body.classList.contains('creation-editor')
       || body.classList.contains('creation-suite') || body.querySelector('.pc-header, .lc-top, .hud-top__bar')) return true;
   return [...body.classList].some((name) => name.startsWith('app-page--tool-') && name !== 'app-page--tool-globe');
 };

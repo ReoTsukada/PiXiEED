@@ -94,7 +94,7 @@ test('portal home links to Explore and keeps all five destinations', () => {
   assert.match(home, /<body class="home-portal">/);
   assert.match(home, /class="portal-actions"/);
   assert.doesNotMatch(home, /id="feed"|src="\/js\/social\/app\.mjs/);
-  for (const href of ['/', '/explore/', '/tools/', '/globe/', '/profile/']) assert.ok(home.includes(`href="${href}"`), href);
-  for (const label of ['ホーム', '探す', 'つくる', '地図', '自分']) assert.ok(home.includes(`>${label}</span></a>`), label);
+  for (const href of ['/', '/explore/', '/tools/', '/books/', '/profile/']) assert.ok(home.includes(`href="${href}"`), href);
+  for (const label of ['ホーム', '探す', 'つくる', 'ショップ', '自分']) assert.ok(home.includes(`>${label}</span></a>`), label);
   assert.doesNotMatch(home, /src="\/js\/home-startup\.mjs|src="\/js\/home-gallery\.mjs/);
 });

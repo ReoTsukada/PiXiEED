@@ -27,7 +27,7 @@ test('shared header does not depend on timed pass state or render legacy reward 
 
 
 test('portal home and Explore provide their own five-destination navigation', async () => {
-  const destinations = [['/', 'ホーム'], ['/explore/', '探す'], ['/tools/', 'つくる'], ['/globe/', '地図'], ['/profile/', '自分']];
+  const destinations = [['/', 'ホーム'], ['/explore/', '探す'], ['/tools/', 'つくる'], ['/books/', 'ショップ'], ['/profile/', '自分']];
   for (const [path, activePath] of [['index.html', '/'], ['explore/index.html', '/explore/']]) {
     const html = await readFile(new URL(`../../${path}`, import.meta.url), 'utf8');
     assert.match(html, path === 'index.html' ? /<body class="home-portal">/ : /<body data-social-page="explore">/, path);

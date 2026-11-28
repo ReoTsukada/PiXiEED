@@ -11,7 +11,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="/css/site.css?rev=20261019-site-gothic-1">
     <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261012-nav-polish-1">
-    <link rel="stylesheet" href="/css/site-header.css?rev=20261012-nav-polish-1">
+    <link rel="stylesheet" href="/css/site-header.css?rev=20261128-explore-shop-1">
     <link rel="stylesheet" href="/css/page-gutters.css?rev=20261020-page-gutters-1" data-page-gutters-style>
     <link rel="stylesheet" href="/css/display-ads.css?rev=20261007-lazy-ads-1">
     <link rel="stylesheet" href="/css/globe-event-detail.css?rev=20261009-seo-1">
@@ -19,6 +19,7 @@
     <link rel="stylesheet" href="/css/globe-event-ui.css?rev=20261008-event-filter-1">
     <link rel="stylesheet" href="/css/globe-navigation.css?rev=20261126-viewport-map-shell-1">
   <style>body.app-page--tool-globe .site-header .header-inner{box-sizing:border-box;width:100%;max-width:none;min-height:56px;margin:0}</style>
+  <link rel="stylesheet" href="/css/explore-sections.css?rev=20261128-explore-shop-1">
 </head>
 <body data-page="map" data-page-gutters="content" class="app-page app-page--field app-page--tool-globe">
   <a class="skip-link" href="#main">本文へ移動</a>
@@ -26,7 +27,15 @@
     <a class="brand" href="/" aria-label="PiXiEED ホーム"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a>
     <nav class="site-nav" aria-label="メインナビゲーション"><a data-nav="home" href="/globe/">地図</a><a data-nav="works" href="/works/">絵</a><a data-nav="stores" href="/stores/">お店</a><a data-nav="collection" href="/collection/">集めた</a><a data-nav="tools" href="/tools/">ツール</a></nav>
   </div></header>
-  <nav class="mobile-nav" aria-label="アプリナビゲーション"><a data-nav="home" href="/globe/"><span aria-hidden="true">⌖</span>地図</a><a data-nav="works" href="/works/"><span aria-hidden="true">▧</span>絵</a><a data-nav="stores" href="/stores/"><span aria-hidden="true">⌂</span>お店</a><a data-nav="collection" href="/collection/"><span aria-hidden="true">✳</span>集めた</a><a data-nav="tools" href="/tools/"><span aria-hidden="true">✦</span>ツール</a></nav>
+  <nav class="explore-sections" aria-label="探すページの表示">
+    <a href="/explore/"><img src="/assets/icons/pixieed/artwork.svg" width="20" height="20" alt="">みんなの作品</a>
+    <a href="/globe/" aria-current="page"><img src="/assets/icons/pixieed/globe.svg" width="20" height="20" alt="">地図</a>
+  </nav>
+  <nav class="mobile-nav public-destination-nav" aria-label="ページ切替"><a data-public-nav="home" class="mobile-nav__item" href="/"><img src="/assets/icons/pixieed/home.svg" alt=""><span>ホーム</span></a>
+<a data-public-nav="explore" class="mobile-nav__item is-current" href="/explore/" aria-current="page"><img src="/assets/icons/pixieed/telescope.svg" alt=""><span>探す</span></a>
+<a data-public-nav="create" class="mobile-nav__item" href="/tools/"><img src="/assets/icons/pixieed/tools.svg" alt=""><span>つくる</span></a>
+<a data-public-nav="shop" class="mobile-nav__item" href="/books/"><img src="/assets/icons/pixieed/shop.svg" alt=""><span>ショップ</span></a>
+<a data-public-nav="me" class="mobile-nav__item" href="/profile/"><img src="/assets/icons/pixieed/profile.svg" alt=""><span>自分</span></a></nav>
   <main id="main">
     <h1 class="visually-hidden">ドット絵のイベント・作品を世界地図で探す</h1>
     <p class="visually-hidden">世界地図を動かして、公開中の作品やイベントを地域ごとに探せます。</p>
@@ -41,7 +50,7 @@
       <section class="map-event-directory container" aria-labelledby="map-event-directory-title"><h2 id="map-event-directory-title">ドット絵イベントの日程・会場を探す</h2><p>開催予定、過去の開催、次回情報待ちを分けて紹介しています。参加前に主催者の公式情報をご確認ください。</p><a class="button button--primary" href="/events/">イベント紹介一覧を見る</a></section>
   </main>
     <script type="module" src="/js/app.js?rev=20261112-profile-workspace-1"></script>
-    <script type="module" src="/js/site-header.mjs?rev=20261111-output-offerwall-1"></script>
+    <script type="module" src="/js/site-header.mjs?rev=20261128-explore-shop-1"></script>
     <script type="module" src="/js/globe/event-detail-host.mjs?rev=20261118-draw-display-ad-1"></script>
     <script type="module" src="/js/globe/map-page-layout.mjs?rev=20261017-map-page-chrome-1"></script>
 </body>

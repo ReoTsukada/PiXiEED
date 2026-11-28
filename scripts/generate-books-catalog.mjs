@@ -137,7 +137,7 @@ function render(route) {
   <link rel="stylesheet" href="/css/books.css?rev=20261128-growing-catalog-1">
   <link rel="stylesheet" href="/css/site-draw-cta.css?rev=20261014-route-cta-1">
   <title>ドット絵の本と道具｜PiXiEED</title>
-<link rel="stylesheet" href="/css/site-header.css?rev=20261012-nav-polish-1">
+<link rel="stylesheet" href="/css/site-header.css?rev=20261128-explore-shop-1">
 </head>
 <body class="books-page"${shopMarker}>
   <a class="skip-link" href="#catalog">商品一覧へ</a>
@@ -185,7 +185,7 @@ ${catalogItems.join('\n')}
   </dialog>
   <script type="module" src="/js/books-catalog.mjs?rev=20261128-puzzle-catalog-1"></script>
   <script type="module" src="/js/books-commerce.mjs?rev=20261020-yahoo-related-offers-1"></script>
-<script type="module" src="/js/site-header.mjs?rev=20261111-output-offerwall-1"></script>
+<script type="module" src="/js/site-header.mjs?rev=20261128-explore-shop-1"></script>
 ${shopAdScripts}
 </body>
 </html>

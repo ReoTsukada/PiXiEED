@@ -9,16 +9,18 @@ test('public navigation has five fixed destination links with route-based active
     ['home', 'ホーム', '/'],
     ['explore', '探す', '/explore/'],
     ['create', 'つくる', '/tools/'],
-    ['map', '地図', '/globe/'],
+    ['shop', 'ショップ', '/books/'],
     ['me', '自分', '/profile/'],
   ]);
   const current = path => currentPublicNavKey(`https://example.test${path}`);
   assert.equal(current('/'), 'home');
-  assert.equal(current('/feed/?view=saved'), 'home');
+  assert.equal(current('/feed/?view=saved'), 'explore');
   assert.equal(current('/explore/?q=cat'), 'explore');
   assert.equal(current('/works/sea-cat.html'), 'explore');
   assert.equal(current('/tools/'), 'create');
-  assert.equal(current('/globe/?post=1'), 'map');
+  assert.equal(current('/globe/?post=1'), 'explore');
+  assert.equal(current('/globe/?art=abc'), 'explore');
+  assert.equal(current('/books/?category=books'), 'shop');
   assert.equal(current('/profile/?view=posts'), 'me');
   assert.equal(current('/draw/?workspace=1'), null, 'editor pages retain their own operation navigation');
 });

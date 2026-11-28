@@ -16,7 +16,7 @@ import { mountConversionRouteChoices } from './conversion-route-choice.mjs?rev=2
 import { conversionSaveMessage, batchSaveActionLabel } from './conversion-clarity.mjs?rev=20261101-direct-material-1';
 import { mountConversionWorkspace } from './conversion-workspace.mjs?rev=20261128-output-post-draft-1';
 import { saveActionLabel, materialChangeInvalidatesSave, createDeferredFocusGuard } from './conversion-stage.mjs?rev=20261105-video-size-1';
-import { mountPublicNavigation } from '../public-navigation.mjs?rev=20261024-common-tool-start-1';
+import { mountPublicNavigation } from '../public-navigation.mjs?rev=20261128-explore-shop-1';
 
 /** Use the same navigation DOM as other pages, once, retaining existing nodes. */
 export function ensureConversionNavigation(doc, win) {

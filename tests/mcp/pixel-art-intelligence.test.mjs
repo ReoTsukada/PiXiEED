@@ -58,7 +58,7 @@ test("AI pages describe the existing receive flow and keep guides optional", () 
   assert.match(retiredSettings, /href="\/ai\/examples\//);
   assert.doesNotMatch(retiredSettings, /GPT連携|GPTとの作業はDrawから/);
   assert.match(retiredSettings, /href="\/tools\/start\/draw\//);
-  assert.doesNotMatch(retiredSettings, /<script|localStorage|settings-reset/);
+  assert.doesNotMatch(retiredSettings, /<script(?! type="module" src="\/js\/public-navigation-entry\.mjs\?)|localStorage|settings-reset/);
   assert.match(guide, /任意資料です/);
   assert.match(examples, /任意の参考資料/);
   assert.doesNotMatch(guide + examples, /href="\/ai\/settings\//);

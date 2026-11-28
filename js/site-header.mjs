@@ -1,9 +1,9 @@
 import './site-analytics.mjs?rev=20261017-analytics-integrity-1';
-import { PAGE_DESTINATIONS, currentPageDestination, creationModeDestination } from './page-navigation.mjs?rev=20261024-common-tool-start-1';
+import { PAGE_DESTINATIONS, PUBLIC_NAV_ITEMS, currentPageDestination, creationModeDestination } from './page-navigation.mjs?rev=20261128-explore-shop-1';
 import { installGlobeAnalyticsBridge } from './globe/analytics-bridge.mjs?rev=20261017-analytics-integrity-1';
 import { installSiteInteractions } from './site-interactions.mjs?rev=20261001-interactions-1';
 import { mountToolHeaderControls } from './tool-header-controls.mjs?rev=20261111-output-offerwall-1&nav=20261016-tool-operations-1';
-import { mountPublicNavigation } from './public-navigation.mjs?rev=20261024-common-tool-start-1';
+import { mountPublicNavigation } from './public-navigation.mjs?rev=20261128-explore-shop-1';
 export { mountToolHeaderControls } from './tool-header-controls.mjs?rev=20261111-output-offerwall-1&nav=20261016-tool-operations-1';
 
 const brandedLink = () => {
@@ -62,6 +62,9 @@ const MENU_MARKUP = `
     </nav>
     <div class="site-menu__utilities"><button type="button" data-menu-setting="all">設定を開く<span>表示・プライバシー</span></button></div>
     </div>
+    <nav class="site-menu__destinations" aria-label="メインナビゲーション">
+      ${PUBLIC_NAV_ITEMS.map(({ href, icon, label }) => `<a href="${href}"><img src="/assets/icons/pixieed/${icon}.svg" width="24" height="24" alt=""><span>${label}</span></a>`).join('')}
+    </nav>
   </aside>
   <dialog class="site-settings" data-site-settings aria-labelledby="site-settings-title">
     <div class="site-settings__head"><div><span class="eyebrow">preferences</span><h2 id="site-settings-title">設定</h2></div><button class="site-settings__close" type="button" data-settings-close aria-label="設定を閉じる">×</button></div>

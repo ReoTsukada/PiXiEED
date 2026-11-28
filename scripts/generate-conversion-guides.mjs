@@ -70,7 +70,7 @@ function shell({title,description,path,items,date,content,index=false}) {
   <link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png">
   <link rel="icon" href="/favicon.ico" sizes="any">
   <link rel="stylesheet" href="/css/site.css?rev=20261019-site-gothic-1">
-  <link rel="stylesheet" href="/css/site-header.css?rev=20261024-free-tools-1">
+  <link rel="stylesheet" href="/css/site-header.css?rev=20261128-explore-shop-1">
   <link rel="stylesheet" href="${css}">
   <script type="application/ld+json">${json(schemaFor({title,description,path,items,date,index}))}</script>
 </head>
@@ -86,7 +86,7 @@ function shell({title,description,path,items,date,content,index=false}) {
   <script type="module" src="/js/app.js?rev=20261112-profile-workspace-1"></script>
   <script type="module" src="/js/ads/output-guide-ad.mjs?rev=20261118-draw-display-ad-1"></script>
   ${index ? '<script type="module" src="/js/conversion-guide-filter.mjs?rev=20261028-discovery-1"></script>' : ''}
-  <script type="module" src="/js/site-header.mjs?rev=20261111-output-offerwall-1"></script>
+  <script type="module" src="/js/site-header.mjs?rev=20261128-explore-shop-1"></script>
 </body>
 </html>
 `;

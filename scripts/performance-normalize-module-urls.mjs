@@ -309,6 +309,7 @@ function normalize(source, file) {
     if (target === 'js/creation/pixfind-play.mjs') return `${quote}${path}?${query.replace(/(^|&)rev=[^&]*/, '$1rev=20261128-pixfind-results-1')}${quote}`;
     if (['css/books.css', 'js/ads/shop-ad.mjs'].includes(target)) return `${quote}${path}?${query.replace(/(^|&)rev=[^&]*/, '$1rev=20261128-growing-catalog-1')}${quote}`;
     if (['js/creation/jigsaw-page.mjs', 'js/creation/jigsaw-arcade.mjs', 'css/creation-jigsaw.css', 'css/creation-puzzle-player.css', 'js/ads/shop-ad.mjs', 'js/books-catalog.mjs', 'css/books.css'].includes(target)) return `${quote}${path}?${query.replace(/(^|&)rev=[^&]*/, '$1rev=20261128-puzzle-catalog-1')}${quote}`;
+    if (['js/page-navigation.mjs', 'js/public-navigation.mjs', 'js/site-header.mjs', 'css/site-header.css'].includes(target)) return `${quote}${path}?${query.replace(/(^|&)rev=[^&]*/, '$1rev=20261128-explore-shop-1')}${quote}`;
     if (target === 'js/social/api.mjs') return `${quote}${path}?${query.replace(/(^|&)rev=[^&]*/, '$1rev=20261128-growing-catalog-1')}${quote}`;
     if (!sourceFirstTargets.has(target) && !workShelfTargets.has(target) && !outputPostDraftTargets.has(target)) return whole;
     const revision = outputPostDraftTargets.has(target) ? '20261128-output-post-draft-1' : workShelfTargets.has(target) ? '20261128-work-shelf-1' : '20261128-output-compact-rails-1';

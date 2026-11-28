@@ -296,3 +296,28 @@ body .pc-header.px-site-header .menu-toggle{color:#fff;border-color:#ffffff35;ba
 /* Compact shared chrome: labels stay available through accessible names. */
 body .px-site-header .menu-toggle { width:44px!important; min-width:44px; flex:0 0 44px; padding-inline:0; }
 body .px-site-header .menu-toggle__label { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+
+
+body .site-menu__destinations {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  flex: none;
+  padding: 6px 8px max(6px, env(safe-area-inset-bottom));
+  border-top: 1px solid #dce8dd;
+}
+
+body .site-menu__destinations a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 44px;
+  border-radius: 10px;
+  color: inherit;
+  font-size: 11px;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+body .site-menu__destinations a:is(:hover, :focus-visible) { background: #eef5ef; }

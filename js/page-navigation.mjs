@@ -28,7 +28,7 @@ export const PAGE_DESTINATIONS = Object.freeze([
     ['/globe/?post=1', 'ドット絵を投稿する', '作品を地図に投稿します。', 'add'],
     ['/events/', 'ドット絵イベントを探す', '開催されるイベントを探します。', 'telescope'],
     ['/stores/', '絵に会えるお店', 'ドット絵に出会えるお店を探します。', 'artwork'],
-    ['/books/', 'ドット絵の本・グッズ', 'ドット絵に関する本やグッズを見ます。', 'artwork'],
+    ['/books/', 'ショップ・ドット絵の本と道具', 'ドット絵に関する本やグッズを見ます。', 'shop'],
   ] },
   { label: '自分のページ', links: [
     ['/profile/', '自分のページ・概要', '投稿や見つけた作品をまとめて確認します。', 'profile'],
@@ -49,7 +49,7 @@ export const PUBLIC_NAV_ITEMS = Object.freeze([
   Object.freeze({ key: 'home', label: 'ホーム', href: '/', icon: 'home' }),
   Object.freeze({ key: 'explore', label: '探す', href: '/explore/', icon: 'telescope' }),
   Object.freeze({ key: 'create', label: 'つくる', href: '/tools/', icon: 'tools' }),
-  Object.freeze({ key: 'map', label: '地図', href: '/globe/', icon: 'globe' }),
+  Object.freeze({ key: 'shop', label: 'ショップ', href: '/books/', icon: 'shop' }),
   Object.freeze({ key: 'me', label: '自分', href: '/profile/', icon: 'profile' }),
 ]);
 
@@ -59,12 +59,12 @@ const canonicalPath = path => path.replace(/\/index\.html$/, '/') || '/';
 export function currentPublicNavKey(location) {
   const url = new URL(location.href || String(location), 'https://pixieed.invalid');
   const path = canonicalPath(url.pathname);
-  if (path === '/' || path === '/feed/') return 'home';
-  if (path.startsWith('/globe/')) return 'map';
+  if (path === '/' || path === '/welcome/' || path === '/home/') return 'home';
+  if (path.startsWith('/books/')) return 'shop';
   if (path.startsWith('/profile/')) return 'me';
   if (path.startsWith('/tools/')) return 'create';
-  if (path.startsWith('/explore/') || path.startsWith('/works/') || path.startsWith('/stores/')
-      || path.startsWith('/events/') || path.startsWith('/collection/') || path.startsWith('/books/')) return 'explore';
+  if (['/explore/', '/feed/', '/globe/', '/works/', '/stores/', '/events/', '/collection/']
+      .some(prefix => path.startsWith(prefix))) return 'explore';
   return null;
 }
 

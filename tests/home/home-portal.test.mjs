@@ -28,7 +28,7 @@ test('play entrance lists real existing games without starting an editor or crea
     assert.ok(existsSync(new URL('../../' + path, import.meta.url)), href);
   }
   assert.equal((play.match(/class="play-card"/g) || []).length, 4);
-  assert.doesNotMatch(play, /<script|<iframe|<canvas|assets\/screenshots/);
+  assert.doesNotMatch(play, /<script(?! type="module" src="\/js\/public-navigation-entry\.mjs\?)|<iframe|<canvas|assets\/screenshots/);
 });
 
 test('home is a navigation portal, not a second social timeline', () => {

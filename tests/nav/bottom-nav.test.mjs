@@ -48,7 +48,7 @@ test('SNS entry pages share the five lower destinations without a second desktop
     const html = read(file);
     const nav = html.match(/<nav class="mobile-nav public-destination-nav"[^>]*>([\s\S]*?)<\/nav>/)?.[1];
     assert.ok(nav, file);
-    assert.deepEqual([...nav.matchAll(/data-public-nav="([^"]+)"/g)].map(match => match[1]), ['home', 'explore', 'create', 'map', 'me'], file);
+    assert.deepEqual([...nav.matchAll(/data-public-nav="([^"]+)"/g)].map(match => match[1]), ['home', 'explore', 'create', 'shop', 'me'], file);
     assert.doesNotMatch(html, /class="(?:left-rail|rail-nav)"/, file);
   }
   assert.match(read('css/social-feed.css'), /@import url\('\.\/public-navigation\.css\?rev=20261024-unified-nav-1'\)/);
@@ -65,7 +65,7 @@ test('profile brand links labeled as home route to the real homepage', () => {
   const profile = read('profile/index.html');
   assert.equal((profile.match(/class="brand" href="\/" aria-label="PiXiEED ホーム"/g) || []).length, 2);
   assert.doesNotMatch(profile, /class="brand" href="\/globe\/" aria-label="PiXiEED ホーム"/);
-  assert.match(profile, /href="\/feed\/\?view=saved"/);
+  assert.match(profile, /href="\/explore\/\?view=saved"/);
   assert.match(profile, /href="\/feed\/\?view=drafts"/);
 });
 
@@ -93,4 +93,15 @@ test('all static store detail map CTAs describe the world map destination', () =
     assert.doesNotMatch(html, /href="\/globe\/">地図でお店を探す<\/a>/, file);
   }
   assert.match(read('js/app.js'), /href="\/globe\/">世界地図を見る<\/a>/);
+});
+
+test('Explore and map share the same section links and mark their own section current', () => {
+  for (const [file, active] of [['explore/index.html', '/explore/'], ['globe/index.html', '/globe/']]) {
+    const html = read(file);
+    const tabBar = html.match(/<nav class="explore-sections"[^>]*>([\s\S]*?)<\/nav>/)?.[1];
+    assert.ok(tabBar, file);
+    assert.deepEqual([...tabBar.matchAll(/<a href="([^"]+)"/g)].map(match => match[1]), ['/explore/', '/globe/']);
+    assert.equal(tabBar.match(/<a href="([^"]+)" aria-current="page"/)?.[1], active);
+    assert.match(html, /data-public-nav="explore"[^>]*aria-current="page"/);
+  }
 });

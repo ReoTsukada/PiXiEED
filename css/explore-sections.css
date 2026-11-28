@@ -1,0 +1,55 @@
+.explore-sections {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  width: min(480px, calc(100% - 24px));
+  box-sizing: border-box;
+  margin: 4px auto;
+  padding: 3px;
+  border: 1px solid #dce8dd;
+  border-radius: 14px;
+  background: #f0f5ee;
+}
+
+.explore-sections a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  border-radius: 10px;
+  color: #36534a;
+  font: 700 14px/1.2 system-ui, sans-serif;
+  text-decoration: none;
+}
+
+.explore-sections a[aria-current="page"] {
+  color: #194c3a;
+  background: #dbeee4;
+}
+
+.explore-sections a:hover { background: #e3eee6; }
+.explore-sections a:focus-visible { outline: 2px solid #246c55; outline-offset: -2px; }
+
+/* Reserve space for both navigation rows and keep the map controls in view. */
+body.app-page--tool-globe:not(:has(.map-event-detail-host:not([hidden]))) {
+  box-sizing: border-box;
+  grid-template-rows: var(--px-header-height) auto minmax(0, 1fr);
+}
+
+body.app-page--tool-globe:not(:has(.map-event-detail-host:not([hidden]))) #main {
+  min-height: 0;
+}
+
+body.app-page--tool-globe:not(:has(.map-event-detail-host:not([hidden]))) .map-hero--field .map-hero__inner {
+  height: 100%;
+}
+
+@media (max-height: 460px) and (orientation: landscape) {
+  body.app-page--tool-globe:not(:has(.map-event-detail-host:not([hidden]))) #main {
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  body.app-page--tool-globe .map-page-directory-link { display: none; }
+}

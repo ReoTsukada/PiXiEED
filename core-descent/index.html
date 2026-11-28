@@ -548,7 +548,11 @@ footer { padding: 18px 28px; color: #93a9ab; font-size: 12px; border-top: 1px so
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
 }
-</style></head><body>
+</style>
+  <link rel="stylesheet" href="/css/public-navigation.css?rev=20261024-unified-nav-1">
+  <script type="module" src="/js/public-navigation-entry.mjs?rev=20261128-explore-shop-1"></script>
+  <style>body.is-playing .public-destination-nav { display: none !important; }</style>
+</head><body>
 <header class="app-header">
   <div class="brand"><div class="logo" aria-hidden="true"><span>∑</span></div><div><b>CORE DESCENT</b><small>A PiXiEED GAME</small></div></div>
   <nav aria-label="メイン"><button data-tab="home" class="active">拠点</button><button data-tab="build">コア基盤</button><button data-tab="inventory">持ち物</button><button data-tab="game">探索</button><button data-tab="rankings">記録</button><button data-tab="catalog">図鑑</button><button data-tab="market" class="hidden" hidden>取引テスト</button></nav>
