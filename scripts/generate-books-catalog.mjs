@@ -102,7 +102,7 @@ function render(route) {
   const shopAdMarkup = preview ? '' : '<aside class="shop-ad" data-shop-display-ad aria-label="広告" hidden><p class="shop-ad__label">広告</p><div class="shop-ad__slot" data-shop-ad-slot></div></aside>';
   const catalogItems = listedProducts.map(card);
   if (!preview) catalogItems.splice(8, 0, shopAdMarkup);
-  const shopAdScripts = preview ? '' : `${OFFERWALL_ENTRY_POLICY_SCRIPT}\n  <script type="module" src="/js/ads/shop-ad.mjs?rev=20261128-puzzle-catalog-1"></script>`;
+  const shopAdScripts = preview ? '' : `${OFFERWALL_ENTRY_POLICY_SCRIPT}\n  <script type="module" src="/js/ads/shop-ad.mjs?rev=20261128-growing-catalog-1"></script>`;
   const intro = `<!doctype html>
 <html lang="ja">
 <head>
@@ -134,7 +134,7 @@ function render(route) {
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="stylesheet" href="/css/site.css?rev=20261019-site-gothic-1">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261012-nav-polish-1">
-  <link rel="stylesheet" href="/css/books.css?rev=20261128-puzzle-catalog-1">
+  <link rel="stylesheet" href="/css/books.css?rev=20261128-growing-catalog-1">
   <link rel="stylesheet" href="/css/site-draw-cta.css?rev=20261014-route-cta-1">
   <title>ドット絵の本と道具｜PiXiEED</title>
 <link rel="stylesheet" href="/css/site-header.css?rev=20261012-nav-polish-1">

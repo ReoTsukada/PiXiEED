@@ -18,7 +18,7 @@ test('Explore is the community experience and matches the home visual language',
   assert.match(read('tools/index.html'), /href="\/explore\/\?compose=new">作品を投稿する/);
   assert.match(read('profile/index.html'), /href="\/explore\/\?view=mine"/);
   assert.match(explore, /css\/social-explore\.css\?rev=/);
-  assert.match(explore, /js\/social\/app\.mjs\?rev=20261128-explore-puzzle-posts-1/);
+  assert.match(explore, /js\/social\/app\.mjs\?rev=20261128-growing-catalog-1/);
   assert.match(explore, /href="\/"/);
   assert.match(explore, /href="\/globe\/"/);
   assert.match(explore, /href="\/tools\/"/);

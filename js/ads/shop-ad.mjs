@@ -128,10 +128,7 @@ function isOnscreen(host, win) {
   return Boolean(box && box.bottom > 0 && box.top < Number(win.innerHeight || 0));
 }
 
-/**
- * Mounts no provider until the unique shop marker, route, content, viewport and
- * ordinary unit are all eligible. This module never adds targeting data.
- */
+/** One distinct slot per group of products. A slot is requested at most once. */
 export function mountShopAd({ doc = globalThis.document, win = globalThis.window,
   config = shopAdConfig, loadAdsense = getAdsenseLoader, timeoutMs = 15000 } = {}) {
   if (!doc || !win || !routeAndMarkerAreShop(doc, win) || !resolveShopAdUnit(config)) {
@@ -142,13 +139,54 @@ export function mountShopAd({ doc = globalThis.document, win = globalThis.window
   const grid = doc.querySelector?.('[data-product-grid]');
   const hosts = [...(doc.querySelectorAll?.('[data-shop-display-ad]') || [])];
   const host = hosts[0];
-  const slot = host?.querySelector?.('[data-shop-ad-slot]');
-  if (!grid || hosts.length !== 1 || !host || !slot || !grid.contains?.(host)
+  if (!grid || hosts.length !== 1 || !host?.querySelector?.('[data-shop-ad-slot]') || !grid.contains?.(host)
       || !readEligibility(doc, win, config, grid)) {
     if (host) host.hidden = true;
     return { mounted: false, reason: 'missing-or-ineligible-content' };
   }
 
+  const interval = SHOP_AD_MIN_PRODUCTS - 1;
+  const slots = [mountShopSlot(host, interval)];
+  function mountShopSlot(node, after) {
+    return mountSlot({ doc, win, config, loadAdsense, timeoutMs, grid, host: node, after });
+  }
+  function addSlots() {
+    if (!readEligibility(doc, win, config, grid)) return;
+    const count = visibleCards(grid).length;
+    const columns = win.getComputedStyle?.(grid)?.gridTemplateColumns?.trim().split(/\s+/).filter(Boolean).length || 1;
+    for (let index = slots.length; Math.ceil(((index + 1) * interval) / columns) * columns < count; index++) {
+      if (typeof host.cloneNode !== 'function') break;
+      const clone = host.cloneNode(true);
+      clone.querySelector('[data-shop-ad-slot]').replaceChildren();
+      clone.hidden = true;
+      grid.append(clone);
+      slots.push(mountShopSlot(clone, (index + 1) * interval));
+    }
+  }
+  const observer = typeof win.MutationObserver === 'function' ? new win.MutationObserver(records => {
+    if (records.some(record => [...(record.addedNodes || []), ...(record.removedNodes || [])]
+      .some(node => node.matches?.('[data-product-id]')))) addSlots();
+  }) : null;
+  observer?.observe(grid, { childList: true });
+  win.addEventListener?.('books:catalog-updated', addSlots);
+  win.addEventListener?.('resize', addSlots);
+  const first = slots[0];
+  const cleanup = () => {
+    observer?.disconnect();
+    win.removeEventListener?.('books:catalog-updated', addSlots);
+    win.removeEventListener?.('resize', addSlots);
+    win.removeEventListener?.('pagehide', cleanup);
+    for (const slot of slots) slot.cleanup();
+  };
+  win.addEventListener?.('pagehide', cleanup, { once: true });
+  const result = { mounted: true, host, cleanup, get requested() { return first.requested; }, get retired() { return first.retired; } };
+  instances.set(doc, result);
+  addSlots();
+  return result;
+}
+
+function mountSlot({ doc, win, config, loadAdsense, timeoutMs, grid, host, after }) {
+  const slot = host.querySelector('[data-shop-ad-slot]');
   const unit = resolveShopAdUnit(config);
   const state = {
     mounted: true, requested: false, retired: false,
@@ -192,12 +230,10 @@ export function mountShopAd({ doc = globalThis.document, win = globalThis.window
   };
   const positionBeforeRequest = () => {
     const cards = visibleCards(grid);
-    if (cards.length < SHOP_AD_MIN_PRODUCTS) { host.hidden = true; return; }
     const columns = win.getComputedStyle?.(grid)?.gridTemplateColumns?.trim().split(/\s+/).filter(Boolean).length || 1;
-    const after = Math.ceil((SHOP_AD_MIN_PRODUCTS - 1) / columns) * columns;
-    const next = cards[after];
+    const next = cards[Math.ceil(after / columns) * columns];
     if (next) grid.insertBefore(host, next);
-    else grid.append(host);
+    return Boolean(next);
   };
   const eligible = () => readEligibility(doc, win, config, grid);
   const retireAfterRequest = () => {
@@ -214,7 +250,7 @@ export function mountShopAd({ doc = globalThis.document, win = globalThis.window
   const refreshBeforeRequest = () => {
     if (state.cleaned || state.retired || state.requested) return;
     if (!eligible()) { host.hidden = true; return; }
-    positionBeforeRequest();
+    if (!positionBeforeRequest()) { host.hidden = true; return; }
     host.hidden = false;
     if (!hasSafeWidth(host, slot, win)) { host.hidden = true; return; }
     host.dataset.adState = 'ready';
@@ -223,7 +259,7 @@ export function mountShopAd({ doc = globalThis.document, win = globalThis.window
   function tryRequest() {
     if (state.cleaned || state.retired || state.requested || !eligible()) return;
     if (!safeVisibleGeometry(host, slot, doc, win)) return;
-    state.requested = true; // One attempt per document; never refresh or retry.
+    state.requested = true; // One attempt per slot; scrolling never reloads a creative.
     host.dataset.adState = 'requested';
     clearRequestObserver();
     const ins = doc.createElement('ins');
@@ -328,7 +364,6 @@ export function mountShopAd({ doc = globalThis.document, win = globalThis.window
     get requested() { return state.requested; },
     get retired() { return state.retired; },
   };
-  instances.set(doc, result);
   refreshBeforeRequest();
   return result;
 }

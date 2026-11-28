@@ -62,7 +62,7 @@ const targets = new Map([
   ['tool-help.css', 'rev=20261024-intelligence-ui-1'],
   ['social-feed.css', 'rev=20261024-side-ad-layout-1'],
   ['social/app.mjs', 'rev=20261108-sns-loading-1'],
-  ['ordinary-ad-entry.mjs', 'rev=20261024-side-ad-layout-2'],
+  ['ordinary-ad-entry.mjs', 'rev=20261128-growing-catalog-1'],
   ['information-auto-ads.mjs', 'rev=20261024-side-ad-layout-1'],
   ['display-ads.mjs', 'rev=20261118-draw-display-ad-1'],
   ['tool-header-controls.mjs', 'rev=20261018-direct-runtime-1&nav=20261016-tool-operations-1'],
@@ -196,7 +196,7 @@ function normalize(source, file) {
     const target = path.startsWith('/') ? path.slice(1) : posix.normalize(posix.join(posix.dirname(relative(root, file)), path));
     const exploreCardTargets = ['js/social/app.mjs', 'js/social/drafts.mjs'];
     if (!normalLayerTargets.has(target) && !exploreCardTargets.includes(target)) return whole;
-    const revision = target === 'js/social/app.mjs' ? '20261128-explore-puzzle-posts-1'
+    const revision = target === 'js/social/app.mjs' ? '20261128-growing-catalog-1'
       : target === 'js/social/drafts.mjs' ? '20261128-explore-puzzle-posts-1' : '20261116-normal-release-2';
     const next = /[?&]rev=/.test(query) ? query.replace(/([?&])rev=[^&]*/, `$1rev=${revision}`) : query + (query ? '&' : '?') + `rev=${revision}`;
     return `${quote}${path}${next}${quote}`;
@@ -307,8 +307,9 @@ function normalize(source, file) {
     if ((!path.startsWith('/') && !path.startsWith('.')) || path.startsWith('//')) return whole;
     const target = path.startsWith('/') ? path.slice(1) : posix.normalize(posix.join(posix.dirname(relative(root, file)), path));
     if (target === 'js/creation/pixfind-play.mjs') return `${quote}${path}?${query.replace(/(^|&)rev=[^&]*/, '$1rev=20261128-pixfind-results-1')}${quote}`;
+    if (['css/books.css', 'js/ads/shop-ad.mjs'].includes(target)) return `${quote}${path}?${query.replace(/(^|&)rev=[^&]*/, '$1rev=20261128-growing-catalog-1')}${quote}`;
     if (['js/creation/jigsaw-page.mjs', 'js/creation/jigsaw-arcade.mjs', 'css/creation-jigsaw.css', 'css/creation-puzzle-player.css', 'js/ads/shop-ad.mjs', 'js/books-catalog.mjs', 'css/books.css'].includes(target)) return `${quote}${path}?${query.replace(/(^|&)rev=[^&]*/, '$1rev=20261128-puzzle-catalog-1')}${quote}`;
-    if (target === 'js/social/api.mjs') return `${quote}${path}?${query.replace(/(^|&)rev=[^&]*/, '$1rev=20261128-explore-puzzle-posts-1')}${quote}`;
+    if (target === 'js/social/api.mjs') return `${quote}${path}?${query.replace(/(^|&)rev=[^&]*/, '$1rev=20261128-growing-catalog-1')}${quote}`;
     if (!sourceFirstTargets.has(target) && !workShelfTargets.has(target) && !outputPostDraftTargets.has(target)) return whole;
     const revision = outputPostDraftTargets.has(target) ? '20261128-output-post-draft-1' : workShelfTargets.has(target) ? '20261128-work-shelf-1' : '20261128-output-compact-rails-1';
     return `${quote}${path}?${query.replace(/(^|&)rev=[^&]*/, `$1rev=${revision}`)}${quote}`;

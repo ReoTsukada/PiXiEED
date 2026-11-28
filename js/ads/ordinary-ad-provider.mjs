@@ -1,4 +1,4 @@
-import { ordinaryAdUnitIsConfigured } from './ordinary-ad-placement.mjs?rev=20261024-ordinary-ad-1';
+import { ordinaryAdUnitIsConfigured, ORDINARY_AD_METRICS } from './ordinary-ad-placement.mjs?rev=20261128-growing-catalog-1';
 
 const sdkByDocument = new WeakMap();
 
@@ -36,12 +36,14 @@ export function createAdSenseDisplayProvider({ doc = globalThis.document, win = 
     try { topLevel = win?.top === win?.self; } catch { /* framed */ }
     const origin = win?.location?.origin;
     const expectedPlacement = placement === 'inline' ? 'inline' : placement === 'gutter' ? 'gutter' : '';
+    const explore = eligibility.exploreFeed === true && ['/explore/', '/explore/index.html'].includes(win?.location?.pathname);
+    const minPosts = explore ? ORDINARY_AD_METRICS.exploreMinimumPosts : ORDINARY_AD_METRICS.inlineMinimumPosts;
     const contextAllowed = placement === 'inline'
       ? eligibility.publicFeed === true && eligibility.trustedContentEligible === true
         && eligibility.feedReady === true && eligibility.partialWarning === false
         && eligibility.loading === false && eligibility.empty === false
         && eligibility.privateView === false && eligibility.composerOpen === false
-        && eligibility.detailOpen === false && eligibility.eligiblePostCount >= 24
+        && eligibility.detailOpen === false && eligibility.eligiblePostCount >= minPosts
       : placement === 'gutter' && eligibility.desktop === true
         && eligibility.gutterFits === true && eligibility.contentReady === true
         && eligibility.privateView === false && eligibility.composerOpen === false

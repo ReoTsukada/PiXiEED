@@ -1,7 +1,7 @@
 /** One in-flow Display unit after the public puzzle lobby's content. */
 import { getAdsenseLoader } from '../display-ads.mjs?rev=20261118-draw-display-ad-1';
 import { ordinaryAdConfig } from '../../data/ordinary-ad-config.mjs?rev=20261024-ordinary-ad-config-1';
-import { ordinaryAdUnitIsConfigured } from './ordinary-ad-placement.mjs?rev=20261024-ordinary-ad-1';
+import { ordinaryAdUnitIsConfigured } from './ordinary-ad-placement.mjs?rev=20261128-growing-catalog-1';
 
 const routes = new Set(['/play/spot-difference/', '/play/hidden-object/', '/jigsaw/']);
 

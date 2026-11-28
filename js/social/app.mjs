@@ -1,10 +1,10 @@
 import { createPostingConsentUi } from '../posting-consent-ui.mjs?rev=20261111-output-offerwall-1';
 import { localPuzzlePlayPath, publicPuzzlePlayPath, savePuzzleForSelf, hasUncertainPuzzlePublication } from './puzzle-audience.mjs?rev=20261021-jigsaw-public-1';
-import { createSocialApi } from './api.mjs?rev=20261128-explore-puzzle-posts-1';
+import { createSocialApi, MAP_PLACEMENT_WARNING } from './api.mjs?rev=20261128-growing-catalog-1';
 import { createFeedDraftStore } from './drafts.mjs?rev=20261128-explore-puzzle-posts-1';
-import { activateOrdinaryDisplayAd, createOrdinaryDisplayAdCard, createOrdinaryAdPageGate, ordinaryAdEligibility } from '../ads/ordinary-ad-placement.mjs?rev=20261024-ordinary-ad-1';
+import { activateOrdinaryDisplayAd, createOrdinaryDisplayAdCard, createOrdinaryAdPageGate, ordinaryAdEligibility, ORDINARY_AD_METRICS } from '../ads/ordinary-ad-placement.mjs?rev=20261128-growing-catalog-1';
 import { ordinaryAdConfig } from '../../data/ordinary-ad-config.mjs?rev=20261024-ordinary-ad-config-1';
-import { connectOptionalFeedAds, createFeedAdRuntime, createPublicFeedGutterGate, isPublicFeedGutterEligible } from '../ads/ordinary-ad-entry.mjs?rev=20261024-side-ad-layout-2';
+import { connectOptionalFeedAds, createFeedAdRuntime, createPublicFeedGutterGate, isPublicFeedGutterEligible } from '../ads/ordinary-ad-entry.mjs?rev=20261128-growing-catalog-1';
 import { toolStartHref } from '../tool-start-routes.mjs?rev=20261110-output-result-1';
 
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -125,7 +125,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
       const label = node('label', { class: 'explore-search' }, '作品・作者を検索');
       input = node('input', { id: 'socialSearch', type: 'search', placeholder: 'タイトル・作者・ことば', 'aria-label': '読み込んだ公開作品を検索' });
       label.append(input);
-      const note = node('p', { class: 'explore-search-note' }, '最新30件の公開作品が対象です。');
+      const note = node('p', { class: 'explore-search-note' }, '読み込んだ公開作品が対象です。');
       const anchor = $('#feedViews', documentRef) || $('#feedFilterWrap', documentRef);
       if (anchor) { anchor.before(label, note); }
       else feed.before(label, note);
@@ -323,6 +323,8 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
   const retiredOrdinaryAds = new Set();
   const ordinaryAdActivations = new Map();
   const ordinaryAdPageGate = createOrdinaryAdPageGate();
+  let olderLoading = false, hasOlderPosts = false;
+  const feedPageSize = 30;
   let ordinaryGutterActivation = null;
   const ordinaryGutterGate = createPublicFeedGutterGate();
   const priorScrollRestoration = windowRef.history.scrollRestoration;
@@ -349,7 +351,8 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
       editor: documentRef.body?.classList?.contains('creation-editor') || false,
       publicFeed,
       feedReady: state.initialized && !state.feedFailed,
-      partialWarning: state.readWarnings.length > 0,
+      exploreFeed: explorePage,
+      partialWarning: state.readWarnings.some(warning => !explorePage || warning !== MAP_PLACEMENT_WARNING),
       loading: state.loading,
       empty: posts.length === 0,
       privateView: state.mineMode || ['local', 'saved'].includes(state.filter),
@@ -461,7 +464,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     if (!ordinaryAdEligibility(context)) { deactivateFeedAds(); return; }
     for (const [anchorId, shell] of ordinaryAdCards) {
       if (!shell.card.isConnected || ordinaryAdActivations.has(anchorId)) continue;
-      if (!ordinaryAdPageGate.markAttempt(anchorId)) { shell.card.remove(); retiredOrdinaryAds.add(anchorId); continue; }
+      if (!explorePage && !ordinaryAdPageGate.markAttempt(anchorId)) { shell.card.remove(); retiredOrdinaryAds.add(anchorId); continue; }
       const mounted = activateOrdinaryDisplayAd({
         ...shell,
         provider: ordinaryAds.provider,
@@ -498,7 +501,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     }
     if (entry.kind === 'ordinary-ad') {
       if (retiredOrdinaryAds.has(entry.anchorId)
-          || !ordinaryAdPageGate.canAttempt(entry.anchorId)) return null;
+          || (!explorePage && !ordinaryAdPageGate.canAttempt(entry.anchorId))) return null;
       let shell = ordinaryAdCards.get(entry.anchorId);
       if (!shell) {
         shell = createOrdinaryDisplayAdCard(documentRef, ordinaryAds.unit, 'inline');
@@ -598,6 +601,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
       previewAds,
       ordinaryAdEnabled: feedAdEligible,
       ordinaryAdAnchorId: ordinaryAdPageGate.attemptedAnchorId,
+      repeatedOrdinaryAds: explorePage,
       previousPlan: publicFlow,
     });
     if (eligible) publicFlow = flow;
@@ -609,6 +613,10 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
       feed.append(node('button', { class: 'feed-empty-action', type: 'button', 'data-action': 'more-puzzles' },
         puzzles.error ? 'パズルの読み込みを再試行' : '以前のパズルをもっと見る'));
     }
+    if (explorePage && eligible && hasOlderPosts && !pending) {
+      feed.append(node('button', { class: 'feed-empty-action', type: 'button', 'data-action': 'older-posts', disabled: olderLoading },
+        olderLoading ? '読み込み中…' : '以前の作品をもっと見る'));
+    }
     updateFeedGutter(posts, eligible);
     if (showingPuzzles) {
       statusText(puzzles.error ? 'パズルを読み込めませんでした。再試行できます。'
@@ -619,7 +627,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
       const range = posts.length ? `${posts.length}件を表示中。` : '取得できた範囲: 0件。';
       statusText(`${range}公開元の一部は未取得です。再試行できます。`);
     } else statusText(posts.length
-      ? `${posts.length}件を表示中${state.mineMode ? '（自分の投稿）' : '（最新30件まで）'}`
+      ? `${posts.length}件を表示中${state.mineMode ? '（自分の投稿）' : explorePage ? '' : '（最新30件まで）'}`
       : '表示件数: 0件。');
     updateReadWarningDetails(showReadWarnings);
     retry.hidden = !showReadWarnings || !state.readWarnings.length;
@@ -720,18 +728,54 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     }
   }
 
+  async function loadOlderPosts() {
+    if (!explorePage || olderLoading || state.loading || !hasOlderPosts || !state.posts.length) return;
+    olderLoading = true;
+    render({ preserveAnchor: true });
+    let firstAdded;
+    try {
+      const oldest = state.posts.at(-1).createdAt;
+      // Include posts in the same millisecond as the boundary, deduplicating
+      // the visible records before merging the next page.
+      const before = new Date(oldest + 1).toISOString();
+      const seen = new Set(state.posts.map(post => post.id));
+      const boundary = new Set(state.posts.filter(post => post.createdAt === oldest).map(post => post.id));
+      const page = await api.list({ limit: feedPageSize + 1, before, excludeIds: boundary, includeLegacyPuzzles: true });
+      const warnings = api.getReadWarnings?.() || [];
+      if (warnings.some(warning => warning !== MAP_PLACEMENT_WARNING)) { toast('一部の作品を読み込めませんでした。再試行できます。'); return; }
+      const older = page.filter(post => post.createdAt <= oldest && !seen.has(post.id));
+      hasOlderPosts = older.length > feedPageSize;
+      firstAdded = older[0]?.id;
+      state.posts = [...state.posts, ...older.slice(0, feedPageSize)];
+    } catch (error) {
+      toast(`以前の作品を読み込めませんでした。${niceError(error, '')}`);
+    } finally {
+      olderLoading = false;
+      if (!state.pageHidden) {
+        render({ preserveAnchor: true });
+        if (firstAdded && state.filter === 'all' && !state.query && !state.mineMode) {
+          const first = feed.querySelector(`[data-post-id="${CSS.escape(firstAdded)}"]`);
+          if (first) { first.tabIndex = -1; first.focus({ preventScroll: true }); }
+        }
+      }
+    }
+  }
+
   async function refresh({ initial = false } = {}) {
-    if (state.loading) return;
+    if (state.loading || olderLoading) return;
     state.loading = true; state.feedFailed = false; retry.hidden = true; state.readWarnings = [];
     deactivateFeedAds();
     updateReadWarningDetails(state.filter !== 'saved' && state.filter !== 'local');
     if (initial) { feed.setAttribute('aria-busy', 'true'); statusText('公開作品を読み込んでいます…'); }
     try {
-      const latest = await api.list({ limit: 30, includeLegacyPuzzles: explorePage, onUpdate: (!state.initialized || initial) ? (posts) => {
+      const pageLimit = explorePage ? feedPageSize + 1 : feedPageSize;
+      const page = await api.list({ limit: pageLimit, includeLegacyPuzzles: explorePage, onUpdate: (!state.initialized || initial) ? (posts) => {
         if (state.pageHidden) return;
-        state.posts = posts;
+        state.posts = posts.slice(0, feedPageSize);
         render({ preserveAnchor: true });
       } : undefined });
+      const latest = page.slice(0, feedPageSize);
+      if (!state.initialized || initial) hasOlderPosts = explorePage && page.length > feedPageSize;
       state.readWarnings = typeof api.getReadWarnings === 'function' ? api.getReadWarnings() : [];
       // Render warning height changes only after the visible scroll anchor is captured.
       // The successful response is ready before rendering. Otherwise the
@@ -758,7 +802,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
   }
   function acceptNewPosts() {
     if (!state.staged.length) return;
-    state.posts = [...state.staged, ...state.posts].sort((a, b) => b.createdAt - a.createdAt).slice(0, 30); state.staged = [];
+    state.posts = [...state.staged, ...state.posts].sort((a, b) => b.createdAt - a.createdAt).slice(0, explorePage ? undefined : feedPageSize); state.staged = [];
     $('#newPostsSlot', documentRef).hidden = true; render();
     windowRef.scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
     const first = feed.querySelector('[data-post-id]'); if (first) { first.tabIndex = -1; first.focus({ preventScroll: true }); }
@@ -1339,6 +1383,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
       action.disabled = true;
       try { await navigateView('mine'); } finally { action.disabled = false; } return;
     }
+    if (name === 'older-posts') { void loadOlderPosts(); return; }
     if (name === 'more-puzzles') { void loadPuzzles(); render({ preserveAnchor: true }); return; }
     if (name === 'refresh' || name === 'retry') {
       if (puzzleView()) void loadPuzzles({ reset: true });
@@ -1731,7 +1776,7 @@ function priorInsertions(previousPlan, kind) {
 }
 
 /** Return posts and sparse, stable-ID anchored introductions in feed order. */
-export function planFeedFlow(posts, { enabled = true, previewAds = false, ordinaryAdEnabled = false, ordinaryAdAnchorId = null, previousPlan = null } = {}) {
+export function planFeedFlow(posts, { enabled = true, previewAds = false, ordinaryAdEnabled = false, ordinaryAdAnchorId = null, repeatedOrdinaryAds = false, previousPlan = null } = {}) {
   if (!Array.isArray(posts) || !posts.length) return [];
   const plan = posts.map((post) => ({ kind: 'post', post }));
   if (!enabled) return plan;
@@ -1786,7 +1831,24 @@ export function planFeedFlow(posts, { enabled = true, previewAds = false, ordina
   }
 
   const ordinaryAdInsertions = [];
-  if (ordinaryAdEnabled && posts.length >= AD_INTERVAL) {
+  if (ordinaryAdEnabled && repeatedOrdinaryAds) {
+    const previous = priorInsertions(previousPlan, 'ordinary-ad').filter(entry => positions.has(entry.anchorId));
+    let last = -1;
+    for (const { anchorId } of previous) {
+      const index = positions.get(anchorId);
+      if (index <= last) continue;
+      ordinaryAdInsertions.push({ kind: 'ordinary-ad', anchorId, index });
+      last = index;
+    }
+    let minimum = last < 0 ? ORDINARY_AD_METRICS.exploreMinimumPosts - 1 : last + AD_INTERVAL;
+    while (minimum < posts.length) {
+      const index = posts.findIndex((post, candidate) => candidate >= minimum && postId(post)
+        && !toolInsertions.some(item => Math.abs(item.index - candidate) < 2));
+      if (index < 0) break;
+      ordinaryAdInsertions.push({ kind: 'ordinary-ad', anchorId: postId(posts[index]), index });
+      minimum = index + AD_INTERVAL;
+    }
+  } else if (ordinaryAdEnabled && posts.length >= AD_INTERVAL) {
     const previous = priorInsertions(previousPlan, 'ordinary-ad').find((entry) => positions.has(entry.anchorId));
     const minIndex = AD_INTERVAL - 1;
     let index = ordinaryAdAnchorId && positions.has(ordinaryAdAnchorId)

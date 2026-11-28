@@ -201,3 +201,15 @@ test('CSS-hidden or zero-geometry placements never reach the injected provider',
   assert.equal(mounted.mounted, false);
   assert.equal(calls, 0);
 });
+
+test('Explore keeps its first ad as older pages add new, spaced slots', () => {
+  const posts = Array.from({ length: 90 }, (_, index) => ({ id: `post-${index}` }));
+  const options = { ordinaryAdEnabled: true, repeatedOrdinaryAds: true };
+  const ads = flow => flow.filter(entry => entry.kind === 'ordinary-ad').map(entry => entry.anchorId);
+  const first = planFeedFlow(posts.slice(0, 14), options);
+  const older = planFeedFlow(posts.slice(0, 60), { ...options, previousPlan: first });
+  const all = planFeedFlow(posts, { ...options, previousPlan: older });
+  assert.deepEqual(ads(first), ['post-11']);
+  assert.deepEqual(ads(older), ['post-11', 'post-35', 'post-59']);
+  assert.deepEqual(ads(all), ['post-11', 'post-35', 'post-59', 'post-83']);
+});

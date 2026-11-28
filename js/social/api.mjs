@@ -4,6 +4,7 @@ import { supabaseConfig } from '../../data/site-config.js?rev=20261004-puzzle-sh
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const CELL_ID = /^globe:v11-meridian-parallel-quarter-degree:(0|[1-9]\d{0,2}):(0|[1-9]\d{0,3})$/;
+export const MAP_PLACEMENT_WARNING = '地図配置リンクを確認できませんでした。作品はフィードで表示できます。';
 const OPTIONAL_MAP_COLUMNS = ['post_kind', 'puzzle_mode', 'author_name'];
 const MAX_LIST_LIMIT = 50;
 const DEFAULT_TIMEOUT_MS = 12_000;
@@ -292,26 +293,27 @@ export function createSocialApi({ config = supabaseConfig, fetchImpl = globalThi
     return mapSnsPost(owned && row && typeof row === 'object' ? { ...row, owned: true } : row, origin);
   }
 
-  async function readMap({ limit, id, signal }) {
+  async function readMap({ limit, id, before, signal }) {
     const cfg = project(config);
     const url = tableUrl(cfg.origin, cfg.table);
     url.searchParams.set('map_space', 'eq.globe');
     url.searchParams.set('published_at', 'not.is.null');
     if (id) url.searchParams.set('post_id', `eq.${id}`);
     else {
-      url.searchParams.set('order', 'published_at.desc');
+      if (before) url.searchParams.set('published_at', `lt.${before}`);
+      url.searchParams.set('order', 'published_at.desc,post_id.asc');
       url.searchParams.set('limit', String(limit));
     }
     return fetchRows({ url, select: 'post_id,title,caption,public_image_path,published_at,globe_cell_id,map_space', optional: OPTIONAL_MAP_COLUMNS, fetchImpl, key: cfg.key, signal, timeoutMs });
   }
 
-  async function readLegacyPuzzles({ limit = 30, offset = 0, id, postIds, signal } = {}) {
+  async function readLegacyPuzzles({ limit = 30, offset = 0, id, postIds, before, signal } = {}) {
     const cfg = project(config);
     const url = tableUrl(cfg.origin, 'social_posts');
     url.searchParams.set('status', 'eq.published');
     url.searchParams.set('post_kind', 'eq.pixfind');
     url.searchParams.set('distribution_mode', 'eq.pixfind');
-    url.searchParams.set('published_at', 'not.is.null');
+    url.searchParams.set('published_at', before ? `lt.${before}` : 'not.is.null');
     url.searchParams.set('order', 'published_at.desc,id.desc');
     url.searchParams.set('limit', String(id ? 1 : limit + 1));
     if (id) url.searchParams.set('id', `eq.${id}`);
@@ -366,7 +368,7 @@ export function createSocialApi({ config = supabaseConfig, fetchImpl = globalThi
     };
   }
 
-  async function readShowcases({ limit, id, signal, onPosts }) {
+  async function readShowcases({ limit, id, before, signal, onPosts }) {
     const cfg = project(config);
     const postsUrl = tableUrl(cfg.origin, 'social_posts');
     postsUrl.searchParams.set('select', 'id,title,caption,creator_display_name,media_object_path,published_at,status,post_kind,distribution_mode');
@@ -377,7 +379,8 @@ export function createSocialApi({ config = supabaseConfig, fetchImpl = globalThi
       postsUrl.searchParams.set('id', `eq.${id}`);
       postsUrl.searchParams.set('limit', '1');
     } else {
-      postsUrl.searchParams.set('order', 'published_at.desc');
+      if (before) postsUrl.searchParams.set('published_at', `lt.${before}`);
+      postsUrl.searchParams.set('order', 'published_at.desc,id.asc');
       postsUrl.searchParams.set('limit', String(limit));
     }
     const rows = await fetchRows({ url: postsUrl, select: 'id,title,caption,creator_display_name,media_object_path,published_at,status,post_kind,distribution_mode', fetchImpl, key: cfg.key, signal, timeoutMs });
@@ -402,7 +405,7 @@ export function createSocialApi({ config = supabaseConfig, fetchImpl = globalThi
       }
     } catch (error) {
       if (error?.code === 'aborted') throw error;
-      placementWarnings.push('地図配置リンクを確認できませんでした。作品はフィードで表示できます。');
+      placementWarnings.push(MAP_PLACEMENT_WARNING);
     }
     return {
       posts: posts.map((post) => placements.has(post.postId)
@@ -412,13 +415,14 @@ export function createSocialApi({ config = supabaseConfig, fetchImpl = globalThi
     };
   }
 
-  async function list({ signal, limit = 30, before, onUpdate, includeLegacyPuzzles = false } = {}) {
+  async function list({ signal, limit = 30, before, excludeIds, onUpdate, includeLegacyPuzzles = false } = {}) {
     const cfg = project(config);
     const bounded = boundedLimit(limit);
+    const sourceLimit = boundedLimit(bounded + (excludeIds?.size || 0));
     let mapPosts = [], showcasePosts = [], snsPosts = [], legacyPosts = [];
     const snapshot = () => {
       const merged = new Map();
-      for (const post of [...mapPosts, ...showcasePosts, ...snsPosts, ...legacyPosts]) merged.set(post.id, post);
+      for (const post of [...mapPosts, ...showcasePosts, ...snsPosts, ...legacyPosts]) if (!excludeIds?.has(post.id)) merged.set(post.id, post);
       return [...merged.values()].sort((a, b) => b.createdAt - a.createdAt || a.id.localeCompare(b.id)).slice(0, bounded);
     };
     const publish = () => {
@@ -431,17 +435,17 @@ export function createSocialApi({ config = supabaseConfig, fetchImpl = globalThi
     // These are independent public reads. In particular, a slow/missing placement
     // table must not delay starting the text/music request or rendering other posts.
     const [mapResult, showcaseResult, snsResult, legacyResult] = await Promise.allSettled([
-      readMap({ limit: bounded, signal }).then(rows => {
+      readMap({ limit: sourceLimit, before, signal }).then(rows => {
         mapPosts = rows.map(row => mapPost(row, cfg)).filter(Boolean); publish(); return rows;
       }),
-      readShowcases({ limit: bounded, signal, onPosts(posts) { showcasePosts = posts; publish(); } }).then(result => {
+      readShowcases({ limit: sourceLimit, before, signal, onPosts(posts) { showcasePosts = posts; publish(); } }).then(result => {
         showcasePosts = result.posts; publish(); return result;
       }),
-      readSns('list', { limit: bounded, ...(before ? { before } : {}) }, signal).then(result => {
+      readSns('list', { limit: sourceLimit, ...(before ? { before } : {}) }, signal).then(result => {
         if (Array.isArray(result?.posts)) { snsPosts = result.posts.map(row => mapSnsPost(row, cfg.origin)).filter(Boolean); publish(); }
         return result;
       }),
-      includeLegacyPuzzles ? readLegacyPuzzles({ limit: bounded, signal }).then(result => {
+      includeLegacyPuzzles ? readLegacyPuzzles({ limit: sourceLimit, before, signal }).then(result => {
         legacyPosts = result.posts; publish();
       }) : null,
     ]);

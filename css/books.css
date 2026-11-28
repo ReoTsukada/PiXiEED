@@ -469,3 +469,19 @@ html[data-pixieed-motion="reduced"] .books-page .product-card:hover { transform:
   gap: 5px;
 }
 .shop-ad { margin-block: 8px; padding: 14px 0; background: #f1f4ef; border: 1px solid var(--catalog-line); border-radius: 14px; }
+
+/* Categories occupy their own full-width track so the search and options never overlap. */
+.books-page .catalog-filters {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "search options" "categories categories" "count count";
+  max-width: none;
+}
+.catalog-filters > .catalog-search { grid-area: search; }
+.catalog-filters > .catalog-more-filters { grid-area: options; }
+.catalog-filters > .catalog-category-filter { grid-area: categories; }
+.catalog-filters > .catalog-count { grid-area: count; }
+.catalog-filters > .catalog-category-filter .catalog-chips {
+  flex-wrap: wrap !important;
+  overflow: visible !important;
+}
+.catalog-filters > .catalog-filter-status { grid-column: 1 / -1; }

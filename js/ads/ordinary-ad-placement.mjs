@@ -10,6 +10,7 @@ export const ORDINARY_AD_METRICS = Object.freeze({
   viewportGap: 24,
   safeObstacleGap: 48,
   inlineMinimumPosts: 24,
+  exploreMinimumPosts: 12,
   gutterLabelHeight: 24,
   gutterUnitHeight: 600,
   minGutterViewportHeight: 672,
@@ -59,6 +60,7 @@ export function ordinaryAdEligibility({
   fullscreen = false,
   editor = false,
   publicFeed = false,
+  exploreFeed = false,
   placement = 'inline',
   contentReady = false,
   feedReady = false,
@@ -79,7 +81,7 @@ export function ordinaryAdEligibility({
       && viewportHeight >= ORDINARY_AD_METRICS.minGutterViewportHeight
       && gutterFits === true && contentReady) return true;
   if (placement === 'inline' && publicFeed && viewportWidth >= 320 && feedReady
-      && trustedContentEligible && eligiblePostCount >= ORDINARY_AD_METRICS.inlineMinimumPosts) return true;
+      && trustedContentEligible && eligiblePostCount >= (exploreFeed ? ORDINARY_AD_METRICS.exploreMinimumPosts : ORDINARY_AD_METRICS.inlineMinimumPosts)) return true;
   return false;
 }
 

@@ -160,7 +160,7 @@ test('Draw rail, editor UI, and direct runtime changes invalidate every parent a
         continue;
       }
       if (target === 'js/social/app.mjs') {
-        for (const value of urls) assert.equal(new URL(value, `https://local.invalid/${owner}`).searchParams.get('rev'), '20261128-explore-puzzle-posts-1');
+        for (const value of urls) assert.equal(new URL(value, `https://local.invalid/${owner}`).searchParams.get('rev'), '20261128-growing-catalog-1');
         continue;
       }
       if (['js/creation/conversion-entry.mjs', 'js/creation/conversion-smart-ui.mjs'].includes(target)) {

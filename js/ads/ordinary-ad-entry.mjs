@@ -1,4 +1,4 @@
-import { ordinaryAdEligibility, ordinaryAdUnitIsConfigured } from './ordinary-ad-placement.mjs?rev=20261024-ordinary-ad-1';
+import { ordinaryAdEligibility, ordinaryAdUnitIsConfigured } from './ordinary-ad-placement.mjs?rev=20261128-growing-catalog-1';
 
 const attemptedGutterDocuments = new WeakSet();
 
@@ -17,7 +17,7 @@ export async function createFeedAdRuntime(config, { doc = globalThis.document, w
       ...(gutterConfig ? { gutter: { enabled: false, unit: null, provider: undefined } } : {}),
     };
   }
-  const { createAdSenseDisplayProvider } = await import('./ordinary-ad-provider.mjs?rev=20261024-ordinary-ad-provider-1');
+  const { createAdSenseDisplayProvider } = await import('./ordinary-ad-provider.mjs?rev=20261128-growing-catalog-1');
   const provider = createAdSenseDisplayProvider({ doc, win });
   return {
     enabled: inlineEnabled, trustedContentEligible: inlineEnabled,
@@ -90,8 +90,8 @@ export async function mountInformationGutter({ config, doc = globalThis.document
   if (!isEligiblePage || !isEnabledPlacement(config, 'gutter')) return { mounted: false, reason: 'disabled-or-ineligible' };
   if (!doc || attemptedGutterDocuments.has(doc)) return { mounted: false, reason: 'already-attempted' };
   attemptedGutterDocuments.add(doc);
-  const { desktopGutterPlacement, mountOrdinaryDisplayAd } = await import('./ordinary-ad-placement.mjs?rev=20261024-ordinary-ad-1');
-  const { createAdSenseDisplayProvider } = await import('./ordinary-ad-provider.mjs?rev=20261024-ordinary-ad-provider-1');
+  const { desktopGutterPlacement, mountOrdinaryDisplayAd } = await import('./ordinary-ad-placement.mjs?rev=20261128-growing-catalog-1');
+  const { createAdSenseDisplayProvider } = await import('./ordinary-ad-provider.mjs?rev=20261128-growing-catalog-1');
   let topLevel = false;
   try { topLevel = win.top === win.self; } catch { /* framed */ }
   const main = doc.querySelector('main#main, main[role="main"], main');

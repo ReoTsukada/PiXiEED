@@ -347,7 +347,7 @@ test('generated production catalog has one labelled ad and preview has none', as
   assert.match(catalog, /<aside class="shop-ad" data-shop-display-ad aria-label="広告" hidden>/);
   assert.ok(catalog.indexOf('data-shop-display-ad') > catalog.indexOf('data-product-id="product-famicom"'));
   assert.match(catalog, /adsense-offerwall-policy\.js\?rev=20261118-draw-display-ad-1/);
-  assert.match(catalog, /js\/ads\/shop-ad\.mjs\?rev=20261128-puzzle-catalog-1/);
+  assert.match(catalog, /js\/ads\/shop-ad\.mjs\?rev=20261128-growing-catalog-1/);
   assert.doesNotMatch(catalog, /<script[^>]*src="https:\/\/pagead2/);
   assert.doesNotMatch(preview, /data-shop-display-ad|data-shop-ad="catalog-v1"|js\/ads\/shop-ad\.mjs/);
   const css = await readFile(new URL('../../css/books.css', import.meta.url), 'utf8');
